@@ -1,0 +1,32 @@
+{
+  "name": "gamevibe",
+  "version": "1.0.0",
+  "description": "GameVibe v1.0 — AI-DJ & Adaptive Gaming Soundtrack Platform (YouTube Music InnerTube + Win32 Optical Telemetry)",
+  "main": "desktop/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "desktop": "electron desktop/main.js"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.16.0",
+    "next": "^15.5.15",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.21",
+    "electron": "^43.4.0",
+    "playwright-core": "^1.64.1",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3"
+  }
+}
