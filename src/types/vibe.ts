@@ -1,95 +1,60 @@
 export type VibeStateId = 'EXPLORE' | 'STEALTH' | 'COMBAT' | 'BOSSFIGHT' | 'VICTORY';
 
+export type MusicPlatformId =
+  | 'builtin'
+  | 'ytmusic'
+  | 'spotify'
+  | 'yandex'
+  | 'soundcloud'
+  | 'vkmusic'
+  | 'local';
+
 export interface VibeStateConfig {
   id: VibeStateId;
   label: string;
   shortLabel: string;
   description: string;
-  bpmRange: string;
-  energyThreshold: number;
   accentHex: string;
   defaultSearchQuery: string;
 }
 
 export interface TrackItem {
+  id: string;
   videoId: string;
   title: string;
   artist: string;
+  album: string;
   duration: string;
   thumbnail: string;
+  previewUrl?: string;
   vibe: VibeStateId;
   genreTag: string;
-  bpm?: number;
-  source: 'ytmusic' | 'community' | 'local';
+  localPath?: string;
 }
 
-export interface GamePreset {
+export interface GameRuleProfile {
   id: string;
   gameTitle: string;
   shortLabel: string;
-  processNames: string[];
-  presetName: string;
-  author: string;
-  authorHandle: string;
-  likes: number;
-  downloads: number;
-  isOfficial?: boolean;
-  isLiked?: boolean;
-  coverGradient: string;
-  category: string;
-  description: string;
-  vibeQueries: Record<VibeStateId, string>;
-  triggers: {
-    combatMotionThreshold: number;
-    bossRedFlashThreshold: number;
-    stealthDarknessThreshold: number;
-    cooldownSeconds: number;
-  };
-  curatedTracks: Record<VibeStateId, TrackItem[]>;
+  executable: string;
+  genreFocus: string;
+  vibeArtistSeeds: Record<VibeStateId, string>;
 }
 
-export interface IntegrationPlugin {
-  id: string;
-  name: string;
-  shortLabel: string;
-  category: 'music' | 'sensor' | 'social';
-  status: 'connected' | 'ready' | 'configurable';
-  enabled: boolean;
-  description: string;
-  badgeText: string;
-  endpointOrProtocol: string;
+export interface RunningWindowProcess {
+  pid: number;
+  processName: string;
+  windowTitle: string;
 }
 
 export interface TelemetrySnapshot {
   timestamp: number;
   activeWindowTitle: string;
   detectedProcess: string;
-  matchedGamePresetId: string | null;
-  motionDelta: number; // 0 - 100
-  crimsonIndex: number; // 0 - 100 (Red HP/Damage/Boss flash)
-  luminance: number; // 0 - 100 (Darkness vs Daylight)
-  audioPeakDb: number; // 0 - 100
-  compositeIntensity: number; // 0 - 100
+  runningWindows: RunningWindowProcess[];
+  motionDelta: number;
+  crimsonIndex: number;
+  luminance: number;
+  compositeIntensity: number;
   inferredVibe: VibeStateId;
-  captureMode: 'live-screen' | 'auto-sim' | 'manual-override';
-}
-
-export interface UserProfile {
-  id: string;
-  username: string;
-  handle: string;
-  avatarColor: string;
-  level: string;
-  favoriteGenres: {
-    EXPLORE: string[];
-    STEALTH: string[];
-    COMBAT: string[];
-    BOSSFIGHT: string[];
-    VICTORY: string[];
-  };
-  crossfadeDurationSec: number;
-  autoSwitchEnabled: boolean;
-  hysteresisCooldownSec: number;
-  activePresetId: string;
-  savedPresetIds: string[];
 }

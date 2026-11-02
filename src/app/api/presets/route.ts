@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { INITIAL_INTEGRATIONS, INITIAL_PRESETS, INITIAL_USER_PROFILE } from '@/lib/defaultData';
-import { GamePreset, IntegrationPlugin, UserProfile } from '@/types/vibe';
+import { INITIAL_GAME_PROFILES } from '@/lib/defaultData';
+import { GameRuleProfile, TrackItem } from '@/types/vibe';
 
 export const dynamic = 'force-dynamic';
 
-const STORE_PATH = path.join(process.cwd(), 'data', 'store.json');
+const STORE_PATH = path.join(process.cwd(), 'data', 'store-v2.json');
 
-interface StoreSchema {
-  presets: GamePreset[];
-  profile: UserProfile;
-  integrations: IntegrationPlugin[];
+interface CleanStoreSchema {
+  gameProfiles: GameRuleProfile[];
+  activeGameProfileId: string;
+  savedTracks: TrackItem[];
+  autoSwitchEnabled: boolean;
+  cooldownSec: number;
   activeBridgeTrack: {
     videoId: string;
     title: string;
@@ -22,20 +24,22 @@ interface StoreSchema {
   } | null;
 }
 
-function readStore(): StoreSchema {
+function readStore(): CleanStoreSchema {
   try {
     if (fs.existsSync(STORE_PATH)) {
       const raw = fs.readFileSync(STORE_PATH, 'utf-8');
-      return JSON.parse(raw) as StoreSchema;
+      return JSON.parse(raw) as CleanStoreSchema;
     }
   } catch {
-    // fallback to default
+    // fallback
   }
 
-  const initial: StoreSchema = {
-    presets: INITIAL_PRESETS,
-    profile: INITIAL_USER_PROFILE,
-    integrations: INITIAL_INTEGRATIONS,
+  const initial: CleanStoreSchema = {
+    gameProfiles: INITIAL_GAME_PROFILES,
+    activeGameProfileId: 'universal',
+    savedTracks: [],
+    autoSwitchEnabled: true,
+    cooldownSec: 10,
     activeBridgeTrack: null,
   };
 
@@ -43,13 +47,13 @@ function readStore(): StoreSchema {
     fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
     fs.writeFileSync(STORE_PATH, JSON.stringify(initial, null, 2), 'utf-8');
   } catch {
-    // ignore write error
+    // ignore
   }
 
   return initial;
 }
 
-function writeStore(data: StoreSchema) {
+function writeStore(data: CleanStoreSchema) {
   try {
     fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
     fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
@@ -61,9 +65,7 @@ function writeStore(data: StoreSchema) {
 export async function GET() {
   const store = readStore();
   return NextResponse.json(store, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-    },
+    headers: { 'Access-Control-Allow-Origin': '*' },
   });
 }
 
@@ -72,36 +74,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const store = readStore();
 
-    if (body.action === 'TOGGLE_LIKE' && body.presetId) {
-      store.presets = store.presets.map((p) => {
-        if (p.id !== body.presetId) return p;
-        const nextLiked = !p.isLiked;
-        return {
-          ...p,
-          isLiked: nextLiked,
-          likes: nextLiked ? p.likes + 1 : Math.max(0, p.likes - 1),
-        };
-      });
-    } else if (body.action === 'CREATE_PRESET' && body.preset) {
-      const newPreset: GamePreset = {
-        ...INITIAL_PRESETS[0],
-        ...body.preset,
-        id: `custom-${Date.now()}`,
-        likes: 1,
-        downloads: 1,
-        isLiked: true,
+    if (body.action === 'SELECT_GAME_PROFILE' && body.profileId) {
+      store.activeGameProfileId = String(body.profileId);
+    } else if (body.action === 'ADD_GAME_PROFILE' && body.gameProfile) {
+      const created: GameRuleProfile = {
+        ...INITIAL_GAME_PROFILES[0],
+        ...body.gameProfile,
+        id: `game-${Date.now()}`,
       };
-      store.presets = [newPreset, ...store.presets];
-      store.profile.activePresetId = newPreset.id;
-    } else if (body.action === 'UPDATE_PROFILE' && body.profile) {
-      store.profile = {
-        ...store.profile,
-        ...body.profile,
-      };
-    } else if (body.action === 'TOGGLE_INTEGRATION' && body.integrationId) {
-      store.integrations = store.integrations.map((item) =>
-        item.id === body.integrationId ? { ...item, enabled: !item.enabled } : item
-      );
+      store.gameProfiles = [created, ...store.gameProfiles];
+      store.activeGameProfileId = created.id;
+    } else if (body.action === 'TOGGLE_SAVE_TRACK' && body.track) {
+      const t = body.track as TrackItem;
+      const exists = store.savedTracks.some((item) => item.id === t.id);
+      if (exists) {
+        store.savedTracks = store.savedTracks.filter((item) => item.id !== t.id);
+      } else {
+        store.savedTracks = [t, ...store.savedTracks];
+      }
     } else if (body.action === 'SYNC_BRIDGE' && body.bridgeTrack) {
       store.activeBridgeTrack = {
         ...body.bridgeTrack,

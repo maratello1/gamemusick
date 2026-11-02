@@ -1,0 +1,86 @@
+{
+  "gameProfiles": [
+    {
+      "id": "universal",
+      "gameTitle": "Авто-режим для любой игры",
+      "shortLabel": "Все игры",
+      "executable": "*",
+      "genreFocus": "Рэп, Альтернативный Рок, Фонк, Метал, Инди",
+      "vibeArtistSeeds": {
+        "EXPLORE": "Deftones Entombed Kavinsky Nightcall Скриптонит",
+        "STEALTH": "Bones HDMI Crystal Castles DVRST Close Eyes",
+        "COMBAT": "Travis Scott FEIN Playboi Carti Kordhell The Prodigy",
+        "BOSSFIGHT": "Deftones My Own Summer Linkin Park Faint Rammstein Sonne Slipknot",
+        "VICTORY": "Kanye West Flashing Lights Кино Группа крови Arctic Monkeys"
+      }
+    },
+    {
+      "id": "cs2-valorant-apex",
+      "gameTitle": "Counter-Strike 2 / Valorant / Apex",
+      "shortLabel": "CS2 / Шутеры",
+      "executable": "cs2.exe, valorant.exe, r5apex.exe",
+      "genreFocus": "Трэп, Фонк, Ру-рэп, Драм-н-бейс",
+      "vibeArtistSeeds": {
+        "EXPLORE": "Скриптонит Космос Miyagi Captain A$AP Rocky Sundress",
+        "STEALTH": "Bones HDMI $uicideboy$ Antarctica Night Lovell Dark Light",
+        "COMBAT": "Travis Scott FEIN Big Baby Tape kizaru Kordhell Murder In My Mind",
+        "BOSSFIGHT": "Playboi Carti Stop Breathing Denzel Curry Ultimate Ghostemane Mercury",
+        "VICTORY": "Kanye West Stronger Travis Scott Goosebumps"
+      }
+    },
+    {
+      "id": "dota2-lol",
+      "gameTitle": "Dota 2 / League of Legends",
+      "shortLabel": "Dota 2 / MOBA",
+      "executable": "dota2.exe, League of Legends.exe",
+      "genreFocus": "Рок, Металкор, Пост-хардкор, Рэп",
+      "vibeArtistSeeds": {
+        "EXPLORE": "Linkin Park Numb Три дня дождя Отпускай Arctic Monkeys",
+        "STEALTH": "Crystal Castles Transgender Bones RestInPeace Shadowraze",
+        "COMBAT": "Bring Me The Horizon Throne Linkin Park Faint Pendulum",
+        "BOSSFIGHT": "Slipknot Psychosocial Rammstein Du Hast System Of A Down",
+        "VICTORY": "Gorillaz Feel Good Inc Король и Шут Лесник"
+      }
+    },
+    {
+      "id": "cyberpunk-gta",
+      "gameTitle": "Cyberpunk 2077 / GTA V / Forza",
+      "shortLabel": "Cyberpunk / Гонки",
+      "executable": "cyberpunk2077.exe, GTA5.exe, ForzaHorizon5.exe",
+      "genreFocus": "Ночной синт, Индастриал, Хип-хоп, Электроника",
+      "vibeArtistSeeds": {
+        "EXPLORE": "Kavinsky Nightcall The Weeknd After Hours Deftones Sextape",
+        "STEALTH": "Gesaffelstein Pursuit Health Major Crimes Grimes Oblivion",
+        "COMBAT": "The Prodigy Breathe Kordhell Scopin Denzel Curry",
+        "BOSSFIGHT": "Nine Inch Nails Closer Rammstein Sonne Mick Gordon",
+        "VICTORY": "Daft Punk Instant Crush M83 Midnight City"
+      }
+    },
+    {
+      "id": "elden-souls",
+      "gameTitle": "Elden Ring / Dark Souls / Witcher 3",
+      "shortLabel": "RPG / Souls",
+      "executable": "eldenring.exe, witcher3.exe, darksoulsiii.exe",
+      "genreFocus": "Альтернативный метал, Шугейз, Пост-рок, Хард-рок",
+      "vibeArtistSeeds": {
+        "EXPLORE": "Deftones Rosemary Radiohead Exit Music Кино Спокойная ночь",
+        "STEALTH": "Massive Attack Teardrop Portishead Roads Chelsea Wolfe",
+        "COMBAT": "Deftones Be Quiet and Drive Muse Hysteria Nirvana",
+        "BOSSFIGHT": "Metallica Master of Puppets Rammstein Mein Herz Brennt Slipknot",
+        "VICTORY": "Deftones Change In the House of Flies System Of A Down Aerials"
+      }
+    }
+  ],
+  "activeGameProfileId": "universal",
+  "savedTracks": [],
+  "autoSwitchEnabled": true,
+  "cooldownSec": 10,
+  "activeBridgeTrack": {
+    "videoId": "U-l4ya3ejko",
+    "title": "FE!N (feat. Playboi Carti)",
+    "artist": "Travis Scott",
+    "vibe": "COMBAT",
+    "volume": 80,
+    "updatedAt": 1793663773885
+  }
+}
