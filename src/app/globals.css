@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 :root {
-  --bg-obsidian: #07080A;
-  --surface-panel: #0C0E12;
-  --surface-elevated: #11141B;
+  --bg-obsidian: #060709;
+  --surface-panel: #0B0D12;
+  --surface-elevated: #11141C;
   --brand-orange: #FF6A00;
 }
 
@@ -17,28 +17,71 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background-color: #07080A;
-  color: #F3F4F6;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #060709;
+  color: #F4F5F8;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom subtle scrollbars */
+.font-mono {
+  font-family: var(--font-mono), Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Studio Glass & Specular Borders */
+.studio-panel {
+  background: linear-gradient(180deg, rgba(20, 24, 34, 0.78) 0%, rgba(11, 13, 19, 0.92) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+}
+
+.studio-card {
+  background: rgba(16, 19, 27, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.studio-card:hover {
+  border-color: rgba(255, 106, 0, 0.35);
+  background: rgba(22, 26, 37, 0.9);
+}
+
+/* Animated Equalizer Bars */
+@keyframes eqPulse {
+  0%, 100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bar {
+  transform-origin: bottom;
+  animation: eqPulse 0.85s ease-in-out infinite;
+}
+
+/* Custom sleek scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #07080A;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #222836;
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #FF6A00;
+}
+
+nextjs-portal {
+  display: none !important;
 }
