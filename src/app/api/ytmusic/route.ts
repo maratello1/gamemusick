@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FALLBACK_REAL_TRACKS, INITIAL_ARTIST_SEEDS } from '@/lib/defaultData';
+import { FALLBACK_REAL_TRACKS, GENRE_PACKS, GenrePackId } from '@/lib/defaultData';
 import { TrackItem, VibeStateId } from '@/types/vibe';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,7 @@ function formatDurationMs(ms?: number): string {
 async function resolveYoutubeVideoId(searchQuery: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2800);
+    const timeout = setTimeout(() => controller.abort(), 2400);
 
     const response = await fetch('https://www.youtube.com/youtubei/v1/search?prettyPrint=false', {
       method: 'POST',
@@ -65,7 +65,7 @@ async function fetchSingleSeedTrack(
 ): Promise<TrackItem | null> {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 2800);
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
       seedQuery
     )}&media=music&entity=song&limit=1`;
@@ -102,88 +102,21 @@ async function fetchSingleSeedTrack(
   }
 }
 
-async function searchTracksByQuery(
-  query: string,
-  vibe: VibeStateId,
-  limit = 10
-): Promise<TrackItem[]> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3500);
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-      query
-    )}&media=music&entity=song&limit=${limit}`;
-
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const data = await res.json();
-      const results = data?.results || [];
-      if (results.length > 0) {
-        const mapped = await Promise.all(
-          results.slice(0, 8).map(async (item: Record<string, unknown>, idx: number) => {
-            const artist = String(item.artistName || 'Unknown Artist');
-            const title = String(item.trackName || 'Track');
-            const ytId =
-              idx < 4
-                ? await resolveYoutubeVideoId(`${artist} ${title}`)
-                : null;
-
-            const artwork = typeof item.artworkUrl100 === 'string'
-              ? item.artworkUrl100.replace('100x100bb', '600x600bb')
-              : 'https://i.ytimg.com/vi/XOzs1FehYOA/hqdefault.jpg';
-
-            return {
-              id: String(item.trackId || `trk-${idx}-${Date.now()}`),
-              videoId: ytId || 'XOzs1FehYOA',
-              title,
-              artist,
-              album: String(item.collectionName || 'Single'),
-              duration: formatDurationMs(Number(item.trackTimeMillis || 200000)),
-              thumbnail: artwork,
-              previewUrl: typeof item.previewUrl === 'string' ? item.previewUrl : undefined,
-              vibe,
-              genreTag: String(item.primaryGenreName || 'Music'),
-            } satisfies TrackItem;
-          })
-        );
-        return mapped;
-      }
-    }
-  } catch {
-    // fallback below
-  }
-
-  return [];
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const customQuery = searchParams.get('q')?.trim() || '';
   const vibe = (searchParams.get('vibe') as VibeStateId) || 'EXPLORE';
-  const mode = searchParams.get('mode') || 'seeds';
+  const packId = (searchParams.get('pack') as GenrePackId) || 'mix';
 
-  // If user typed a specific search query (e.g. "Deftones", "Скриптонит", "Playboi Carti")
-  if (customQuery && mode === 'search') {
-    const found = await searchTracksByQuery(customQuery, vibe, 10);
-    if (found.length > 0) {
-      return NextResponse.json({
-        source: 'apple-ytm-hybrid',
-        vibe,
-        tracks: found,
-      });
-    }
-  }
+  const pack = GENRE_PACKS[packId] || GENRE_PACKS.mix;
+  const seeds = pack.seedsByVibe[vibe] || pack.seedsByVibe.EXPLORE;
 
-  // Otherwise load diverse multi-artist tracklist for the selected Vibe state
-  const seeds = INITIAL_ARTIST_SEEDS[vibe] || INITIAL_ARTIST_SEEDS.EXPLORE;
   const seedTracks = await Promise.all(seeds.map((s) => fetchSingleSeedTrack(s, vibe)));
   const validTracks = seedTracks.filter((t): t is TrackItem => t !== null);
 
   if (validTracks.length > 0) {
     return NextResponse.json({
-      source: 'curated-multi-artist-live',
+      source: 'autopilot-live',
+      pack: packId,
       vibe,
       tracks: validTracks,
     });
@@ -191,6 +124,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     source: 'fallback',
+    pack: packId,
     vibe,
     tracks: FALLBACK_REAL_TRACKS,
   });

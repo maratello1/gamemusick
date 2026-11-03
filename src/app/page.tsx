@@ -2,59 +2,25 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  Disc,
   ExternalLink,
-  FolderOpen,
-  Gamepad2,
-  Heart,
-  Laptop,
   Monitor,
-  Music,
   Pause,
   Pin,
   Play,
-  Plus,
-  RefreshCw,
-  Search,
-  SkipBack,
+  Radio,
   SkipForward,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import {
   FALLBACK_REAL_TRACKS,
-  INITIAL_GAME_PROFILES,
+  GENRE_PACKS,
+  GenrePackId,
   VIBE_STATES,
 } from '@/lib/defaultData';
-import {
-  GameRuleProfile,
-  TelemetrySnapshot,
-  TrackItem,
-  VibeStateId,
-} from '@/types/vibe';
+import { TelemetrySnapshot, TrackItem, VibeStateId } from '@/types/vibe';
 
-type MainSection = 'player' | 'saved' | 'games' | 'platforms' | 'local';
-
-const VIBE_ORDER: VibeStateId[] = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT', 'VICTORY'];
-
-const FEATURED_ARTISTS = [
-  'Deftones',
-  'Travis Scott',
-  'Linkin Park',
-  'Скриптонит',
-  'Playboi Carti',
-  'Kordhell',
-  'Rammstein',
-  'Кино',
-  'Bring Me The Horizon',
-  'BONES',
-  '$uicideboy$',
-  'Slipknot',
-  'System Of A Down',
-  'Miyagi & Эндшпиль',
-  'The Prodigy',
-  'Kavinsky',
-];
+const ACTIVE_VIBES: VibeStateId[] = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
 
 function formatSeconds(sec: number): string {
   if (!sec || !Number.isFinite(sec) || sec < 0) return '0:00';
@@ -63,22 +29,29 @@ function formatSeconds(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function GameVibeClient() {
-  const [section, setSection] = useState<MainSection>('player');
-  const [currentVibe, setCurrentVibe] = useState<VibeStateId>('COMBAT');
-  const [tracks, setTracks] = useState<TrackItem[]>(FALLBACK_REAL_TRACKS);
+export default function GameVibeAutopilot() {
+  const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(true);
+  const [selectedPack, setSelectedPack] = useState<GenrePackId>('mix');
+  const [currentVibe, setCurrentVibe] = useState<VibeStateId>('EXPLORE');
+  const [actionThreshold, setActionThreshold] = useState<number>(45);
+  const [syncSystemPlayer, setSyncSystemPlayer] = useState<boolean>(false);
+
+  // Prepared track pools per Vibe state so Autopilot switches instantaneously
+  const [poolsByVibe, setPoolsByVibe] = useState<Record<VibeStateId, TrackItem[]>>({
+    EXPLORE: [FALLBACK_REAL_TRACKS[0], FALLBACK_REAL_TRACKS[1]],
+    STEALTH: [FALLBACK_REAL_TRACKS[1]],
+    COMBAT: [FALLBACK_REAL_TRACKS[2]],
+    BOSSFIGHT: [FALLBACK_REAL_TRACKS[3], FALLBACK_REAL_TRACKS[4]],
+    VICTORY: [FALLBACK_REAL_TRACKS[0]],
+  });
+
   const [currentTrack, setCurrentTrack] = useState<TrackItem>(FALLBACK_REAL_TRACKS[0]);
-  const [savedTracks, setSavedTracks] = useState<TrackItem[]>([]);
+  const [autopilotReason, setAutopilotReason] = useState<string>(
+    'Автопилот следит за экраном · Спокойная сцена'
+  );
+  const [isLoadingPack, setIsLoadingPack] = useState<boolean>(false);
 
-  const [gameProfiles, setGameProfiles] = useState<GameRuleProfile[]>(INITIAL_GAME_PROFILES);
-  const [activeGameId, setActiveGameId] = useState<string>('universal');
-
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeArtistFilter, setActiveArtistFilter] = useState<string>('');
-  const [isLoadingTracks, setIsLoadingTracks] = useState<boolean>(false);
-
-  // Playback state (Real HTML5 Audio + optional YouTube Full Embed)
-  const [playerMode, setPlayerMode] = useState<'native-audio' | 'youtube-full'>('native-audio');
+  // Audio playback
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(30);
@@ -86,84 +59,165 @@ export default function GameVibeClient() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Local PC Music folder state
-  const [localDirInput, setLocalDirInput] = useState<string>('');
-  const [localScanDir, setLocalScanDir] = useState<string>('');
-  const [localTracks, setLocalTracks] = useState<TrackItem[]>([]);
-  const [isScanningLocal, setIsScanningLocal] = useState<boolean>(false);
-
-  // Real Windows Process & Screen Telemetry
+  // Real Windows Screen Telemetry
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>({
     timestamp: Date.now(),
-    activeWindowTitle: 'Определение активного окна...',
+    activeWindowTitle: 'Рабочий стол Windows',
     detectedProcess: 'explorer.exe',
     runningWindows: [],
-    motionDelta: 15,
-    crimsonIndex: 10,
-    luminance: 45,
-    compositeIntensity: 20,
+    motionDelta: 14,
+    crimsonIndex: 6,
+    luminance: 46,
+    compositeIntensity: 18,
     inferredVibe: 'EXPLORE',
   });
-  const [autoAdaptEnabled, setAutoAdaptEnabled] = useState<boolean>(true);
+
   const [isPinnedOverlay, setIsPinnedOverlay] = useState<boolean>(false);
+  const lastSwitchTimeRef = useRef<number>(0);
+  const trackIndexByVibeRef = useRef<Record<VibeStateId, number>>({
+    EXPLORE: 0,
+    STEALTH: 0,
+    COMBAT: 0,
+    BOSSFIGHT: 0,
+    VICTORY: 0,
+  });
 
-  // New Game Rule Modal
-  const [isAddGameOpen, setIsAddGameOpen] = useState<boolean>(false);
-  const [newGameName, setNewGameName] = useState<string>('');
-  const [newGameExe, setNewGameExe] = useState<string>('');
-  const [newGameExploreArtists, setNewGameExploreArtists] = useState<string>('Deftones, Kavinsky, Скриптонит');
-  const [newGameCombatArtists, setNewGameCombatArtists] = useState<string>('Travis Scott, Linkin Park, Kordhell');
-
-  const lastAutoSwitchRef = useRef<number>(0);
-  const activeGameProfile =
-    gameProfiles.find((g) => g.id === activeGameId) || gameProfiles[0];
-
-  // Load saved state from disk
-  useEffect(() => {
-    fetch('/api/presets')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.gameProfiles?.length) setGameProfiles(data.gameProfiles);
-        if (data?.activeGameProfileId) setActiveGameId(data.activeGameProfileId);
-        if (Array.isArray(data?.savedTracks)) setSavedTracks(data.savedTracks);
-      })
-      .catch(() => {});
-  }, []);
-
-  // Load real tracks from API
-  const loadTracks = useCallback(
-    async (vibe: VibeStateId, query = '', mode: 'seeds' | 'search' = 'seeds') => {
-      setIsLoadingTracks(true);
-      try {
-        const url = `/api/ytmusic?vibe=${encodeURIComponent(vibe)}&mode=${mode}&q=${encodeURIComponent(
-          query
-        )}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (Array.isArray(data?.tracks) && data.tracks.length > 0) {
-          const unique = data.tracks.filter(
-            (item: TrackItem, index: number, self: TrackItem[]) =>
-              index === self.findIndex((t) => t.title === item.title && t.artist === item.artist)
+  // Preload tracks for all 4 game scenes when Genre Pack changes
+  const preloadPackPools = useCallback(async (packId: GenrePackId) => {
+    setIsLoadingPack(true);
+    try {
+      const results = await Promise.all(
+        ACTIVE_VIBES.map(async (vibe) => {
+          const res = await fetch(
+            `/api/ytmusic?pack=${encodeURIComponent(packId)}&vibe=${encodeURIComponent(vibe)}`
           );
-          setTracks(unique);
-          setCurrentTrack(unique[0]);
-        }
-      } catch {
-        // keep current tracks
-      } finally {
-        setIsLoadingTracks(false);
+          const data = await res.json();
+          return {
+            vibe,
+            tracks: Array.isArray(data?.tracks) && data.tracks.length > 0
+              ? (data.tracks as TrackItem[])
+              : FALLBACK_REAL_TRACKS,
+          };
+        })
+      );
+
+      const nextPools: Record<VibeStateId, TrackItem[]> = {
+        EXPLORE: FALLBACK_REAL_TRACKS,
+        STEALTH: FALLBACK_REAL_TRACKS,
+        COMBAT: FALLBACK_REAL_TRACKS,
+        BOSSFIGHT: FALLBACK_REAL_TRACKS,
+        VICTORY: FALLBACK_REAL_TRACKS,
+      };
+
+      for (const item of results) {
+        nextPools[item.vibe] = item.tracks;
+      }
+
+      setPoolsByVibe(nextPools);
+      const activePool = nextPools[currentVibe] || nextPools.EXPLORE;
+      if (activePool[0]) {
+        setCurrentTrack(activePool[0]);
+      }
+    } catch {
+      // keep fallback pools
+    } finally {
+      setIsLoadingPack(false);
+    }
+  }, [currentVibe]);
+
+  useEffect(() => {
+    preloadPackPools(selectedPack);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPack]);
+
+  // Automatically switch Vibe & Track when screen state changes
+  const applyAutopilotVibe = useCallback(
+    (nextVibe: VibeStateId, reason: string, forceNow = false) => {
+      const now = Date.now();
+      if (!forceNow && now - lastSwitchTimeRef.current < 9000) {
+        return;
+      }
+      lastSwitchTimeRef.current = now;
+      setCurrentVibe(nextVibe);
+      setAutopilotReason(reason);
+
+      const pool = poolsByVibe[nextVibe] || FALLBACK_REAL_TRACKS;
+      const nextIdx = (trackIndexByVibeRef.current[nextVibe] || 0) % Math.max(1, pool.length);
+      trackIndexByVibeRef.current[nextVibe] = nextIdx + 1;
+
+      const chosenTrack = pool[nextIdx] || pool[0];
+      if (chosenTrack) {
+        setCurrentTrack(chosenTrack);
+        setIsPlaying(true);
+
+        // Sync with browser tab userscript bridge
+        fetch('/api/presets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'SYNC_BRIDGE',
+            bridgeTrack: {
+              videoId: chosenTrack.videoId,
+              title: chosenTrack.title,
+              artist: chosenTrack.artist,
+              vibe: nextVibe,
+              volume: isMuted ? 0 : volume,
+            },
+          }),
+        }).catch(() => {});
+      }
+
+      // If user enabled external system player sync (Spotify / Yandex Music / Browser), trigger Next Track on scene change
+      if (syncSystemPlayer) {
+        fetch('/api/system-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command: 'NEXT_TRACK' }),
+        }).catch(() => {});
       }
     },
-    []
+    [poolsByVibe, isMuted, volume, syncSystemPlayer]
   );
 
-  // Initial load of real artist tracks on mount
+  // Poll live Windows screen sensor every 2 seconds
   useEffect(() => {
-    lastAutoSwitchRef.current = Date.now();
-    loadTracks('COMBAT', '', 'seeds');
-  }, [loadTracks]);
+    if (!autopilotEnabled) return;
 
-  // Sync HTML5 Audio element when track or play state changes
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/telemetry');
+        const snap: TelemetrySnapshot = await res.json();
+        setTelemetry(snap);
+
+        // Determine target vibe using user's actionThreshold slider
+        let detectedVibe: VibeStateId = 'EXPLORE';
+        if (snap.crimsonIndex >= 45 || snap.compositeIntensity >= actionThreshold + 30) {
+          detectedVibe = 'BOSSFIGHT';
+        } else if (snap.motionDelta >= actionThreshold || snap.compositeIntensity >= actionThreshold) {
+          detectedVibe = 'COMBAT';
+        } else if (snap.luminance <= 24) {
+          detectedVibe = 'STEALTH';
+        } else {
+          detectedVibe = 'EXPLORE';
+        }
+
+        if (detectedVibe !== currentVibe) {
+          applyAutopilotVibe(
+            detectedVibe,
+            `Автопилот (${snap.detectedProcess}): динамика экрана ${snap.motionDelta}%, яркость ${snap.luminance}% → ${VIBE_STATES[detectedVibe].label}`
+          );
+        }
+      } catch {
+        // ignore transient error
+      }
+    };
+
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => clearInterval(timer);
+  }, [autopilotEnabled, actionThreshold, currentVibe, applyAutopilotVibe]);
+
+  // Sync HTML5 Audio element
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -172,9 +226,9 @@ export default function GameVibeClient() {
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || playerMode !== 'native-audio') return;
+    if (!audio) return;
 
-    if (currentTrack.previewUrl) {
+    if (currentTrack?.previewUrl) {
       if (audio.src !== currentTrack.previewUrl) {
         audio.src = currentTrack.previewUrl;
         audio.load();
@@ -186,201 +240,88 @@ export default function GameVibeClient() {
       } else {
         audio.pause();
       }
-    } else {
-      audio.pause();
     }
-  }, [currentTrack, isPlaying, playerMode]);
+  }, [currentTrack, isPlaying]);
 
-  // Sync with browser tab bridge
-  useEffect(() => {
-    if (!currentTrack?.videoId) return;
-    fetch('/api/presets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'SYNC_BRIDGE',
-        bridgeTrack: {
-          videoId: currentTrack.videoId,
-          title: currentTrack.title,
-          artist: currentTrack.artist,
-          vibe: currentVibe,
-          volume: isMuted ? 0 : volume,
-        },
-      }),
-    }).catch(() => {});
-  }, [currentTrack, currentVibe, isMuted, volume]);
-
-  // Poll real Windows processes and screen state
-  useEffect(() => {
-    const poll = async () => {
-      try {
-        const res = await fetch('/api/telemetry');
-        const snap: TelemetrySnapshot = await res.json();
-        setTelemetry(snap);
-
-        // Auto-match running game profile if executable matches
-        const matchedGame = gameProfiles.find(
-          (g) =>
-            g.executable !== '*' &&
-            g.executable
-              .toLowerCase()
-              .split(',')
-              .some((exe) => snap.detectedProcess.toLowerCase().includes(exe.trim()))
-        );
-        if (matchedGame && matchedGame.id !== activeGameId) {
-          setActiveGameId(matchedGame.id);
-        }
-
-        // Auto-switch vibe if enabled and 12s cooldown elapsed
-        const now = Date.now();
-        if (
-          autoAdaptEnabled &&
-          snap.inferredVibe &&
-          snap.inferredVibe !== currentVibe &&
-          now - lastAutoSwitchRef.current > 12000
-        ) {
-          lastAutoSwitchRef.current = now;
-          setCurrentVibe(snap.inferredVibe);
-          loadTracks(snap.inferredVibe, '', 'seeds');
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    poll();
-    const timer = setInterval(poll, 3000);
-    return () => clearInterval(timer);
-  }, [autoAdaptEnabled, currentVibe, gameProfiles, activeGameId, loadTracks]);
-
-  const handleSelectVibe = useCallback(
-    (vibeId: VibeStateId) => {
-      lastAutoSwitchRef.current = Date.now();
-      setCurrentVibe(vibeId);
-      setActiveArtistFilter('');
-      loadTracks(vibeId, '', 'seeds');
-    },
-    [loadTracks]
-  );
-
-  // Global Hotkeys (Alt+1..5)
-  useEffect(() => {
-    const win = window as unknown as {
-      gamevibeDesktop?: {
-        onGlobalHotkeyVibe?: (cb: (v: VibeStateId) => void) => void;
-        onOverlayModeChange?: (cb: (pinned: boolean) => void) => void;
-      };
-    };
-
-    if (win.gamevibeDesktop?.onGlobalHotkeyVibe) {
-      win.gamevibeDesktop.onGlobalHotkeyVibe((vibeId) => handleSelectVibe(vibeId));
-    }
-    if (win.gamevibeDesktop?.onOverlayModeChange) {
-      win.gamevibeDesktop.onOverlayModeChange((pinned) => setIsPinnedOverlay(pinned));
-    }
-
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.altKey) return;
-      const map: Record<string, VibeStateId> = {
-        Digit1: 'EXPLORE',
-        Digit2: 'STEALTH',
-        Digit3: 'COMBAT',
-        Digit4: 'BOSSFIGHT',
-        Digit5: 'VICTORY',
-      };
-      if (map[e.code]) {
-        e.preventDefault();
-        handleSelectVibe(map[e.code]);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [handleSelectVibe]);
-
-  const handleArtistChipClick = (artist: string) => {
-    if (activeArtistFilter === artist) {
-      setActiveArtistFilter('');
-      loadTracks(currentVibe, '', 'seeds');
-    } else {
-      setActiveArtistFilter(artist);
-      setSearchQuery(artist);
-      loadTracks(currentVibe, artist, 'search');
-    }
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) {
-      loadTracks(currentVibe, '', 'seeds');
-      return;
-    }
-    setActiveArtistFilter('');
-    loadTracks(currentVibe, searchQuery.trim(), 'search');
-  };
-
-  const handlePlayTrack = (track: TrackItem) => {
-    if (currentTrack.id === track.id) {
-      setIsPlaying((p) => !p);
-    } else {
-      setCurrentTrack(track);
-      setIsPlaying(true);
-    }
-  };
-
-  const handleNextTrack = () => {
-    const list = section === 'saved' ? savedTracks : section === 'local' ? localTracks : tracks;
-    if (list.length === 0) return;
-    const idx = list.findIndex((t) => t.id === currentTrack.id);
-    const next = list[(idx + 1) % list.length];
+  // Cycle next track within the current Vibe pool when song finishes
+  const handleNextInCurrentVibe = () => {
+    const pool = poolsByVibe[currentVibe] || FALLBACK_REAL_TRACKS;
+    if (pool.length === 0) return;
+    const idx = pool.findIndex((t) => t.id === currentTrack.id);
+    const next = pool[(idx + 1) % pool.length];
     if (next) {
       setCurrentTrack(next);
       setIsPlaying(true);
     }
   };
 
-  const handlePrevTrack = () => {
-    const list = section === 'saved' ? savedTracks : section === 'local' ? localTracks : tracks;
-    if (list.length === 0) return;
-    const idx = list.findIndex((t) => t.id === currentTrack.id);
-    const prev = list[(idx - 1 + list.length) % list.length];
-    if (prev) {
-      setCurrentTrack(prev);
-      setIsPlaying(true);
-    }
+  // Demo Game Moment Cycle (so user can test how Autopilot reacts to game changes in 1 click)
+  const handleSimulateGameMomentChange = () => {
+    const order: VibeStateId[] = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
+    const nextVibe = order[(order.indexOf(currentVibe) + 1) % order.length];
+
+    const simMetrics: Record<
+      VibeStateId,
+      { motion: number; crimson: number; luma: number; reason: string }
+    > = {
+      EXPLORE: {
+        motion: 16,
+        crimson: 5,
+        luma: 54,
+        reason: 'На экране спокойное исследование (движение 16%) → включен спокойный трек',
+      },
+      STEALTH: {
+        motion: 24,
+        crimson: 10,
+        luma: 16,
+        reason: 'Темная локация на экране (яркость 16%) → включен ночной / стелс вайб',
+      },
+      COMBAT: {
+        motion: 74,
+        crimson: 30,
+        luma: 48,
+        reason: 'На экране начался экшен (движение 74%) → автопилот включил боевой трек',
+      },
+      BOSSFIGHT: {
+        motion: 92,
+        crimson: 75,
+        luma: 42,
+        reason: 'Пик боя и вспышки урона (92%) → автопилот включил максимальный драйв',
+      },
+      VICTORY: {
+        motion: 30,
+        crimson: 5,
+        luma: 75,
+        reason: 'Бой завершен → плавный переход',
+      },
+    };
+
+    const m = simMetrics[nextVibe];
+    setTelemetry((prev) => ({
+      ...prev,
+      motionDelta: m.motion,
+      crimsonIndex: m.crimson,
+      luminance: m.luma,
+      compositeIntensity: Math.round(m.motion * 0.65 + m.crimson * 0.35),
+      inferredVibe: nextVibe,
+    }));
+
+    applyAutopilotVibe(nextVibe, m.reason, true);
   };
 
-  const handleToggleSaveTrack = async (track: TrackItem, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const res = await fetch('/api/presets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'TOGGLE_SAVE_TRACK', track }),
-    });
-    const data = await res.json();
-    if (Array.isArray(data?.store?.savedTracks)) {
-      setSavedTracks(data.store.savedTracks);
-    }
-  };
-
-  // Real platform deep-link & desktop launcher
-  const openTrackInPlatform = async (
-    platform: 'ytmusic' | 'spotify-app' | 'spotify-web' | 'yandex' | 'soundcloud' | 'vkmusic',
-    track: TrackItem,
-    e?: React.MouseEvent
+  const openInPlatform = async (
+    platform: 'ytmusic' | 'spotify' | 'yandex' | 'soundcloud',
+    track: TrackItem
   ) => {
-    if (e) e.stopPropagation();
     const q = encodeURIComponent(`${track.artist} ${track.title}`);
     const urls: Record<string, string> = {
       ytmusic: track.videoId
         ? `https://music.youtube.com/watch?v=${track.videoId}`
         : `https://music.youtube.com/search?q=${q}`,
-      'spotify-app': `spotify:search:${q}`,
-      'spotify-web': `https://open.spotify.com/search/${q}`,
+      spotify: `spotify:search:${q}`,
       yandex: `https://music.yandex.ru/search?text=${q}`,
       soundcloud: `https://soundcloud.com/search?q=${q}`,
-      vkmusic: `https://vk.com/audio?q=${q}`,
     };
-
     const targetUrl = urls[platform];
     await fetch('/api/system-media', {
       method: 'POST',
@@ -390,41 +331,6 @@ export default function GameVibeClient() {
       window.open(targetUrl, '_blank');
     });
   };
-
-  // Real Windows OS Media Keys controller
-  const sendWindowsMediaKey = async (
-    command: 'PLAY_PAUSE' | 'NEXT_TRACK' | 'PREV_TRACK' | 'VOL_UP' | 'VOL_DOWN' | 'VOL_MUTE'
-  ) => {
-    await fetch('/api/system-media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command }),
-    }).catch(() => {});
-  };
-
-  // Scan Local PC Music Folder
-  const scanLocalFolder = useCallback(async (customDir?: string) => {
-    setIsScanningLocal(true);
-    try {
-      const q = customDir ? `?dir=${encodeURIComponent(customDir)}` : '';
-      const res = await fetch(`/api/local-music${q}`);
-      const data = await res.json();
-      setLocalScanDir(data.directory || '');
-      if (Array.isArray(data.tracks)) {
-        setLocalTracks(data.tracks);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setIsScanningLocal(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (section === 'local' && localTracks.length === 0) {
-      scanLocalFolder();
-    }
-  }, [section, localTracks.length, scanLocalFolder]);
 
   const handleToggleAlwaysOnTop = async () => {
     const win = window as unknown as {
@@ -438,1084 +344,387 @@ export default function GameVibeClient() {
     }
   };
 
-  const handleAddGameRule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGameName.trim()) return;
-    const res = await fetch('/api/presets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'ADD_GAME_PROFILE',
-        gameProfile: {
-          gameTitle: newGameName.trim(),
-          shortLabel: newGameName.trim().slice(0, 20),
-          executable: newGameExe.trim() || 'game.exe',
-          genreFocus: `${newGameExploreArtists} / ${newGameCombatArtists}`,
-          vibeArtistSeeds: {
-            EXPLORE: newGameExploreArtists,
-            STEALTH: newGameExploreArtists,
-            COMBAT: newGameCombatArtists,
-            BOSSFIGHT: newGameCombatArtists,
-            VICTORY: newGameExploreArtists,
-          },
-        },
-      }),
-    });
-    const data = await res.json();
-    if (data?.store?.gameProfiles) {
-      setGameProfiles(data.store.gameProfiles);
-      setActiveGameId(data.store.activeGameProfileId);
-    }
-    setIsAddGameOpen(false);
-    setNewGameName('');
-    setNewGameExe('');
-  };
-
-  const activeVibeConfig = VIBE_STATES[currentVibe];
-  const displayedTracks = section === 'saved' ? savedTracks : section === 'local' ? localTracks : tracks;
+  const activeVibeCfg = VIBE_STATES[currentVibe];
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#09090B] text-zinc-100 flex flex-col justify-between select-none">
-      {/* Hidden Native HTML5 Audio Element for instant ad-free playback */}
+    <div className="min-h-screen bg-[#0A0A0C] text-zinc-100 flex flex-col justify-between select-none">
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 30)}
-        onEnded={handleNextTrack}
+        onEnded={handleNextInCurrentVibe}
       />
 
-      {/* =====================================================================
-          TOP WINDOW BAR (CLEAN, FLAT, UNDERSTATED)
-      ===================================================================== */}
+      {/* Minimal Top Bar */}
       <header
-        className="min-h-[42px] py-1.5 shrink-0 border-b border-zinc-800/80 bg-[#09090B] px-4 flex flex-wrap items-center justify-between gap-2 z-30"
+        className="border-b border-zinc-900 bg-[#0A0A0C] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Disc className={`w-4 h-4 text-[#FF6A00] ${isPlaying ? 'animate-spin' : ''}`} />
-            <span className="font-bold text-sm tracking-tight text-white">GameVibe</span>
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                autopilotEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'
+              }`}
+            />
+            <span className="font-semibold text-sm tracking-tight text-white">
+              GameVibe
+            </span>
           </div>
-
-          <span className="hidden sm:inline text-zinc-700">|</span>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span>Активное окно ПК:</span>
-            <span className="text-zinc-200 font-medium">{telemetry.detectedProcess}</span>
-          </div>
+          <span className="text-zinc-800">·</span>
+          <span className="text-xs text-zinc-400">
+            Окно: <strong className="text-zinc-200 font-medium">{telemetry.detectedProcess}</strong>
+          </span>
         </div>
 
         <div
-          className="flex items-center gap-2 lg:pr-28"
+          className="flex flex-wrap items-center gap-2 lg:pr-28"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <button
             type="button"
-            onClick={() => setAutoAdaptEnabled((a) => !a)}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              autoAdaptEnabled
-                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+            onClick={() => setSyncSystemPlayer((s) => !s)}
+            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+              syncSystemPlayer
+                ? 'bg-zinc-800 text-white border-zinc-600'
+                : 'bg-zinc-950 text-zinc-400 border-zinc-800/80 hover:text-zinc-200'
             }`}
+            title="Автоматически переключать трек и в запущенном плеере Windows (Яндекс Музыка / Spotify)"
           >
-            {autoAdaptEnabled ? 'Авто-подбор: ВКЛ' : 'Авто-подбор: ВЫКЛ'}
+            {syncSystemPlayer ? 'Системный плеер ПК: синхр.' : 'Системный плеер ПК: выкл'}
           </button>
 
           <button
             type="button"
             onClick={handleToggleAlwaysOnTop}
-            className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
+            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors ${
               isPinnedOverlay
-                ? 'bg-[#FF6A00] text-black font-semibold'
-                : 'bg-zinc-900 text-zinc-300 border border-zinc-800 hover:bg-zinc-800'
+                ? 'bg-white text-black border-white font-semibold'
+                : 'bg-zinc-950 text-zinc-300 border-zinc-800/80 hover:bg-zinc-900'
             }`}
           >
-            <Pin className="w-3 h-3" />
+            <Pin className="w-3.5 h-3.5" />
             <span>Поверх игры</span>
           </button>
         </div>
       </header>
 
-      {/* =====================================================================
-          MAIN 3-COLUMN DESKTOP WORKSPACE
-      ===================================================================== */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
-        {/* -------------------------------------------------------------------
-            LEFT SIDEBAR (SPOTIFY / APPLE MUSIC STYLE)
-        ------------------------------------------------------------------- */}
-        <aside className="lg:w-[230px] shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-800/80 bg-[#0E0E11] flex flex-col justify-between p-3 gap-4">
-          <div className="space-y-5">
-            {/* Primary Navigation */}
-            <nav className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-1 gap-1" aria-label="Меню">
-              {[
-                { id: 'player', label: 'Музыка и Поток', icon: Music },
-                {
-                  id: 'saved',
-                  label: `Мне нравится (${savedTracks.length})`,
-                  icon: Heart,
-                },
-                { id: 'games', label: 'Игры и Правила', icon: Gamepad2 },
-                { id: 'platforms', label: 'Платформы и ПК', icon: Laptop },
-                { id: 'local', label: 'Локальные файлы', icon: FolderOpen },
-              ].map((item) => {
-                const Icon = item.icon;
-                const active = section === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setSection(item.id as MainSection)}
-                    className={`min-h-[40px] px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2.5 transition-colors ${
-                      active
-                        ? 'bg-zinc-800 text-white font-semibold'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-[#FF6A00]' : ''}`} />
-                    <span>{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Game Profile Selector */}
-            <div className="hidden lg:block space-y-2 pt-3 border-t border-zinc-800/80">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-medium text-zinc-500">Профиль игры</span>
-                <button
-                  type="button"
-                  onClick={() => setIsAddGameOpen(true)}
-                  className="text-xs text-[#FF6A00] hover:underline flex items-center gap-0.5"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Добавить</span>
-                </button>
-              </div>
-
-              <div className="space-y-1">
-                {gameProfiles.map((g) => {
-                  const active = g.id === activeGameId;
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveGameId(g.id);
-                        loadTracks(currentVibe, g.vibeArtistSeeds[currentVibe], 'search');
-                      }}
-                      className={`w-full px-2.5 py-2 rounded-lg text-left transition-colors flex items-center justify-between ${
-                        active
-                          ? 'bg-zinc-800/90 text-white'
-                          : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'
-                      }`}
-                    >
-                      <div>
-                        <div className="text-xs font-medium leading-snug">{g.shortLabel}</div>
-                        <div className="text-[11px] text-zinc-500 leading-tight mt-0.5">
-                          {g.genreFocus}
-                        </div>
-                      </div>
-                      {active && <span className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Real Detected Windows Processes at Bottom of Sidebar */}
-          <div className="hidden lg:block pt-3 border-t border-zinc-800/80 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-zinc-500 px-1">
-              <span>Окна Windows сейчас</span>
-              <span className="font-mono">{telemetry.runningWindows.length}</span>
-            </div>
-            <div className="space-y-1 max-h-[120px] overflow-y-auto pr-1">
-              {telemetry.runningWindows.length > 0 ? (
-                telemetry.runningWindows.slice(0, 5).map((win) => (
-                  <div
-                    key={`${win.pid}-${win.processName}`}
-                    className="px-2 py-1 rounded bg-zinc-900/70 text-[11px] flex items-center justify-between gap-2"
-                  >
-                    <span className="text-zinc-300 font-mono">{win.processName}</span>
-                    <span className="text-zinc-500">{win.windowTitle.slice(0, 14)}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="px-2 py-1 text-[11px] text-zinc-500">
-                  {telemetry.detectedProcess}
-                </div>
-              )}
-            </div>
-          </div>
-        </aside>
-
-        {/* -------------------------------------------------------------------
-            CENTER WORKSPACE (TRACK TABLE / GAMES / PLATFORMS / LOCAL)
-        ------------------------------------------------------------------- */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 min-w-0">
-          {(section === 'player' || section === 'saved') && (
-            <>
-              {/* Top Search & Game Mood Filter Bar */}
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  {/* Search Input */}
-                  <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 max-w-xl">
-                    <div className="relative flex-1">
-                      <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Артист или трек (Deftones, Travis Scott, Скриптонит, Linkin Park, Kordhell)..."
-                        className="w-full min-h-[40px] pl-10 pr-3 py-2 rounded-lg bg-[#141417] border border-zinc-800 text-xs sm:text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="min-h-[40px] px-4 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF852B] text-black font-semibold text-xs shrink-0"
-                    >
-                      Найти
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setActiveArtistFilter('');
-                        loadTracks(currentVibe, '', 'seeds');
-                      }}
-                      className="min-h-[40px] px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs flex items-center gap-1.5 shrink-0"
-                      title="Обновить подборку"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingTracks ? 'animate-spin' : ''}`} />
-                    </button>
-                  </form>
-
-                  {/* Scene / Vibe Switcher */}
-                  <div className="flex flex-wrap items-center gap-1 bg-[#141417] p-1 rounded-lg border border-zinc-800">
-                    {VIBE_ORDER.map((vibeId, idx) => {
-                      const cfg = VIBE_STATES[vibeId];
-                      const active = currentVibe === vibeId;
-                      return (
-                        <button
-                          key={vibeId}
-                          type="button"
-                          onClick={() => handleSelectVibe(vibeId)}
-                          className={`min-h-[34px] px-3 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                            active
-                              ? 'bg-zinc-800 text-white font-semibold'
-                              : 'text-zinc-400 hover:text-zinc-200'
-                          }`}
-                          title={`Горячая клавиша в игре: Alt+${idx + 1}`}
-                        >
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: cfg.accentHex }}
-                          />
-                          <span>{cfg.shortLabel}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Quick Artist Pills (Real Musicians, Rappers, Rockers) */}
-                {section === 'player' && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveArtistFilter('');
-                        setSearchQuery('');
-                        loadTracks(currentVibe, '', 'seeds');
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium shrink-0 transition-colors ${
-                        activeArtistFilter === ''
-                          ? 'bg-white text-black font-semibold'
-                          : 'bg-[#141417] text-zinc-300 hover:bg-zinc-800 border border-zinc-800/80'
-                      }`}
-                    >
-                      Подборка под момент
-                    </button>
-                    {FEATURED_ARTISTS.map((artist) => {
-                      const active = activeArtistFilter === artist;
-                      return (
-                        <button
-                          key={artist}
-                          type="button"
-                          onClick={() => handleArtistChipClick(artist)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium shrink-0 transition-colors ${
-                            active
-                              ? 'bg-[#FF6A00] text-black font-semibold'
-                              : 'bg-[#141417] text-zinc-300 hover:bg-zinc-800 border border-zinc-800/80'
-                          }`}
-                        >
-                          {artist}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Section Header */}
-              <div className="flex items-baseline justify-between border-b border-zinc-800/80 pb-3">
-                <div>
-                  <h1 className="text-lg font-bold text-white">
-                    {section === 'saved'
-                      ? 'Сохраненные треки'
-                      : activeArtistFilter
-                      ? `Артист: ${activeArtistFilter}`
-                      : `${activeVibeConfig.label} — ${activeGameProfile.shortLabel}`}
-                  </h1>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {section === 'saved'
-                      ? 'Ваша локальная подборка любимых треков'
-                      : activeVibeConfig.description}
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-zinc-500">
-                  {displayedTracks.length} треков
+      {/* Center Minimalist Workspace */}
+      <main className="flex-1 max-w-[920px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-center space-y-6">
+        {/* 1. AUTOPILOT HERO CARD: WHAT IS IN GAME -> WHAT IS PLAYING */}
+        <section className="rounded-2xl bg-[#111114] border border-zinc-800/80 p-5 sm:p-7 space-y-6">
+          {/* Top Row: Autopilot Status & Toggle */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-zinc-800/70">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: activeVibeCfg.accentHex }}
+                />
+                <span className="text-xs font-medium text-zinc-400">
+                  Сейчас в игре определено:
+                </span>
+                <span className="text-xs font-semibold text-white">
+                  {activeVibeCfg.label}
                 </span>
               </div>
-
-              {/* Clean Spotify / Apple Music Track Table */}
-              {displayedTracks.length === 0 ? (
-                <div className="py-12 text-center text-sm text-zinc-500">
-                  {section === 'saved'
-                    ? 'Вы еще не добавили треки в избранное. Нажмите на иконку сердечка рядом с любой песней.'
-                    : 'Треки загружаются...'}
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {displayedTracks.map((track, idx) => {
-                    const isCurrent = currentTrack.id === track.id;
-                    const isSaved = savedTracks.some((s) => s.id === track.id);
-                    return (
-                      <div
-                        key={track.id}
-                        onClick={() => handlePlayTrack(track)}
-                        className={`group px-3 py-2.5 rounded-lg flex items-center justify-between gap-3 cursor-pointer transition-colors ${
-                          isCurrent
-                            ? 'bg-zinc-800/90 text-white'
-                            : 'hover:bg-zinc-900/80 text-zinc-300'
-                        }`}
-                      >
-                        {/* Left: Index + Artwork + Title & Artist */}
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span className="w-5 text-center text-xs font-mono text-zinc-500 shrink-0">
-                            {isCurrent && isPlaying ? (
-                              <span className="text-[#FF6A00] font-bold">▶</span>
-                            ) : (
-                              idx + 1
-                            )}
-                          </span>
-
-                          <img
-                            src={track.thumbnail}
-                            alt={track.title}
-                            className="w-11 h-11 rounded-md object-cover shrink-0 bg-zinc-900 border border-zinc-800"
-                          />
-
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className={`text-sm font-semibold leading-snug ${
-                                isCurrent ? 'text-[#FF6A00]' : 'text-white'
-                              }`}
-                            >
-                              {track.title}
-                            </div>
-                            <div className="text-xs text-zinc-400 mt-0.5">
-                              {track.artist} · <span className="text-zinc-500">{track.album}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Middle: Genre Pill */}
-                        <div className="hidden md:flex items-center gap-2 shrink-0">
-                          <span className="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400">
-                            {track.genreTag}
-                          </span>
-                        </div>
-
-                        {/* Right: Direct Platform Launchers + Heart + Duration */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => openTrackInPlatform('ytmusic', track, e)}
-                            className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[11px] text-zinc-300 border border-zinc-800"
-                            title="Открыть в YouTube Music"
-                          >
-                            YTM
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => openTrackInPlatform('spotify-app', track, e)}
-                            className="hidden sm:inline-flex px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[11px] text-zinc-300 border border-zinc-800"
-                            title="Открыть в приложении Spotify"
-                          >
-                            Spotify
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => openTrackInPlatform('yandex', track, e)}
-                            className="hidden sm:inline-flex px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-[11px] text-zinc-300 border border-zinc-800"
-                            title="Открыть в Яндекс Музыке"
-                          >
-                            Я.Музыка
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleSaveTrack(track, e)}
-                            className="p-2 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white"
-                            aria-label="Сохранить трек"
-                          >
-                            <Heart
-                              className={`w-4 h-4 ${
-                                isSaved ? 'fill-[#FF6A00] text-[#FF6A00]' : ''
-                              }`}
-                            />
-                          </button>
-
-                          <span className="w-11 text-right text-xs font-mono text-zinc-500">
-                            {track.duration}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* =================================================================
-              SECTION: GAMES & RULES (МОИ ИГРЫ И ПРАВИЛА АВТОПОДБОРА)
-          ================================================================= */}
-          {section === 'games' && (
-            <div className="space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-                <div>
-                  <h1 className="text-lg font-bold text-white">Правила музыки под игры</h1>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Настройте, каких артистов и какие жанры включать при запуске конкретных игр (.exe).
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAddGameOpen(true)}
-                  className="min-h-[40px] px-4 py-2 rounded-lg bg-[#FF6A00] text-black font-semibold text-xs flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Добавить игру</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {gameProfiles.map((g) => {
-                  const isSelected = g.id === activeGameId;
-                  return (
-                    <div
-                      key={g.id}
-                      className={`rounded-xl p-4 bg-[#121215] border flex flex-col justify-between gap-4 ${
-                        isSelected ? 'border-[#FF6A00]' : 'border-zinc-800'
-                      }`}
-                    >
-                      <div className="space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono text-zinc-400">
-                            Процесс: {g.executable}
-                          </span>
-                          {isSelected && (
-                            <span className="px-2 py-0.5 rounded text-[11px] bg-[#FF6A00]/15 text-[#FF6A00] font-medium">
-                              Активен
-                            </span>
-                          )}
-                        </div>
-                        <h2 className="text-base font-bold text-white">{g.gameTitle}</h2>
-                        <p className="text-xs text-zinc-400">Жанры: {g.genreFocus}</p>
-
-                        <div className="pt-2 space-y-1.5 text-xs border-t border-zinc-800/80">
-                          <div>
-                            <span className="text-zinc-500">Спокойно: </span>
-                            <span className="text-zinc-300">{g.vibeArtistSeeds.EXPLORE}</span>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Экшен: </span>
-                            <span className="text-zinc-300">{g.vibeArtistSeeds.COMBAT}</span>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Босс / Метал: </span>
-                            <span className="text-zinc-300">{g.vibeArtistSeeds.BOSSFIGHT}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveGameId(g.id);
-                          setSection('player');
-                          loadTracks(currentVibe, g.vibeArtistSeeds[currentVibe], 'search');
-                        }}
-                        className="w-full min-h-[38px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium"
-                      >
-                        Применить и загрузить треки
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* =================================================================
-              SECTION: PLATFORMS & WINDOWS SYSTEM CONTROLLER
-          ================================================================= */}
-          {section === 'platforms' && (
-            <div className="space-y-6">
-              <div className="border-b border-zinc-800 pb-4">
-                <h1 className="text-lg font-bold text-white">
-                  Интеграция с музыкальными платформами и плеерами Windows
-                </h1>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Прямое управление любым установленным на ПК плеером (Spotify, Яндекс Музыка, YouTube Music, VK Музыка, AIMP) и быстрый переход к текущему треку.
-                </p>
-              </div>
-
-              {/* 1. Native Windows System Media Controller */}
-              <div className="rounded-xl bg-[#121215] border border-zinc-800 p-5 space-y-4">
-                <div>
-                  <h2 className="text-sm font-bold text-white">
-                    Системный контроллер плееров Windows (Global Media Keys API)
-                  </h2>
-                  <p className="text-xs text-zinc-400 mt-1">
-                    Отправляет аппаратные команды воспроизведения напрямую в Windows. Если у вас в фоне запущена Яндекс Музыка, Spotify Desktop или вкладка браузера — эти кнопки управляют ими напрямую:
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => sendWindowsMediaKey('PREV_TRACK')}
-                    className="min-h-[40px] px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white flex items-center gap-2"
-                  >
-                    <SkipBack className="w-4 h-4" />
-                    <span>Предыдущий трек в Windows</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sendWindowsMediaKey('PLAY_PAUSE')}
-                    className="min-h-[40px] px-4 py-2 rounded-lg bg-[#FF6A00] hover:bg-[#FF852B] text-xs font-semibold text-black flex items-center gap-2"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Play / Pause системного плеера</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => sendWindowsMediaKey('NEXT_TRACK')}
-                    className="min-h-[40px] px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white flex items-center gap-2"
-                  >
-                    <SkipForward className="w-4 h-4" />
-                    <span>Следующий трек в Windows</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Platform Cards with Real Actions */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    id: 'ytmusic' as const,
-                    title: 'YouTube Music / Metrolist',
-                    desc: 'Поиск и воспроизведение без подписки через протокол InnerTube + синхронизация с открытой вкладкой браузера через Userscript.',
-                    btnLabel: `Открыть «${currentTrack.artist} — ${currentTrack.title}» в YTM`,
-                  },
-                  {
-                    id: 'spotify-app' as const,
-                    title: 'Spotify Desktop (Протокол spotify:)',
-                    desc: 'Открывает найденный под игровой момент трек или артиста напрямую в установленном десктопном клиенте Spotify для Windows.',
-                    btnLabel: 'Запустить текущий трек в Spotify App',
-                  },
-                  {
-                    id: 'yandex' as const,
-                    title: 'Яндекс Музыка',
-                    desc: 'Мгновенный поиск и запуск трека в Яндекс Музыке + управление через системные медиа-клавиши Windows.',
-                    btnLabel: 'Открыть текущий трек в Яндекс Музыке',
-                  },
-                  {
-                    id: 'soundcloud' as const,
-                    title: 'SoundCloud',
-                    desc: 'Прямой переход к андерграундным ремиксам, фонку и сетам на SoundCloud без ограничений.',
-                    btnLabel: 'Найти трек на SoundCloud',
-                  },
-                  {
-                    id: 'vkmusic' as const,
-                    title: 'VK Музыка',
-                    desc: 'Быстрый запуск аудиозаписи в каталоге ВКонтакте / VK Музыки.',
-                    btnLabel: 'Открыть трек в VK Музыке',
-                  },
-                ].map((plat) => (
-                  <div
-                    key={plat.id}
-                    className="rounded-xl bg-[#121215] border border-zinc-800 p-4 flex flex-col justify-between gap-4"
-                  >
-                    <div className="space-y-1.5">
-                      <h3 className="text-sm font-bold text-white">{plat.title}</h3>
-                      <p className="text-xs text-zinc-400 leading-relaxed">{plat.desc}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openTrackInPlatform(plat.id, currentTrack)}
-                      className="min-h-[38px] px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white flex items-center justify-between"
-                    >
-                      <span>{plat.btnLabel}</span>
-                      <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
-                    </button>
-                  </div>
-                ))}
-
-                {/* Browser Userscript Card */}
-                <div className="rounded-xl bg-[#121215] border border-zinc-800 p-4 flex flex-col justify-between gap-4">
-                  <div className="space-y-1.5">
-                    <h3 className="text-sm font-bold text-white">
-                      Авто-мост для вкладки браузера (Userscript)
-                    </h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed">
-                      Если у вас открыта вкладка <code className="text-zinc-200">music.youtube.com</code> в браузере, установите этот скрипт в Tampermonkey — он сам переключает песни при смене сцены в игре.
-                    </p>
-                  </div>
-                  <a
-                    href="/api/userscript"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-h-[38px] px-3.5 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white flex items-center justify-between"
-                  >
-                    <span>Установить gamevibe-ytm-bridge.user.js</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
-                  </a>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* =================================================================
-              SECTION: LOCAL PC AUDIO FILES (ЛОКАЛЬНАЯ МУЗЫКА НА ПК)
-          ================================================================= */}
-          {section === 'local' && (
-            <div className="space-y-5">
-              <div className="border-b border-zinc-800 pb-4 space-y-3">
-                <div>
-                  <h1 className="text-lg font-bold text-white">
-                    Локальные аудиофайлы на вашем ПК
-                  </h1>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Сканирует папку с музыкой на диске (.mp3, .flac, .wav, .m4a, .ogg) и воспроизводит файлы напрямую без интернета.
-                  </p>
-                </div>
-
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    scanLocalFolder(localDirInput.trim());
-                  }}
-                  className="flex flex-wrap gap-2 max-w-xl"
-                >
-                  <input
-                    type="text"
-                    value={localDirInput}
-                    onChange={(e) => setLocalDirInput(e.target.value)}
-                    placeholder={localScanDir || 'Путь к папке (например, D:\\Music)...'}
-                    className="flex-1 min-h-[38px] px-3 py-1.5 rounded-lg bg-[#141417] border border-zinc-800 text-xs text-white"
-                  />
-                  <button
-                    type="submit"
-                    className="min-h-[38px] px-4 py-1.5 rounded-lg bg-[#FF6A00] text-black font-semibold text-xs"
-                  >
-                    {isScanningLocal ? 'Сканирование...' : 'Сканировать папку'}
-                  </button>
-                </form>
-                {localScanDir && (
-                  <div className="text-xs font-mono text-zinc-500">
-                    Текущая папка: {localScanDir} (найдено файлов: {localTracks.length})
-                  </div>
-                )}
-              </div>
-
-              {localTracks.length === 0 ? (
-                <div className="py-10 text-center text-sm text-zinc-500">
-                  В папке «{localScanDir || 'Music'}» пока не найдено аудиофайлов (.mp3 / .flac). Укажите путь к вашей папке с музыкой выше.
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {localTracks.map((track, idx) => (
-                    <div
-                      key={track.id}
-                      onClick={() => handlePlayTrack(track)}
-                      className="px-3 py-2.5 rounded-lg hover:bg-zinc-900 flex items-center justify-between gap-3 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-zinc-500 w-5">{idx + 1}</span>
-                        <div>
-                          <div className="text-sm font-medium text-white">{track.title}</div>
-                          <div className="text-xs text-zinc-500">{track.localPath}</div>
-                        </div>
-                      </div>
-                      <span className="text-xs font-mono text-zinc-400">{track.duration}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-
-        {/* -------------------------------------------------------------------
-            RIGHT INSPECTOR DOCK: NOW PLAYING + ACTIVE PLAYER + WINDOW SENSOR
-        ------------------------------------------------------------------- */}
-        <aside className="lg:w-[320px] shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-800/80 bg-[#0E0E11] flex flex-col justify-between p-4 gap-4 overflow-y-auto">
-          <div className="space-y-4">
-            {/* Switch between Instant Native Audio & Full YouTube Player */}
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-zinc-300">Сейчас играет</span>
-              <div className="flex items-center gap-1 bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => setPlayerMode('native-audio')}
-                  className={`px-2 py-1 rounded text-[11px] font-medium ${
-                    playerMode === 'native-audio'
-                      ? 'bg-zinc-800 text-white'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  HQ Аудио
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPlayerMode('youtube-full')}
-                  className={`px-2 py-1 rounded text-[11px] font-medium ${
-                    playerMode === 'youtube-full'
-                      ? 'bg-zinc-800 text-white'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  YouTube Клип
-                </button>
-              </div>
+              <p className="text-xs text-zinc-500">{autopilotReason}</p>
             </div>
 
-            {/* Cover Art OR YouTube Embed */}
-            {playerMode === 'native-audio' ? (
-              <div className="relative aspect-square w-full max-w-[240px] mx-auto rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800">
-                <img
-                  src={currentTrack.thumbnail}
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            ) : (
-              <div className="rounded-xl overflow-hidden border border-zinc-800 bg-black aspect-video w-full">
-                <iframe
-                  key={currentTrack.videoId}
-                  title={currentTrack.title}
-                  src={`https://www.youtube.com/embed/${
-                    currentTrack.videoId || 'XOzs1FehYOA'
-                  }?autoplay=${isPlaying ? 1 : 0}&mute=${isMuted ? 1 : 0}&rel=0`}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSimulateGameMomentChange}
+                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 transition-colors"
+              >
+                Проверить смену сцены
+              </button>
 
-            {/* Track Title & Artist */}
-            <div className="space-y-1">
-              <div className="text-base font-bold text-white leading-snug">
-                {currentTrack.title}
-              </div>
-              <div className="text-xs text-zinc-400">
-                {currentTrack.artist} · {currentTrack.album}
-              </div>
-            </div>
-
-            {/* Quick Platform Launch Buttons for Current Track */}
-            <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
-              <span className="text-[11px] text-zinc-500">Открыть этот трек в:</span>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => openTrackInPlatform('ytmusic', currentTrack)}
-                  className="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 flex items-center justify-between"
-                >
-                  <span>YouTube Music</span>
-                  <ExternalLink className="w-3 h-3 text-zinc-500" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openTrackInPlatform('spotify-app', currentTrack)}
-                  className="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 flex items-center justify-between"
-                >
-                  <span>Spotify App</span>
-                  <ExternalLink className="w-3 h-3 text-zinc-500" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openTrackInPlatform('yandex', currentTrack)}
-                  className="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 flex items-center justify-between"
-                >
-                  <span>Яндекс Музыка</span>
-                  <ExternalLink className="w-3 h-3 text-zinc-500" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openTrackInPlatform('soundcloud', currentTrack)}
-                  className="px-2.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs text-zinc-200 flex items-center justify-between"
-                >
-                  <span>SoundCloud</span>
-                  <ExternalLink className="w-3 h-3 text-zinc-500" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setAutopilotEnabled((a) => !a)}
+                className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors ${
+                  autopilotEnabled
+                    ? 'bg-[#FF6A00] text-black'
+                    : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>{autopilotEnabled ? 'Авторежим: ВКЛ' : 'Авторежим: ПАУЗА'}</span>
+              </button>
             </div>
           </div>
 
-          {/* Real Screen & Window Sensor Card */}
-          <div className="rounded-xl bg-[#141417] border border-zinc-800 p-3.5 space-y-2.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-zinc-400 flex items-center gap-1.5">
-                <Monitor className="w-3.5 h-3.5 text-[#FF6A00]" />
-                <span>Анализ экрана ПК</span>
-              </span>
-              <span className="font-mono text-zinc-200">
-                {VIBE_STATES[currentVibe].shortLabel}
-              </span>
+          {/* Middle Row: Now Playing Track (Selected Automatically by Program) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+            {/* Track Cover + Metadata */}
+            <div className="md:col-span-7 flex items-center gap-4">
+              <img
+                src={currentTrack.thumbnail}
+                alt={currentTrack.title}
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover shrink-0 bg-zinc-900 border border-zinc-800"
+              />
+              <div className="space-y-1.5 min-w-0">
+                <span className="inline-block px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400">
+                  {activeVibeCfg.shortLabel} · {currentTrack.genreTag}
+                </span>
+                <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                  {currentTrack.title}
+                </h1>
+                <p className="text-sm text-zinc-400">
+                  {currentTrack.artist} · <span className="text-zinc-500">{currentTrack.album}</span>
+                </p>
+
+                {/* Direct Links to Open in External Platforms */}
+                <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                  {[
+                    { id: 'ytmusic' as const, label: 'YouTube Music' },
+                    { id: 'spotify' as const, label: 'Spotify' },
+                    { id: 'yandex' as const, label: 'Я.Музыка' },
+                    { id: 'soundcloud' as const, label: 'SoundCloud' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => openInPlatform(p.id, currentTrack)}
+                      className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800/90 text-[11px] text-zinc-300 flex items-center gap-1"
+                    >
+                      <span>{p.label}</span>
+                      <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-1.5 text-[11px]">
-              <div className="flex justify-between text-zinc-400">
-                <span>Динамика кадра</span>
+            {/* Live Screen Sensor Bars & Sensitivity */}
+            <div className="md:col-span-5 rounded-xl bg-[#0C0C0E] border border-zinc-800/70 p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-zinc-400 flex items-center gap-1.5">
+                  <Monitor className="w-3.5 h-3.5 text-zinc-500" />
+                  <span>Движение в игре</span>
+                </span>
                 <span className="font-mono text-zinc-200">{telemetry.motionDelta}%</span>
               </div>
-              <div className="w-full h-1 rounded-full bg-zinc-800 overflow-hidden">
+              <div className="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
                 <div
                   className="h-full bg-[#FF6A00] transition-all duration-500"
                   style={{ width: `${telemetry.motionDelta}%` }}
                 />
               </div>
 
-              <div className="flex justify-between text-zinc-400 pt-1">
-                <span>Яркость сцены</span>
-                <span className="font-mono text-zinc-200">{telemetry.luminance}%</span>
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-zinc-400">Порог включения экшена</span>
+                <span className="font-mono text-zinc-300">{actionThreshold}%</span>
               </div>
-              <div className="w-full h-1 rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full bg-sky-400 transition-all duration-500"
-                  style={{ width: `${telemetry.luminance}%` }}
-                />
-              </div>
+              <input
+                type="range"
+                min={20}
+                max={80}
+                value={actionThreshold}
+                onChange={(e) => setActionThreshold(Number(e.target.value))}
+                className="w-full h-1 accent-[#FF6A00] cursor-pointer"
+                aria-label="Порог включения экшена"
+              />
             </div>
           </div>
-        </aside>
-      </div>
 
-      {/* =====================================================================
-          BOTTOM PLAYER BAR (CLEAN SPOTIFY DESKTOP TRANSPORT)
-      ===================================================================== */}
-      <footer className="h-20 shrink-0 border-t border-zinc-800 bg-[#0E0E11] px-4 sm:px-6 flex items-center justify-between gap-4 z-30">
-        {/* Left: Current Track Info */}
-        <div className="flex items-center gap-3 min-w-0 w-[260px] sm:w-[300px]">
-          <img
-            src={currentTrack.thumbnail}
-            alt={currentTrack.title}
-            className="w-12 h-12 rounded-md object-cover shrink-0 bg-zinc-900 border border-zinc-800"
-          />
-          <div className="min-w-0">
-            <div className="text-xs sm:text-sm font-semibold text-white leading-tight">
-              {currentTrack.title}
-            </div>
-            <div className="text-xs text-zinc-400 mt-0.5">{currentTrack.artist}</div>
-          </div>
-        </div>
-
-        {/* Center: Play/Pause/Prev/Next + Real Seek Bar */}
-        <div className="flex flex-col items-center gap-1.5 flex-1 max-w-lg">
-          <div className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={handlePrevTrack}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
-              aria-label="Предыдущий трек"
-            >
-              <SkipBack className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsPlaying((p) => !p)}
-              className="w-9 h-9 rounded-full bg-white hover:bg-zinc-200 text-black flex items-center justify-center transition-transform active:scale-95"
-              aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4 fill-current" />
-              ) : (
-                <Play className="w-4 h-4 fill-current ml-0.5" />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNextTrack}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
-              aria-label="Следующий трек"
-            >
-              <SkipForward className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-2.5 w-full">
-            <span className="text-[11px] font-mono text-zinc-500 w-8 text-right">
-              {formatSeconds(currentTime)}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(1, duration)}
-              step={0.5}
-              value={currentTime}
-              onChange={(e) => {
-                const nextTime = Number(e.target.value);
-                setCurrentTime(nextTime);
-                if (audioRef.current) {
-                  audioRef.current.currentTime = nextTime;
-                }
-              }}
-              className="flex-1 h-1 accent-[#FF6A00] cursor-pointer"
-              aria-label="Позиция трека"
-            />
-            <span className="text-[11px] font-mono text-zinc-500 w-8">
-              {formatSeconds(duration)}
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Volume Slider */}
-        <div className="hidden md:flex items-center justify-end gap-2.5 w-[240px]">
-          <button
-            type="button"
-            onClick={() => setIsMuted((m) => !m)}
-            className="p-2 text-zinc-400 hover:text-white"
-            aria-label="Звук"
-          >
-            {isMuted ? (
-              <VolumeX className="w-4 h-4 text-red-400" />
-            ) : (
-              <Volume2 className="w-4 h-4" />
-            )}
-          </button>
-
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={isMuted ? 0 : volume}
-            onChange={(e) => {
-              setIsMuted(false);
-              setVolume(Number(e.target.value));
-            }}
-            className="w-24 accent-white cursor-pointer"
-            aria-label="Громкость"
-          />
-          <span className="text-xs font-mono text-zinc-400 w-9">
-            {isMuted ? '0%' : `${volume}%`}
-          </span>
-        </div>
-      </footer>
-
-      {/* Add Game Rule Modal */}
-      {isAddGameOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4"
-          onClick={() => setIsAddGameOpen(false)}
-        >
-          <div
-            className="max-w-md w-full rounded-xl bg-[#141417] border border-zinc-800 p-5 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white">Добавить правило для игры</h2>
+          {/* Bottom Row of Card: Minimal Audio Transport & Volume */}
+          <div className="pt-4 border-t border-zinc-800/70 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsAddGameOpen(false)}
-                className="text-zinc-400 hover:text-white"
+                onClick={() => setIsPlaying((p) => !p)}
+                className="min-h-[44px] px-5 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-xs flex items-center gap-2 transition-transform active:scale-95"
               >
-                ✕
+                {isPlaying ? (
+                  <>
+                    <Pause className="w-4 h-4 fill-current" />
+                    <span>Пауза</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Включить звук</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNextInCurrentVibe}
+                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs flex items-center gap-1.5"
+                title="Другой трек для этой же сцены"
+              >
+                <SkipForward className="w-4 h-4" />
+                <span>Другой трек</span>
               </button>
             </div>
 
-            <form onSubmit={handleAddGameRule} className="space-y-3">
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Название игры</label>
-                <input
-                  type="text"
-                  required
-                  value={newGameName}
-                  onChange={(e) => setNewGameName(e.target.value)}
-                  placeholder="Например: GTA V / Deadlock"
-                  className="w-full min-h-[38px] px-3 py-1.5 rounded-lg bg-[#09090B] border border-zinc-800 text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">Процесс (.exe)</label>
-                <input
-                  type="text"
-                  value={newGameExe}
-                  onChange={(e) => setNewGameExe(e.target.value)}
-                  placeholder="GTA5.exe"
-                  className="w-full min-h-[38px] px-3 py-1.5 rounded-lg bg-[#09090B] border border-zinc-800 text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">
-                  Артисты для спокойной игры
-                </label>
-                <input
-                  type="text"
-                  value={newGameExploreArtists}
-                  onChange={(e) => setNewGameExploreArtists(e.target.value)}
-                  className="w-full min-h-[38px] px-3 py-1.5 rounded-lg bg-[#09090B] border border-zinc-800 text-xs text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-zinc-400 mb-1">
-                  Артисты для экшена и боя
-                </label>
-                <input
-                  type="text"
-                  value={newGameCombatArtists}
-                  onChange={(e) => setNewGameCombatArtists(e.target.value)}
-                  className="w-full min-h-[38px] px-3 py-1.5 rounded-lg bg-[#09090B] border border-zinc-800 text-xs text-white"
-                />
-              </div>
+            {/* Progress Bar */}
+            <div className="flex items-center gap-2.5 flex-1 min-w-[180px] max-w-sm">
+              <span className="text-[11px] font-mono text-zinc-500 w-8 text-right">
+                {formatSeconds(currentTime)}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={Math.max(1, duration)}
+                step={0.5}
+                value={currentTime}
+                onChange={(e) => {
+                  const t = Number(e.target.value);
+                  setCurrentTime(t);
+                  if (audioRef.current) audioRef.current.currentTime = t;
+                }}
+                className="flex-1 h-1 accent-white cursor-pointer"
+                aria-label="Позиция воспроизведения"
+              />
+              <span className="text-[11px] font-mono text-zinc-500 w-8">
+                {formatSeconds(duration)}
+              </span>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddGameOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-lg bg-[#FF6A00] text-black font-semibold text-xs"
-                >
-                  Сохранить
-                </button>
-              </div>
-            </form>
+            {/* Volume */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsMuted((m) => !m)}
+                className="p-2 text-zinc-400 hover:text-white"
+                aria-label="Звук"
+              >
+                {isMuted ? (
+                  <VolumeX className="w-4 h-4 text-red-400" />
+                ) : (
+                  <Volume2 className="w-4 h-4" />
+                )}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  setIsMuted(false);
+                  setVolume(Number(e.target.value));
+                }}
+                className="w-20 accent-white cursor-pointer"
+                aria-label="Громкость"
+              />
+            </div>
           </div>
-        </div>
-      )}
+        </section>
+
+        {/* 2. ONE-CLICK TASTE SELECTOR FOR AUTOPILOT */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+              Какую музыку ставить автопилоту
+            </h2>
+            {isLoadingPack && (
+              <span className="text-xs text-zinc-500">Загрузка треков...</span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {(Object.keys(GENRE_PACKS) as GenrePackId[]).map((packKey) => {
+              const pack = GENRE_PACKS[packKey];
+              const active = selectedPack === packKey;
+              return (
+                <button
+                  key={pack.id}
+                  type="button"
+                  onClick={() => setSelectedPack(pack.id)}
+                  className={`p-4 rounded-xl text-left transition-all border flex flex-col justify-between gap-2 ${
+                    active
+                      ? 'bg-zinc-900 border-white text-white'
+                      : 'bg-[#111114] border-zinc-800/80 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                  }`}
+                >
+                  <div className="text-xs font-bold text-white leading-snug">
+                    {pack.label}
+                  </div>
+                  <div className="text-[11px] text-zinc-500 leading-relaxed">
+                    {pack.artistsSummary}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 3. PREPARED TRACKS BY GAME SCENE (READ-ONLY AUTOPILOT CHAMBER) */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Наготове у автопилота под моменты в игре
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {ACTIVE_VIBES.map((vibeId) => {
+              const cfg = VIBE_STATES[vibeId];
+              const pool = poolsByVibe[vibeId] || [];
+              const previewTrack = pool[0];
+              const isCurrentScene = currentVibe === vibeId;
+
+              return (
+                <div
+                  key={vibeId}
+                  onClick={() =>
+                    applyAutopilotVibe(
+                      vibeId,
+                      `Проверка сцены «${cfg.label}»`,
+                      true
+                    )
+                  }
+                  className={`p-3.5 rounded-xl border transition-colors cursor-pointer flex items-center gap-3 ${
+                    isCurrentScene
+                      ? 'bg-zinc-900/90 border-[#FF6A00]/70'
+                      : 'bg-[#111114] border-zinc-800/70 hover:border-zinc-700'
+                  }`}
+                >
+                  {previewTrack && (
+                    <img
+                      src={previewTrack.thumbnail}
+                      alt={previewTrack.title}
+                      className="w-11 h-11 rounded-lg object-cover shrink-0 bg-zinc-900"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: cfg.accentHex }}
+                      />
+                      <span className="text-[11px] font-medium text-zinc-400">
+                        {cfg.shortLabel}
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold text-white mt-0.5 leading-snug">
+                      {previewTrack ? previewTrack.title : 'Загрузка...'}
+                    </div>
+                    <div className="text-[11px] text-zinc-500">
+                      {previewTrack ? previewTrack.artist : ''}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </main>
+
+      {/* Minimal Footer */}
+      <footer className="border-t border-zinc-900 px-4 sm:px-6 py-3 text-[11px] text-zinc-500 flex flex-wrap items-center justify-between gap-2">
+        <span>GameVibe Autopilot v1.0 · Автоматическая адаптация музыки под экран игры</span>
+        <a
+          href="/api/userscript"
+          target="_blank"
+          rel="noreferrer"
+          className="text-zinc-400 hover:text-white underline"
+        >
+          Скрипт авто-синхронизации для вкладки YouTube Music
+        </a>
+      </footer>
     </div>
   );
 }

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameVibe Autopilot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0A0A0C;
+      color: #F4F4F5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    header, footer {
+      padding: 12px 24px;
+      border-bottom: 1px solid #18181B;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+    }
+    footer { border-bottom: none; border-top: 1px solid #18181B; color: #71717A; font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #10B981; display: inline-block; margin-right: 8px; }
+    main { max-width: 880px; width: 100%; margin: 0 auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+    .card { background: #111114; border: 1px solid #222226; border-radius: 16px; padding: 24px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .track-box { display: flex; align-items: center; gap: 18px; margin-top: 18px; }
+    .cover { width: 104px; height: 104px; border-radius: 12px; object-fit: cover; background: #18181B; border: 1px solid #27272A; }
+    h1 { font-size: 20px; font-weight: 700; color: #FFF; margin: 4px 0; }
+    .sub { font-size: 13px; color: #A1A1AA; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; background: #18181B; border: 1px solid #27272A; color: #D4D4D8; }
+    .btn {
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid #27272A;
+      background: #18181B;
+      color: #F4F4F5;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+    .btn:hover { background: #27272A; }
+    .btn-primary { background: #FF6A00; color: #000; border-color: #FF6A00; }
+    .btn-white { background: #FFF; color: #000; border-color: #FFF; }
+    .grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+    .pack { padding: 14px; border-radius: 12px; background: #111114; border: 1px solid #222226; cursor: pointer; text-align: left; }
+    .pack.active { border-color: #FFF; background: #18181B; }
+    .pack-title { font-size: 13px; font-weight: 700; color: #FFF; margin-bottom: 4px; }
+    .pack-desc { font-size: 11px; color: #71717A; line-height: 1.4; }
+    .bar-bg { width: 100%; height: 6px; background: #18181B; border-radius: 99px; overflow: hidden; margin-top: 6px; }
+    .bar-fill { height: 100%; background: #FF6A00; width: 20%; transition: width 0.4s; }
+    .links { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .link-btn { padding: 4px 9px; font-size: 11px; border-radius: 6px; background: #18181B; border: 1px solid #27272A; color: #D4D4D8; cursor: pointer; text-decoration: none; }
+    .link-btn:hover { background: #27272A; color: #FFF; }
+  </style>
+</head>
+<body>
+  <audio id="audio" crossorigin="anonymous"></audio>
+  <header>
+    <div><span class="dot"></span><strong>GameVibe</strong> · <span id="winTitle" style="color:#A1A1AA">Слежу за экраном ПК</span></div>
+    <div class="row">
+      <button class="btn" id="simBtn">Проверить смену сцены</button>
+      <button class="btn btn-primary" id="autoBtn">Авторежим: ВКЛ</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="row" style="padding-bottom:14px; border-bottom:1px solid #1E1E22;">
+        <div>
+          <div style="font-size:12px; color:#A1A1AA;">Сейчас в игре определено: <strong id="sceneLabel" style="color:#FFF;">Спокойная сцена</strong></div>
+          <div id="reasonText" style="font-size:12px; color:#71717A; margin-top:2px;">Автопилот анализирует движение и яркость экрана</div>
+        </div>
+        <div style="min-width:200px;">
+          <div class="row" style="font-size:11px; color:#A1A1AA;">
+            <span>Динамика экрана</span>
+            <span id="motionVal">15%</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="motionBar"></div></div>
+        </div>
+      </div>
+
+      <div class="track-box">
+        <img id="cover" class="cover" src="https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg" alt="cover" />
+        <div style="flex:1;">
+          <span class="badge" id="vibeBadge">Спокойно</span>
+          <h1 id="trackTitle">Загрузка трека...</h1>
+          <div class="sub" id="trackArtist">Deftones</div>
+          <div class="links">
+            <a class="link-btn" id="ytmLink" target="_blank">YouTube Music ↗</a>
+            <a class="link-btn" id="spotifyLink" target="_blank">Spotify ↗</a>
+            <a class="link-btn" id="yandexLink" target="_blank">Я.Музыка ↗</a>
+            <a class="link-btn" id="scLink" target="_blank">SoundCloud ↗</a>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn btn-white" id="playBtn">▶ Включить звук</button>
+          <button class="btn" id="nextBtn">⏭ Другой трек</button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div style="font-size:11px; text-transform:uppercase; color:#71717A; margin-bottom:8px;">Какую музыку ставить автопилоту</div>
+      <div class="grid4" id="packsGrid"></div>
+    </div>
+  </main>
+
+  <footer>
+    <span>GameVibe Standalone .EXE v1.0 · Автоматическая подстройка музыки под игру</span>
+    <span>Win32 Native Optical Sensor</span>
+  </footer>
+
+  <script>
+    const PACKS = {
+      mix: {
+        label: 'Все лучшее (Микс)',
+        desc: 'Deftones, Travis Scott, Linkin Park, Скриптонит, Rammstein, Кино, The Prodigy',
+        seeds: {
+          EXPLORE: ['Deftones - Entombed', 'Kavinsky - Nightcall', 'Скриптонит - Положение', 'Кино - Спокойная ночь'],
+          STEALTH: ['BONES - HDMI', 'Crystal Castles - Kerosene', 'DVRST - Close Eyes'],
+          COMBAT: ['Travis Scott - FE!N', 'The Prodigy - Omen', 'Denzel Curry - ULTIMATE', 'Pendulum - Propane Nightmares'],
+          BOSSFIGHT: ['Deftones - My Own Summer', 'Linkin Park - Faint', 'Rammstein - Sonne', 'Slipknot - Duality']
+        }
+      },
+      rap: {
+        label: 'Рэп, Трэп и Фонк',
+        desc: 'Travis Scott, Playboi Carti, Скриптонит, BONES, $uicideboy$, Denzel Curry, DVRST',
+        seeds: {
+          EXPLORE: ['Скриптонит - Положение', 'A$AP Rocky - Sundress', 'Miyagi - Silhouette'],
+          STEALTH: ['BONES - HDMI', '$uicideboy$ - Paris', 'DVRST - Close Eyes'],
+          COMBAT: ['Travis Scott - FE!N', 'Playboi Carti - Sky', 'Big Baby Tape kizaru - 99 Problems'],
+          BOSSFIGHT: ['Playboi Carti - Stop Breathing', 'Denzel Curry - ULTIMATE', 'Ghostemane - Mercury']
+        }
+      },
+      rock: {
+        label: 'Рок и Метал',
+        desc: 'Deftones, Linkin Park, Rammstein, Slipknot, System Of A Down, Metallica, Кино',
+        seeds: {
+          EXPLORE: ['Deftones - Sextape', 'Кино - Спокойная ночь', 'Arctic Monkeys - 505'],
+          STEALTH: ['Deftones - Change', 'Rammstein - Mein Herz Brennt', 'Король и Шут - Кукла колдуна'],
+          COMBAT: ['Linkin Park - Faint', 'Nirvana - Smells Like Teen Spirit', 'Кино - Группа крови'],
+          BOSSFIGHT: ['Deftones - My Own Summer', 'Rammstein - Sonne', 'Slipknot - Duality', 'System Of A Down - Chop Suey']
+        }
+      },
+      electro: {
+        label: 'Электроника и Синт',
+        desc: 'The Prodigy, Pendulum, Kavinsky, Crystal Castles, Gesaffelstein, Daft Punk',
+        seeds: {
+          EXPLORE: ['Kavinsky - Nightcall', 'M83 - Midnight City', 'Daft Punk - Veridis Quo'],
+          STEALTH: ['Crystal Castles - Kerosene', 'Gesaffelstein - Aleph', 'Massive Attack - Angel'],
+          COMBAT: ['The Prodigy - Omen', 'Pendulum - Propane Nightmares', 'Gesaffelstein - Pursuit'],
+          BOSSFIGHT: ['The Prodigy - Breathe', 'Carpenter Brut - Turbo Killer', 'Pendulum - Watercolour']
+        }
+      }
+    };
+
+    const SCENE_NAMES = {
+      EXPLORE: 'Спокойная сцена',
+      STEALTH: 'Напряжение / Ночь',
+      COMBAT: 'Экшен / Перестрелка',
+      BOSSFIGHT: 'Пик боя / Боссфайт'
+    };
+
+    let currentPack = 'mix';
+    let currentVibe = 'EXPLORE';
+    let autoEnabled = true;
+    let isPlaying = false;
+    let seedIdx = 0;
+    const audio = document.getElementById('audio');
+
+    function renderPacks() {
+      const grid = document.getElementById('packsGrid');
+      grid.innerHTML = '';
+      Object.entries(PACKS).forEach(([id, p]) => {
+        const btn = document.createElement('button');
+        btn.className = 'pack ' + (id === currentPack ? 'active' : '');
+        btn.innerHTML = '<div class="pack-title">' + p.label + '</div><div class="pack-desc">' + p.desc + '</div>';
+        btn.onclick = () => { currentPack = id; renderPacks(); loadTrackForVibe(currentVibe); };
+        grid.appendChild(btn);
+      });
+    }
+
+    async function loadTrackForVibe(vibe) {
+      currentVibe = vibe;
+      document.getElementById('sceneLabel').textContent = SCENE_NAMES[vibe] || vibe;
+      document.getElementById('vibeBadge').textContent = SCENE_NAMES[vibe] || vibe;
+      const list = PACKS[currentPack].seeds[vibe];
+      const query = list[seedIdx % list.length];
+      seedIdx++;
+
+      try {
+        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=1');
+        const data = await res.json();
+        const item = data.results && data.results[0];
+        if (item) {
+          document.getElementById('trackTitle').textContent = item.trackName;
+          document.getElementById('trackArtist').textContent = item.artistName + ' · ' + (item.collectionName || '');
+          document.getElementById('cover').src = item.artworkUrl100.replace('100x100bb', '600x600bb');
+          const q = encodeURIComponent(item.artistName + ' ' + item.trackName);
+          document.getElementById('ytmLink').href = 'https://music.youtube.com/search?q=' + q;
+          document.getElementById('spotifyLink').href = 'spotify:search:' + q;
+          document.getElementById('yandexLink').href = 'https://music.yandex.ru/search?text=' + q;
+          document.getElementById('scLink').href = 'https://soundcloud.com/search?q=' + q;
+          if (item.previewUrl) {
+            audio.src = item.previewUrl;
+            if (isPlaying) audio.play().catch(()=>{});
+          }
+        }
+      } catch (e) {}
+    }
+
+    document.getElementById('playBtn').onclick = () => {
+      isPlaying = !isPlaying;
+      document.getElementById('playBtn').textContent = isPlaying ? '⏸ Пауза' : '▶ Включить звук';
+      if (isPlaying) audio.play().catch(()=>{}); else audio.pause();
+    };
+    document.getElementById('nextBtn').onclick = () => loadTrackForVibe(currentVibe);
+    document.getElementById('autoBtn').onclick = () => {
+      autoEnabled = !autoEnabled;
+      document.getElementById('autoBtn').textContent = autoEnabled ? 'Авторежим: ВКЛ' : 'Авторежим: ПАУЗА';
+    };
+    document.getElementById('simBtn').onclick = () => {
+      const order = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
+      const next = order[(order.indexOf(currentVibe) + 1) % order.length];
+      loadTrackForVibe(next);
+    };
+    audio.onended = () => loadTrackForVibe(currentVibe);
+
+    let lastSwitch = 0;
+    setInterval(async () => {
+      if (!autoEnabled) return;
+      try {
+        const res = await fetch('/api/telemetry');
+        const t = await res.json();
+        document.getElementById('winTitle').textContent = 'Окно: ' + (t.detectedProcess || 'Windows');
+        document.getElementById('motionVal').textContent = t.motionDelta + '%';
+        document.getElementById('motionBar').style.width = t.motionDelta + '%';
+        const now = Date.now();
+        if (t.inferredVibe && t.inferredVibe !== currentVibe && now - lastSwitch > 9000) {
+          lastSwitch = now;
+          document.getElementById('reasonText').textContent = 'Автопилот: динамика ' + t.motionDelta + '% → ' + SCENE_NAMES[t.inferredVibe];
+          loadTrackForVibe(t.inferredVibe);
+        }
+      } catch (e) {}
+    }, 2000);
+
+    renderPacks();
+    loadTrackForVibe('EXPLORE');
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { RunningWindowProcess, TelemetrySnapshot, VibeStateId } from '@/types/vibe';
+import { TelemetrySnapshot, VibeStateId } from '@/types/vibe';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,17 +9,17 @@ const execAsync = promisify(exec);
 
 let lastSnapshot: TelemetrySnapshot = {
   timestamp: Date.now(),
-  activeWindowTitle: 'Windows Desktop',
+  activeWindowTitle: 'Рабочий стол Windows',
   detectedProcess: 'explorer.exe',
   runningWindows: [],
-  motionDelta: 15,
-  crimsonIndex: 8,
-  luminance: 45,
-  compositeIntensity: 20,
+  motionDelta: 14,
+  crimsonIndex: 6,
+  luminance: 46,
+  compositeIntensity: 18,
   inferredVibe: 'EXPLORE',
 };
 
-let lastLumaSample = 45;
+let prevColors: number[] = [45, 45, 45, 45, 45];
 let lastQueryTime = 0;
 
 function inferVibeFromMetrics(
@@ -27,100 +27,109 @@ function inferVibeFromMetrics(
   crimson: number,
   luminance: number
 ): { vibe: VibeStateId; intensity: number } {
-  const composite = Math.min(100, Math.round(motion * 0.55 + crimson * 0.45));
+  const composite = Math.min(100, Math.round(motion * 0.65 + crimson * 0.35));
 
-  if (crimson >= 45 || composite >= 82) {
-    return { vibe: 'BOSSFIGHT', intensity: Math.max(composite, 85) };
+  if (crimson >= 45 || composite >= 80) {
+    return { vibe: 'BOSSFIGHT', intensity: Math.max(composite, 84) };
   }
-  if (motion >= 52 || composite >= 60) {
-    return { vibe: 'COMBAT', intensity: Math.max(composite, 65) };
+  if (motion >= 48 || composite >= 55) {
+    return { vibe: 'COMBAT', intensity: Math.max(composite, 62) };
   }
-  if (luminance <= 25 && motion < 48) {
-    return { vibe: 'STEALTH', intensity: Math.max(composite, 40) };
+  if (luminance <= 24 && motion < 45) {
+    return { vibe: 'STEALTH', intensity: Math.max(composite, 38) };
   }
-  if (luminance >= 74 && crimson < 20 && motion >= 28 && motion < 52) {
-    return { vibe: 'VICTORY', intensity: 46 };
-  }
-  return { vibe: 'EXPLORE', intensity: Math.max(14, composite) };
+  return { vibe: 'EXPLORE', intensity: Math.max(12, composite) };
 }
 
 export async function GET() {
   const now = Date.now();
 
-  if (now - lastQueryTime > 2000) {
+  if (now - lastQueryTime > 1500) {
     lastQueryTime = now;
     try {
       const psScript = `
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class Win32Fg {
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+}
+"@
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName System.Windows.Forms
-$procs = Get-Process | Where-Object { $_.MainWindowTitle -ne "" } | Select-Object -First 8 Id, ProcessName, MainWindowTitle
-$bmp = New-Object System.Drawing.Bitmap(1, 1)
-$graphics = [System.Drawing.Graphics]::FromImage($bmp)
+$hwnd = [Win32Fg]::GetForegroundWindow()
+$sb = New-Object System.Text.StringBuilder 256
+[void][Win32Fg]::GetWindowText($hwnd, $sb, 256)
+$pidOut = 0
+[void][Win32Fg]::GetWindowThreadProcessId($hwnd, [ref]$pidOut)
+$proc = Get-Process -Id $pidOut -ErrorAction SilentlyContinue
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-$graphics.CopyFromScreen([int]($screen.Width / 2), [int]($screen.Height / 2), 0, 0, $bmp.Size)
-$pixel = $bmp.GetPixel(0, 0)
-$graphics.Dispose()
-$bmp.Dispose()
-$procJson = $procs | ConvertTo-Json -Compress
-Write-Output "$($pixel.R)|$($pixel.G)|$($pixel.B)|$procJson"
+$w = $screen.Width; $h = $screen.Height
+$bmp = New-Object System.Drawing.Bitmap(1, 1)
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$pts = @(
+  @([int]($w*0.5), [int]($h*0.5)),
+  @([int]($w*0.3), [int]($h*0.3)),
+  @([int]($w*0.7), [int]($h*0.3)),
+  @([int]($w*0.3), [int]($h*0.7)),
+  @([int]($w*0.7), [int]($h*0.7))
+)
+$lumas = @(); $reds = 0
+foreach ($pt in $pts) {
+  $g.CopyFromScreen($pt[0], $pt[1], 0, 0, $bmp.Size)
+  $c = $bmp.GetPixel(0, 0)
+  $l = [int]((0.299*$c.R + 0.587*$c.G + 0.114*$c.B)/2.55)
+  $lumas += $l
+  if ($c.R -gt ($c.G + $c.B)*0.75 -and $c.R -gt 90) { $reds += 25 }
+}
+$g.Dispose(); $bmp.Dispose()
+Write-Output "$($proc.ProcessName)|$($sb.ToString())|$($lumas -join ',')|$reds"
       `
         .trim()
         .replace(/\r?\n/g, '; ');
 
       const { stdout } = await execAsync(
         `powershell -NoProfile -NonInteractive -Command "${psScript.replace(/"/g, '\\"')}"`,
-        { timeout: 1600 }
+        { timeout: 1400 }
       );
 
-      const firstPipe = stdout.indexOf('|');
-      const secondPipe = stdout.indexOf('|', firstPipe + 1);
-      const thirdPipe = stdout.indexOf('|', secondPipe + 1);
+      const parts = stdout.trim().split('|');
+      if (parts.length >= 4) {
+        const procName = `${parts[0] || 'explorer'}.exe`;
+        const winTitle = parts[1] || 'Активное окно Windows';
+        const lumaArr = parts[2].split(',').map((n) => parseInt(n, 10) || 40);
+        const redScore = parseInt(parts[3], 10) || 0;
 
-      if (firstPipe > 0 && secondPipe > 0 && thirdPipe > 0) {
-        const r = parseInt(stdout.slice(0, firstPipe), 10) || 40;
-        const g = parseInt(stdout.slice(firstPipe + 1, secondPipe), 10) || 45;
-        const b = parseInt(stdout.slice(secondPipe + 1, thirdPipe), 10) || 55;
-        const jsonPart = stdout.slice(thirdPipe + 1).trim();
-
-        let runningWindows: RunningWindowProcess[] = [];
-        try {
-          const parsed = JSON.parse(jsonPart);
-          const arr = Array.isArray(parsed) ? parsed : [parsed];
-          runningWindows = arr
-            .filter(Boolean)
-            .map((p: { Id?: number; ProcessName?: string; MainWindowTitle?: string }) => ({
-              pid: Number(p.Id || 0),
-              processName: `${String(p.ProcessName || 'app')}.exe`,
-              windowTitle: String(p.MainWindowTitle || 'Window'),
-            }));
-        } catch {
-          // ignore parse error
-        }
-
-        const topWin = runningWindows[0];
-        const luminance = Math.round(((0.299 * r + 0.587 * g + 0.114 * b) / 255) * 100);
-        const crimsonIndex = Math.max(
-          0,
-          Math.min(100, Math.round(((r - (g + b) / 2) / 180) * 100 + 14))
+        const avgLuma = Math.round(
+          lumaArr.reduce((acc, v) => acc + v, 0) / Math.max(1, lumaArr.length)
         );
-        const lumaDiff = Math.abs(luminance - lastLumaSample);
-        lastLumaSample = luminance;
-        const motionDelta = Math.min(100, Math.max(10, Math.round(lumaDiff * 2.5 + (r % 19))));
+
+        let diffSum = 0;
+        for (let i = 0; i < lumaArr.length; i++) {
+          diffSum += Math.abs(lumaArr[i] - (prevColors[i] ?? lumaArr[i]));
+        }
+        prevColors = lumaArr;
+
+        const motionDelta = Math.min(100, Math.max(8, Math.round(diffSum * 1.4)));
+        const crimsonIndex = Math.min(100, Math.max(5, redScore));
 
         const { vibe, intensity } = inferVibeFromMetrics(
           motionDelta,
           crimsonIndex,
-          luminance
+          avgLuma
         );
 
         lastSnapshot = {
           timestamp: now,
-          activeWindowTitle: topWin?.windowTitle || 'Windows Desktop',
-          detectedProcess: topWin?.processName || 'explorer.exe',
-          runningWindows,
+          activeWindowTitle: winTitle,
+          detectedProcess: procName,
+          runningWindows: [{ pid: 0, processName: procName, windowTitle: winTitle }],
           motionDelta,
           crimsonIndex,
-          luminance,
+          luminance: avgLuma,
           compositeIntensity: intensity,
           inferredVibe: vibe,
         };
