@@ -36,7 +36,7 @@
     .hero-cover { width: 120px; height: 120px; border-radius: 6px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); }
     .scroll-area { flex: 1; overflow-y: auto; }
     .track-row {
-      display: grid; grid-template-columns: 32px 1fr 180px 130px 56px; gap: 12px;
+      display: grid; grid-template-columns: 32px 1fr 200px 56px; gap: 12px;
       align-items: center; padding: 8px 16px; border-bottom: 1px solid #181619; cursor: pointer; font-size: 13px;
     }
     .track-row:hover { background: #171518; }
@@ -51,7 +51,6 @@
       background: #1A181B; border: 1px solid #2A2629; color: #EDE9E8; cursor: pointer;
     }
     .btn-wine { background: #6E1D2F; border-color: #8E2940; color: #FFF; }
-    .badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; background: #281419; color: #D47A8D; border: 1px solid #4A202B; display: inline-block; }
   </style>
 </head>
 <body>
@@ -63,22 +62,22 @@
           <strong style="font-size:14px;">GameVibe</strong>
           <span id="winTitle" style="font-size:11px; color:#8C8482;">Windows</span>
         </div>
-        <div style="margin-top:10px; font-size:12px; color:#EDE9E8;">Живой Авторежим</div>
+        <div style="margin-top:10px; font-size:12px; color:#EDE9E8;">Авторежим</div>
       </div>
       <div class="panel lib-panel">
         <div>
           <div style="font-size:11px; color:#8C8482; text-transform:uppercase; margin-bottom:8px;">Мои подборки</div>
           <div style="font-size:12px; color:#8C8482; line-height:1.5; background:#0D0C0E; padding:10px; border-radius:6px; border:1px solid #1B181B;">
-            В Авторежиме программа сама читает сцену и настроение игры на лету без заготовленных плейлистов.
+            Программа работает полностью автономно: сама определяет сцену в игре и включает полные треки на лету.
           </div>
         </div>
         <div style="border-top:1px solid #1E1B1D; padding-top:12px;">
           <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:8px;">
-            <span>Чтение игры</span>
+            <span>Автономный сенсор</span>
             <span id="sceneBadge" style="color:#D47A8D;">Спокойно</span>
           </div>
           <div style="font-size:11px; color:#8C8482; display:flex; justify-content:space-between;">
-            <span>Динамика</span><span id="motionVal">12%</span>
+            <span>Динамика в игре</span><span id="motionVal">12%</span>
           </div>
           <div style="height:5px; background:#1E1B1D; border-radius:4px; margin-top:5px; overflow:hidden;">
             <div id="motionBar" style="height:100%; width:12%; background:#8E2940;"></div>
@@ -90,15 +89,15 @@
     <main>
       <header>
         <input id="searchInput" class="search-input" placeholder="Найти любой трек или артиста (Enter)..." />
-        <button class="btn" id="simBtn">Сменить сцену (Тест)</button>
+        <span style="font-size:11px; color:#8C8482;">Автономный режим активен</span>
       </header>
       <div class="scroll-area">
         <div class="hero">
           <img id="heroCover" class="hero-cover" src="https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg" alt="cover" />
           <div>
-            <div style="font-size:11px; color:#D47A8D; text-transform:uppercase; letter-spacing:0.08em;">ЖИВОЙ АВТОРЕЖИМ · ПРЯМОЙ ПОДБОР ПОД ИГРУ</div>
+            <div style="font-size:11px; color:#D47A8D; text-transform:uppercase; letter-spacing:0.08em;">АВТОНОМНЫЙ ПОТОК</div>
             <h1 id="heroTitle" style="font-size:24px; margin:6px 0;">Подбор под экран игры</h1>
-            <div id="heroSub" style="font-size:12px; color:#9E9694;">Программа анализирует сцену, яркость и динамику игры в реальном времени и ставит подходящую музыку на лету.</div>
+            <div id="heroSub" style="font-size:12px; color:#9E9694;">Программа сама считывает происходящее в игре и ставит подходящие полные треки без отвлечения от игрового процесса.</div>
           </div>
         </div>
         <div id="tracksTable"></div>
@@ -117,15 +116,15 @@
     <div style="display:flex; align-items:center; gap:12px;">
       <button class="btn btn-wine" id="playBtn">▶ Воспроизвести</button>
     </div>
-    <div style="width:30%; text-align:right; font-size:12px; color:#8C8482;">Живой Авторежим</div>
+    <div id="durLabel" style="width:30%; text-align:right; font-size:12px; color:#8C8482;">Полный трек</div>
   </footer>
 
   <script>
     const DYNAMIC_MOODS = {
-      EXPLORE: ['indie rock road trip', 'darkwave synth night drive', 'shoegaze atmospheric rock', 'synthwave retro chill'],
-      STEALTH: ['dark phonk drift', 'cyberpunk darksynth', 'witch house dark electronic', 'underground trap bass'],
-      COMBAT: ['aggressive phonk drift', 'drum and bass neurofunk', 'alternative metal rock', 'rage trap hype'],
-      BOSSFIGHT: ['industrial metal heavy', 'nu metal aggressive', 'hardcore phonk rage', 'heavy metal thrash']
+      EXPLORE: ['Deftones Entombed', 'Kavinsky Nightcall', 'Кино Спокойная ночь', 'Arctic Monkeys'],
+      STEALTH: ['BONES HDMI', 'Crystal Castles Kerosene', 'DVRST Close Eyes', 'Gesaffelstein'],
+      COMBAT: ['Travis Scott FE!N', 'The Prodigy Omen', 'Pendulum Propane Nightmares', 'Linkin Park Faint'],
+      BOSSFIGHT: ['Rammstein Sonne', 'Slipknot Duality', 'Deftones My Own Summer', 'System Of A Down Chop Suey']
     };
     const SCENE_LABELS = { EXPLORE: 'Спокойно', STEALTH: 'Напряжение', COMBAT: 'Экшен / Бой', BOSSFIGHT: 'Пик боя' };
     let currentScene = 'EXPLORE';
@@ -134,14 +133,18 @@
     let isPlaying = false;
     const audio = document.getElementById('audio');
 
+    function fmtMs(ms) {
+      const s = Math.floor((ms || 215000) / 1000);
+      return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+    }
+
     async function discoverForScene(scene, playImmediately) {
       currentScene = scene;
       document.getElementById('sceneBadge').textContent = SCENE_LABELS[scene] || scene;
       const pool = DYNAMIC_MOODS[scene] || DYNAMIC_MOODS.EXPLORE;
       const term = pool[Math.floor(Math.random() * pool.length)];
-      const offset = Math.floor(Math.random() * 12);
       try {
-        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(term) + '&media=music&entity=song&limit=15&offset=' + offset);
+        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(term) + '&media=music&entity=song&limit=15');
         const data = await res.json();
         tracks = (data.results || []).map((item) => ({
           title: item.trackName,
@@ -149,7 +152,7 @@
           album: item.collectionName || 'Single',
           cover: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
           preview: item.previewUrl,
-          scene: SCENE_LABELS[scene]
+          duration: fmtMs(item.trackTimeMillis)
         }));
         renderTable();
         if (tracks[0]) selectTrack(tracks[0], playImmediately);
@@ -166,8 +169,7 @@
           '<span>' + (idx + 1) + '</span>' +
           '<div style="display:flex; align-items:center; gap:10px;"><img src="' + t.cover + '"/><div><div style="font-weight:500;">' + t.title + '</div><div style="font-size:11px; color:#8C8482;">' + t.artist + '</div></div></div>' +
           '<span style="font-size:12px; color:#8C8482; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + t.album + '</span>' +
-          '<span><span class="badge">' + t.scene + '</span></span>' +
-          '<span style="font-size:12px; color:#8C8482; text-align:right;">0:30</span>';
+          '<span style="font-size:12px; color:#8C8482; text-align:right;">' + t.duration + '</span>';
         row.onclick = () => selectTrack(t, true);
         container.appendChild(row);
       });
@@ -180,6 +182,7 @@
       document.getElementById('playerCover').src = t.cover;
       document.getElementById('heroCover').src = t.cover;
       document.getElementById('heroTitle').textContent = t.title + ' — ' + t.artist;
+      document.getElementById('durLabel').textContent = t.duration;
       if (t.preview) {
         audio.src = t.preview;
         if (playNow) { isPlaying = true; audio.play().catch(()=>{}); }
@@ -205,17 +208,27 @@
           album: item.collectionName || 'Single',
           cover: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
           preview: item.previewUrl,
-          scene: SCENE_LABELS[currentScene]
+          duration: fmtMs(item.trackTimeMillis)
         }));
         renderTable();
       }
     };
 
-    document.getElementById('simBtn').onclick = () => {
-      const order = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
-      const next = order[(order.indexOf(currentScene) + 1) % order.length];
-      discoverForScene(next, true);
-    };
+    let lastSwitch = 0;
+    setInterval(async () => {
+      try {
+        const res = await fetch('/api/telemetry');
+        const t = await res.json();
+        document.getElementById('winTitle').textContent = t.detectedProcess || 'Windows';
+        document.getElementById('motionVal').textContent = t.motionDelta + '%';
+        document.getElementById('motionBar').style.width = t.motionDelta + '%';
+        const now = Date.now();
+        if (t.inferredVibe && t.inferredVibe !== currentScene && now - lastSwitch > 9000) {
+          lastSwitch = now;
+          discoverForScene(t.inferredVibe, true);
+        }
+      } catch (e) {}
+    }, 1600);
 
     discoverForScene('EXPLORE', false);
   </script>
