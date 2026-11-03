@@ -19,6 +19,7 @@ extern "system" {
     fn GetDC(hWnd: isize) -> isize;
     fn ReleaseDC(hWnd: isize, hDC: isize) -> i32;
     fn GetSystemMetrics(nIndex: i32) -> i32;
+    fn GetAsyncKeyState(vKey: i32) -> i16;
 }
 
 #[link(name = "gdi32")]
@@ -27,6 +28,7 @@ extern "system" {
 }
 
 static PREV_LUMA: Mutex<[i32; 5]> = Mutex::new([45, 45, 45, 45, 45]);
+static ROLLING_ENERGY: Mutex<i32> = Mutex::new(15);
 
 fn sample_win32_telemetry() -> String {
     unsafe {
@@ -40,6 +42,19 @@ fn sample_win32_telemetry() -> String {
         } else {
             String::from("Windows Desktop")
         };
+
+        // Check active gaming input (LMB=0x01, RMB=0x02, W=0x57, A=0x41, S=0x53, D=0x44, Space=0x20, Shift=0x10)
+        let keys = [0x01, 0x02, 0x57, 0x41, 0x53, 0x44, 0x20, 0x10];
+        let mut input_score = 0i32;
+        for k in keys.iter() {
+            if GetAsyncKeyState(*k) != 0 {
+                if *k == 0x01 || *k == 0x02 {
+                    input_score += 28;
+                } else {
+                    input_score += 14;
+                }
+            }
+        }
 
         let w = GetSystemMetrics(0).max(800);
         let h = GetSystemMetrics(1).max(600);
@@ -79,15 +94,24 @@ fn sample_win32_telemetry() -> String {
         }
 
         let avg_luma = luma_sum / 5;
-        let motion = (diff_sum * 2).clamp(8, 100);
-        let crimson = red_score.clamp(5, 100);
-        let intensity = ((motion * 65 + crimson * 35) / 100).clamp(10, 100);
+        let optical = (diff_sum * 2).clamp(0, 100);
+        let instant = ((optical * 55 + input_score * 80 + red_score * 35) / 100).clamp(10, 100);
 
-        let vibe = if crimson >= 45 || intensity >= 80 {
+        let mut rolling = ROLLING_ENERGY.lock().unwrap();
+        if instant > *rolling {
+            *rolling = (*rolling * 40 + instant * 60) / 100;
+        } else {
+            *rolling = ((*rolling * 78 + instant * 22) / 100).max(10);
+        }
+
+        let motion = *rolling;
+        let crimson = red_score.clamp(5, 100);
+
+        let vibe = if crimson >= 45 || motion >= 76 {
             "BOSSFIGHT"
-        } else if motion >= 45 || intensity >= 52 {
+        } else if motion >= 42 {
             "COMBAT"
-        } else if avg_luma <= 24 {
+        } else if avg_luma <= 22 {
             "STEALTH"
         } else {
             "EXPLORE"
@@ -95,7 +119,7 @@ fn sample_win32_telemetry() -> String {
 
         format!(
             "{{\"activeWindowTitle\":\"{}\",\"detectedProcess\":\"{}\",\"motionDelta\":{},\"crimsonIndex\":{},\"luminance\":{},\"compositeIntensity\":{},\"inferredVibe\":\"{}\"}}",
-            title, title, motion, crimson, avg_luma, intensity, vibe
+            title, title, motion, crimson, avg_luma, motion, vibe
         )
     }
 }
@@ -112,7 +136,7 @@ fn open_app_window(url: &str) {
             "",
             "msedge",
             &format!("--app={}", url),
-            "--window-size=980,760",
+            "--window-size=780,680",
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn();
@@ -154,19 +178,16 @@ fn main() {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
 
-    // If running inside full dev repository and port 3000 is active, open it
     if is_port_open(3000) {
         open_app_window("http://localhost:3000");
         return;
     }
 
-    // If standalone .exe is already running on 3847, just open window
     if is_port_open(3847) {
         open_app_window("http://127.0.0.1:3847");
         return;
     }
 
-    // If package.json exists alongside .exe, also start Next.js in background
     if project_dir.join("package.json").exists() {
         let _ = Command::new("cmd")
             .args(["/C", "npm run dev"])
@@ -183,7 +204,6 @@ fn main() {
         }
     }
 
-    // Otherwise run 100% self-contained standalone embedded server on 127.0.0.1:3847
     open_app_window("http://127.0.0.1:3847");
     run_embedded_server(3847);
 }

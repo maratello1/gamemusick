@@ -2,13 +2,11 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
-  ExternalLink,
-  Monitor,
   Pause,
   Pin,
   Play,
-  Radio,
   SkipForward,
+  Sparkles,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -33,10 +31,8 @@ export default function GameVibeAutopilot() {
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(true);
   const [selectedPack, setSelectedPack] = useState<GenrePackId>('mix');
   const [currentVibe, setCurrentVibe] = useState<VibeStateId>('EXPLORE');
-  const [actionThreshold, setActionThreshold] = useState<number>(45);
-  const [syncSystemPlayer, setSyncSystemPlayer] = useState<boolean>(false);
+  const [actionThreshold, setActionThreshold] = useState<number>(42);
 
-  // Prepared track pools per Vibe state so Autopilot switches instantaneously
   const [poolsByVibe, setPoolsByVibe] = useState<Record<VibeStateId, TrackItem[]>>({
     EXPLORE: [FALLBACK_REAL_TRACKS[0], FALLBACK_REAL_TRACKS[1]],
     STEALTH: [FALLBACK_REAL_TRACKS[1]],
@@ -46,12 +42,6 @@ export default function GameVibeAutopilot() {
   });
 
   const [currentTrack, setCurrentTrack] = useState<TrackItem>(FALLBACK_REAL_TRACKS[0]);
-  const [autopilotReason, setAutopilotReason] = useState<string>(
-    'Автопилот следит за экраном · Спокойная сцена'
-  );
-  const [isLoadingPack, setIsLoadingPack] = useState<boolean>(false);
-
-  // Audio playback
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(30);
@@ -59,16 +49,15 @@ export default function GameVibeAutopilot() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Real Windows Screen Telemetry
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>({
     timestamp: Date.now(),
-    activeWindowTitle: 'Рабочий стол Windows',
+    activeWindowTitle: 'Ожидание игры',
     detectedProcess: 'explorer.exe',
     runningWindows: [],
     motionDelta: 14,
-    crimsonIndex: 6,
+    crimsonIndex: 5,
     luminance: 46,
-    compositeIntensity: 18,
+    compositeIntensity: 16,
     inferredVibe: 'EXPLORE',
   });
 
@@ -82,67 +71,68 @@ export default function GameVibeAutopilot() {
     VICTORY: 0,
   });
 
-  // Preload tracks for all 4 game scenes when Genre Pack changes
-  const preloadPackPools = useCallback(async (packId: GenrePackId) => {
-    setIsLoadingPack(true);
-    try {
-      const results = await Promise.all(
-        ACTIVE_VIBES.map(async (vibe) => {
-          const res = await fetch(
-            `/api/ytmusic?pack=${encodeURIComponent(packId)}&vibe=${encodeURIComponent(vibe)}`
-          );
-          const data = await res.json();
-          return {
-            vibe,
-            tracks: Array.isArray(data?.tracks) && data.tracks.length > 0
-              ? (data.tracks as TrackItem[])
-              : FALLBACK_REAL_TRACKS,
-          };
-        })
-      );
+  // Preload tracks for all game scenes when Genre Pack changes
+  const preloadPackPools = useCallback(
+    async (packId: GenrePackId) => {
+      try {
+        const results = await Promise.all(
+          ACTIVE_VIBES.map(async (vibe) => {
+            const res = await fetch(
+              `/api/ytmusic?pack=${encodeURIComponent(packId)}&vibe=${encodeURIComponent(vibe)}`
+            );
+            const data = await res.json();
+            return {
+              vibe,
+              tracks:
+                Array.isArray(data?.tracks) && data.tracks.length > 0
+                  ? (data.tracks as TrackItem[])
+                  : FALLBACK_REAL_TRACKS,
+            };
+          })
+        );
 
-      const nextPools: Record<VibeStateId, TrackItem[]> = {
-        EXPLORE: FALLBACK_REAL_TRACKS,
-        STEALTH: FALLBACK_REAL_TRACKS,
-        COMBAT: FALLBACK_REAL_TRACKS,
-        BOSSFIGHT: FALLBACK_REAL_TRACKS,
-        VICTORY: FALLBACK_REAL_TRACKS,
-      };
+        const nextPools: Record<VibeStateId, TrackItem[]> = {
+          EXPLORE: FALLBACK_REAL_TRACKS,
+          STEALTH: FALLBACK_REAL_TRACKS,
+          COMBAT: FALLBACK_REAL_TRACKS,
+          BOSSFIGHT: FALLBACK_REAL_TRACKS,
+          VICTORY: FALLBACK_REAL_TRACKS,
+        };
 
-      for (const item of results) {
-        nextPools[item.vibe] = item.tracks;
+        for (const item of results) {
+          nextPools[item.vibe] = item.tracks;
+        }
+
+        setPoolsByVibe(nextPools);
+        const activePool = nextPools[currentVibe] || nextPools.EXPLORE;
+        if (activePool[0]) {
+          setCurrentTrack(activePool[0]);
+        }
+      } catch {
+        // keep fallback pools
       }
-
-      setPoolsByVibe(nextPools);
-      const activePool = nextPools[currentVibe] || nextPools.EXPLORE;
-      if (activePool[0]) {
-        setCurrentTrack(activePool[0]);
-      }
-    } catch {
-      // keep fallback pools
-    } finally {
-      setIsLoadingPack(false);
-    }
-  }, [currentVibe]);
+    },
+    [currentVibe]
+  );
 
   useEffect(() => {
     preloadPackPools(selectedPack);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPack]);
 
-  // Automatically switch Vibe & Track when screen state changes
+  // Smoothly crossfade and switch track when game state changes
   const applyAutopilotVibe = useCallback(
-    (nextVibe: VibeStateId, reason: string, forceNow = false) => {
+    (nextVibe: VibeStateId, forceNow = false) => {
       const now = Date.now();
-      if (!forceNow && now - lastSwitchTimeRef.current < 9000) {
+      if (!forceNow && now - lastSwitchTimeRef.current < 10000) {
         return;
       }
       lastSwitchTimeRef.current = now;
       setCurrentVibe(nextVibe);
-      setAutopilotReason(reason);
 
       const pool = poolsByVibe[nextVibe] || FALLBACK_REAL_TRACKS;
-      const nextIdx = (trackIndexByVibeRef.current[nextVibe] || 0) % Math.max(1, pool.length);
+      const nextIdx =
+        (trackIndexByVibeRef.current[nextVibe] || 0) % Math.max(1, pool.length);
       trackIndexByVibeRef.current[nextVibe] = nextIdx + 1;
 
       const chosenTrack = pool[nextIdx] || pool[0];
@@ -150,7 +140,6 @@ export default function GameVibeAutopilot() {
         setCurrentTrack(chosenTrack);
         setIsPlaying(true);
 
-        // Sync with browser tab userscript bridge
         fetch('/api/presets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -166,20 +155,11 @@ export default function GameVibeAutopilot() {
           }),
         }).catch(() => {});
       }
-
-      // If user enabled external system player sync (Spotify / Yandex Music / Browser), trigger Next Track on scene change
-      if (syncSystemPlayer) {
-        fetch('/api/system-media', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ command: 'NEXT_TRACK' }),
-        }).catch(() => {});
-      }
     },
-    [poolsByVibe, isMuted, volume, syncSystemPlayer]
+    [poolsByVibe, isMuted, volume]
   );
 
-  // Poll live Windows screen sensor every 2 seconds
+  // Poll live Windows screen & input sensor every 1.5s
   useEffect(() => {
     if (!autopilotEnabled) return;
 
@@ -189,31 +169,27 @@ export default function GameVibeAutopilot() {
         const snap: TelemetrySnapshot = await res.json();
         setTelemetry(snap);
 
-        // Determine target vibe using user's actionThreshold slider
         let detectedVibe: VibeStateId = 'EXPLORE';
-        if (snap.crimsonIndex >= 45 || snap.compositeIntensity >= actionThreshold + 30) {
+        if (snap.crimsonIndex >= 45 || snap.motionDelta >= actionThreshold + 28) {
           detectedVibe = 'BOSSFIGHT';
-        } else if (snap.motionDelta >= actionThreshold || snap.compositeIntensity >= actionThreshold) {
+        } else if (snap.motionDelta >= actionThreshold) {
           detectedVibe = 'COMBAT';
-        } else if (snap.luminance <= 24) {
+        } else if (snap.luminance <= 22) {
           detectedVibe = 'STEALTH';
         } else {
           detectedVibe = 'EXPLORE';
         }
 
         if (detectedVibe !== currentVibe) {
-          applyAutopilotVibe(
-            detectedVibe,
-            `Автопилот (${snap.detectedProcess}): динамика экрана ${snap.motionDelta}%, яркость ${snap.luminance}% → ${VIBE_STATES[detectedVibe].label}`
-          );
+          applyAutopilotVibe(detectedVibe);
         }
       } catch {
-        // ignore transient error
+        // ignore
       }
     };
 
     poll();
-    const timer = setInterval(poll, 2000);
+    const timer = setInterval(poll, 1600);
     return () => clearInterval(timer);
   }, [autopilotEnabled, actionThreshold, currentVibe, applyAutopilotVibe]);
 
@@ -243,7 +219,6 @@ export default function GameVibeAutopilot() {
     }
   }, [currentTrack, isPlaying]);
 
-  // Cycle next track within the current Vibe pool when song finishes
   const handleNextInCurrentVibe = () => {
     const pool = poolsByVibe[currentVibe] || FALLBACK_REAL_TRACKS;
     if (pool.length === 0) return;
@@ -255,45 +230,16 @@ export default function GameVibeAutopilot() {
     }
   };
 
-  // Demo Game Moment Cycle (so user can test how Autopilot reacts to game changes in 1 click)
   const handleSimulateGameMomentChange = () => {
     const order: VibeStateId[] = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
     const nextVibe = order[(order.indexOf(currentVibe) + 1) % order.length];
 
-    const simMetrics: Record<
-      VibeStateId,
-      { motion: number; crimson: number; luma: number; reason: string }
-    > = {
-      EXPLORE: {
-        motion: 16,
-        crimson: 5,
-        luma: 54,
-        reason: 'На экране спокойное исследование (движение 16%) → включен спокойный трек',
-      },
-      STEALTH: {
-        motion: 24,
-        crimson: 10,
-        luma: 16,
-        reason: 'Темная локация на экране (яркость 16%) → включен ночной / стелс вайб',
-      },
-      COMBAT: {
-        motion: 74,
-        crimson: 30,
-        luma: 48,
-        reason: 'На экране начался экшен (движение 74%) → автопилот включил боевой трек',
-      },
-      BOSSFIGHT: {
-        motion: 92,
-        crimson: 75,
-        luma: 42,
-        reason: 'Пик боя и вспышки урона (92%) → автопилот включил максимальный драйв',
-      },
-      VICTORY: {
-        motion: 30,
-        crimson: 5,
-        luma: 75,
-        reason: 'Бой завершен → плавный переход',
-      },
+    const simMetrics: Record<VibeStateId, { motion: number; crimson: number; luma: number }> = {
+      EXPLORE: { motion: 14, crimson: 5, luma: 52 },
+      STEALTH: { motion: 24, crimson: 8, luma: 16 },
+      COMBAT: { motion: 68, crimson: 25, luma: 48 },
+      BOSSFIGHT: { motion: 92, crimson: 70, luma: 40 },
+      VICTORY: { motion: 25, crimson: 5, luma: 70 },
     };
 
     const m = simMetrics[nextVibe];
@@ -302,34 +248,11 @@ export default function GameVibeAutopilot() {
       motionDelta: m.motion,
       crimsonIndex: m.crimson,
       luminance: m.luma,
-      compositeIntensity: Math.round(m.motion * 0.65 + m.crimson * 0.35),
+      compositeIntensity: m.motion,
       inferredVibe: nextVibe,
     }));
 
-    applyAutopilotVibe(nextVibe, m.reason, true);
-  };
-
-  const openInPlatform = async (
-    platform: 'ytmusic' | 'spotify' | 'yandex' | 'soundcloud',
-    track: TrackItem
-  ) => {
-    const q = encodeURIComponent(`${track.artist} ${track.title}`);
-    const urls: Record<string, string> = {
-      ytmusic: track.videoId
-        ? `https://music.youtube.com/watch?v=${track.videoId}`
-        : `https://music.youtube.com/search?q=${q}`,
-      spotify: `spotify:search:${q}`,
-      yandex: `https://music.yandex.ru/search?text=${q}`,
-      soundcloud: `https://soundcloud.com/search?q=${q}`,
-    };
-    const targetUrl = urls[platform];
-    await fetch('/api/system-media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: 'OPEN_PLATFORM', url: targetUrl }),
-    }).catch(() => {
-      window.open(targetUrl, '_blank');
-    });
+    applyAutopilotVibe(nextVibe, true);
   };
 
   const handleToggleAlwaysOnTop = async () => {
@@ -345,9 +268,20 @@ export default function GameVibeAutopilot() {
   };
 
   const activeVibeCfg = VIBE_STATES[currentVibe];
+  const isHighIntensity = currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT';
 
   return (
-    <div className="min-h-screen bg-[#0A0A0C] text-zinc-100 flex flex-col justify-between select-none">
+    <div className="min-h-screen bg-[#04050A] text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden select-none">
+      {/* Galactic Nebula Background Glow */}
+      <div
+        className="pointer-events-none fixed inset-0 transition-all duration-1000"
+        style={{
+          background: isHighIntensity
+            ? 'radial-gradient(circle at 50% 25%, rgba(168, 85, 247, 0.22) 0%, rgba(99, 102, 241, 0.12) 40%, rgba(4, 5, 10, 0) 75%)'
+            : 'radial-gradient(circle at 50% 25%, rgba(99, 102, 241, 0.18) 0%, rgba(56, 189, 248, 0.08) 40%, rgba(4, 5, 10, 0) 75%)',
+        }}
+      />
+
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -355,187 +289,142 @@ export default function GameVibeAutopilot() {
         onEnded={handleNextInCurrentVibe}
       />
 
-      {/* Minimal Top Bar */}
-      <header
-        className="border-b border-zinc-900 bg-[#0A0A0C] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                autopilotEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-600'
-              }`}
-            />
-            <span className="font-semibold text-sm tracking-tight text-white">
-              GameVibe
+      {/* Minimalist Centered Galactic Container */}
+      <main className="w-full max-w-[680px] relative z-10 space-y-5">
+        {/* Top Minimal Header Bar */}
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 px-1"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-violet-400" />
+            <span className="font-bold text-sm tracking-wide text-white">GameVibe</span>
+            <span className="text-xs text-slate-500">·</span>
+            <span className="text-xs text-slate-400">
+              {telemetry.detectedProcess}
             </span>
           </div>
-          <span className="text-zinc-800">·</span>
-          <span className="text-xs text-zinc-400">
-            Окно: <strong className="text-zinc-200 font-medium">{telemetry.detectedProcess}</strong>
-          </span>
+
+          <div
+            className="flex items-center gap-2"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            <button
+              type="button"
+              onClick={handleSimulateGameMomentChange}
+              className="min-h-[34px] px-3 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-slate-300 transition-colors"
+            >
+              Тест смены сцены
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleAlwaysOnTop}
+              className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors ${
+                isPinnedOverlay
+                  ? 'bg-violet-500/25 text-violet-200 border-violet-400/40'
+                  : 'bg-white/[0.04] text-slate-300 border-white/[0.08] hover:bg-white/[0.08]'
+              }`}
+            >
+              <Pin className="w-3 h-3" />
+              <span>Поверх игры</span>
+            </button>
+          </div>
         </div>
 
-        <div
-          className="flex flex-wrap items-center gap-2 lg:pr-28"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <button
-            type="button"
-            onClick={() => setSyncSystemPlayer((s) => !s)}
-            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              syncSystemPlayer
-                ? 'bg-zinc-800 text-white border-zinc-600'
-                : 'bg-zinc-950 text-zinc-400 border-zinc-800/80 hover:text-zinc-200'
-            }`}
-            title="Автоматически переключать трек и в запущенном плеере Windows (Яндекс Музыка / Spotify)"
-          >
-            {syncSystemPlayer ? 'Системный плеер ПК: синхр.' : 'Системный плеер ПК: выкл'}
-          </button>
-
-          <button
-            type="button"
-            onClick={handleToggleAlwaysOnTop}
-            className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors ${
-              isPinnedOverlay
-                ? 'bg-white text-black border-white font-semibold'
-                : 'bg-zinc-950 text-zinc-300 border-zinc-800/80 hover:bg-zinc-900'
-            }`}
-          >
-            <Pin className="w-3.5 h-3.5" />
-            <span>Поверх игры</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Center Minimalist Workspace */}
-      <main className="flex-1 max-w-[920px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-center space-y-6">
-        {/* 1. AUTOPILOT HERO CARD: WHAT IS IN GAME -> WHAT IS PLAYING */}
-        <section className="rounded-2xl bg-[#111114] border border-zinc-800/80 p-5 sm:p-7 space-y-6">
-          {/* Top Row: Autopilot Status & Toggle */}
-          <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-zinc-800/70">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: activeVibeCfg.accentHex }}
-                />
-                <span className="text-xs font-medium text-zinc-400">
-                  Сейчас в игре определено:
-                </span>
-                <span className="text-xs font-semibold text-white">
+        {/* Main Galactic Autopilot Capsule */}
+        <section className="rounded-3xl bg-[#0A0C16]/85 backdrop-blur-2xl border border-indigo-300/15 shadow-[0_24px_80px_rgba(4,6,20,0.95)] p-6 sm:p-8 space-y-6">
+          {/* Status Row */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-white/[0.06]">
+            <div>
+              <div className="text-xs text-slate-400">
+                Режим игры сейчас:{' '}
+                <span className="text-violet-300 font-semibold">
                   {activeVibeCfg.label}
                 </span>
               </div>
-              <p className="text-xs text-zinc-500">{autopilotReason}</p>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {activeVibeCfg.description}
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSimulateGameMomentChange}
-                className="min-h-[40px] px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-medium text-zinc-200 border border-zinc-800 transition-colors"
-              >
-                Проверить смену сцены
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAutopilotEnabled((a) => !a)}
-                className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors ${
-                  autopilotEnabled
-                    ? 'bg-[#FF6A00] text-black'
-                    : 'bg-zinc-900 text-zinc-400 border border-zinc-800'
-                }`}
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>{autopilotEnabled ? 'Авторежим: ВКЛ' : 'Авторежим: ПАУЗА'}</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setAutopilotEnabled((a) => !a)}
+              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                autopilotEnabled
+                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-[0_0_25px_rgba(139,92,246,0.4)]'
+                  : 'bg-white/[0.05] text-slate-400 border border-white/[0.08]'
+              }`}
+            >
+              {autopilotEnabled ? 'Авторежим активен' : 'Авторежим на паузе'}
+            </button>
           </div>
 
-          {/* Middle Row: Now Playing Track (Selected Automatically by Program) */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-            {/* Track Cover + Metadata */}
-            <div className="md:col-span-7 flex items-center gap-4">
+          {/* Track + Activity Sensor */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
+            <div className="sm:col-span-7 flex items-center gap-4">
               <img
                 src={currentTrack.thumbnail}
                 alt={currentTrack.title}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl object-cover shrink-0 bg-zinc-900 border border-zinc-800"
+                className="w-24 h-24 rounded-2xl object-cover shrink-0 bg-slate-900 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
               />
-              <div className="space-y-1.5 min-w-0">
-                <span className="inline-block px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-400">
-                  {activeVibeCfg.shortLabel} · {currentTrack.genreTag}
-                </span>
+              <div className="space-y-1 min-w-0">
+                <div className="text-xs text-violet-300/90 font-medium">
+                  {currentTrack.genreTag}
+                </div>
                 <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
                   {currentTrack.title}
                 </h1>
-                <p className="text-sm text-zinc-400">
-                  {currentTrack.artist} · <span className="text-zinc-500">{currentTrack.album}</span>
+                <p className="text-sm text-slate-400">
+                  {currentTrack.artist}
                 </p>
-
-                {/* Direct Links to Open in External Platforms */}
-                <div className="pt-1 flex flex-wrap items-center gap-1.5">
-                  {[
-                    { id: 'ytmusic' as const, label: 'YouTube Music' },
-                    { id: 'spotify' as const, label: 'Spotify' },
-                    { id: 'yandex' as const, label: 'Я.Музыка' },
-                    { id: 'soundcloud' as const, label: 'SoundCloud' },
-                  ].map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => openInPlatform(p.id, currentTrack)}
-                      className="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800/90 text-[11px] text-zinc-300 flex items-center gap-1"
-                    >
-                      <span>{p.label}</span>
-                      <ExternalLink className="w-2.5 h-2.5 text-zinc-500" />
-                    </button>
-                  ))}
-                </div>
+                <p className="text-xs text-slate-500">
+                  {currentTrack.album}
+                </p>
               </div>
             </div>
 
-            {/* Live Screen Sensor Bars & Sensitivity */}
-            <div className="md:col-span-5 rounded-xl bg-[#0C0C0E] border border-zinc-800/70 p-4 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-400 flex items-center gap-1.5">
-                  <Monitor className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>Движение в игре</span>
-                </span>
-                <span className="font-mono text-zinc-200">{telemetry.motionDelta}%</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-zinc-900 overflow-hidden">
-                <div
-                  className="h-full bg-[#FF6A00] transition-all duration-500"
-                  style={{ width: `${telemetry.motionDelta}%` }}
-                />
+            {/* Clean Activity & Sensitivity Box */}
+            <div className="sm:col-span-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 space-y-3">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Активность в игре</span>
+                  <span className="font-mono text-indigo-300">{telemetry.motionDelta}%</span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-white/[0.07] overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400 transition-all duration-500"
+                    style={{ width: `${telemetry.motionDelta}%` }}
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-zinc-400">Порог включения экшена</span>
-                <span className="font-mono text-zinc-300">{actionThreshold}%</span>
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">Порог экшена</span>
+                  <span className="font-mono text-slate-300">{actionThreshold}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={20}
+                  max={80}
+                  value={actionThreshold}
+                  onChange={(e) => setActionThreshold(Number(e.target.value))}
+                  className="w-full h-1 cursor-pointer"
+                  aria-label="Порог включения экшена"
+                />
               </div>
-              <input
-                type="range"
-                min={20}
-                max={80}
-                value={actionThreshold}
-                onChange={(e) => setActionThreshold(Number(e.target.value))}
-                className="w-full h-1 accent-[#FF6A00] cursor-pointer"
-                aria-label="Порог включения экшена"
-              />
             </div>
           </div>
 
-          {/* Bottom Row of Card: Minimal Audio Transport & Volume */}
-          <div className="pt-4 border-t border-zinc-800/70 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+          {/* Transport & Volume */}
+          <div className="pt-4 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsPlaying((p) => !p)}
-                className="min-h-[44px] px-5 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold text-xs flex items-center gap-2 transition-transform active:scale-95"
+                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 text-white font-semibold text-xs flex items-center gap-2 shadow-[0_0_24px_rgba(124,58,237,0.35)] transition-all active:scale-95"
               >
                 {isPlaying ? (
                   <>
@@ -545,7 +434,7 @@ export default function GameVibeAutopilot() {
                 ) : (
                   <>
                     <Play className="w-4 h-4 fill-current" />
-                    <span>Включить звук</span>
+                    <span>Запустить звук</span>
                   </>
                 )}
               </button>
@@ -553,17 +442,15 @@ export default function GameVibeAutopilot() {
               <button
                 type="button"
                 onClick={handleNextInCurrentVibe}
-                className="min-h-[44px] px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 text-xs flex items-center gap-1.5"
-                title="Другой трек для этой же сцены"
+                className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] text-xs flex items-center gap-1.5"
               >
                 <SkipForward className="w-4 h-4" />
-                <span>Другой трек</span>
+                <span>Следующий</span>
               </button>
             </div>
 
-            {/* Progress Bar */}
-            <div className="flex items-center gap-2.5 flex-1 min-w-[180px] max-w-sm">
-              <span className="text-[11px] font-mono text-zinc-500 w-8 text-right">
+            <div className="flex items-center gap-2.5 flex-1 min-w-[160px]">
+              <span className="text-[11px] font-mono text-slate-500 w-8 text-right">
                 {formatSeconds(currentTime)}
               </span>
               <input
@@ -577,26 +464,25 @@ export default function GameVibeAutopilot() {
                   setCurrentTime(t);
                   if (audioRef.current) audioRef.current.currentTime = t;
                 }}
-                className="flex-1 h-1 accent-white cursor-pointer"
-                aria-label="Позиция воспроизведения"
+                className="flex-1 h-1 cursor-pointer"
+                aria-label="Позиция трека"
               />
-              <span className="text-[11px] font-mono text-zinc-500 w-8">
+              <span className="text-[11px] font-mono text-slate-500 w-8">
                 {formatSeconds(duration)}
               </span>
             </div>
 
-            {/* Volume */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsMuted((m) => !m)}
-                className="p-2 text-zinc-400 hover:text-white"
+                className="p-2 text-slate-400 hover:text-white"
                 aria-label="Звук"
               >
                 {isMuted ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
+                  <VolumeX className="w-4 h-4 text-rose-400" />
                 ) : (
-                  <Volume2 className="w-4 h-4" />
+                  <Volume2 className="w-4 h-4 text-indigo-300" />
                 )}
               </button>
               <input
@@ -608,123 +494,39 @@ export default function GameVibeAutopilot() {
                   setIsMuted(false);
                   setVolume(Number(e.target.value));
                 }}
-                className="w-20 accent-white cursor-pointer"
+                className="w-20 cursor-pointer"
                 aria-label="Громкость"
               />
             </div>
           </div>
         </section>
 
-        {/* 2. ONE-CLICK TASTE SELECTOR FOR AUTOPILOT */}
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-              Какую музыку ставить автопилоту
-            </h2>
-            {isLoadingPack && (
-              <span className="text-xs text-zinc-500">Загрузка треков...</span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {(Object.keys(GENRE_PACKS) as GenrePackId[]).map((packKey) => {
-              const pack = GENRE_PACKS[packKey];
-              const active = selectedPack === packKey;
-              return (
-                <button
-                  key={pack.id}
-                  type="button"
-                  onClick={() => setSelectedPack(pack.id)}
-                  className={`p-4 rounded-xl text-left transition-all border flex flex-col justify-between gap-2 ${
-                    active
-                      ? 'bg-zinc-900 border-white text-white'
-                      : 'bg-[#111114] border-zinc-800/80 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                  }`}
-                >
-                  <div className="text-xs font-bold text-white leading-snug">
-                    {pack.label}
-                  </div>
-                  <div className="text-[11px] text-zinc-500 leading-relaxed">
-                    {pack.artistsSummary}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 3. PREPARED TRACKS BY GAME SCENE (READ-ONLY AUTOPILOT CHAMBER) */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-zinc-500">
-            Наготове у автопилота под моменты в игре
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {ACTIVE_VIBES.map((vibeId) => {
-              const cfg = VIBE_STATES[vibeId];
-              const pool = poolsByVibe[vibeId] || [];
-              const previewTrack = pool[0];
-              const isCurrentScene = currentVibe === vibeId;
-
-              return (
-                <div
-                  key={vibeId}
-                  onClick={() =>
-                    applyAutopilotVibe(
-                      vibeId,
-                      `Проверка сцены «${cfg.label}»`,
-                      true
-                    )
-                  }
-                  className={`p-3.5 rounded-xl border transition-colors cursor-pointer flex items-center gap-3 ${
-                    isCurrentScene
-                      ? 'bg-zinc-900/90 border-[#FF6A00]/70'
-                      : 'bg-[#111114] border-zinc-800/70 hover:border-zinc-700'
-                  }`}
-                >
-                  {previewTrack && (
-                    <img
-                      src={previewTrack.thumbnail}
-                      alt={previewTrack.title}
-                      className="w-11 h-11 rounded-lg object-cover shrink-0 bg-zinc-900"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ backgroundColor: cfg.accentHex }}
-                      />
-                      <span className="text-[11px] font-medium text-zinc-400">
-                        {cfg.shortLabel}
-                      </span>
-                    </div>
-                    <div className="text-xs font-semibold text-white mt-0.5 leading-snug">
-                      {previewTrack ? previewTrack.title : 'Загрузка...'}
-                    </div>
-                    <div className="text-[11px] text-zinc-500">
-                      {previewTrack ? previewTrack.artist : ''}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        {/* Minimalist 4-Pill Taste Selector */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[
+            { id: 'mix' as GenrePackId, name: 'Все лучшее' },
+            { id: 'rap-phonk' as GenrePackId, name: 'Рэп и Фонк' },
+            { id: 'rock-metal' as GenrePackId, name: 'Рок и Метал' },
+            { id: 'electronic' as GenrePackId, name: 'Электроника' },
+          ].map((item) => {
+            const active = selectedPack === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedPack(item.id)}
+                className={`min-h-[44px] px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all border ${
+                  active
+                    ? 'bg-indigo-500/20 text-white border-indigo-400/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                    : 'bg-[#0A0C16]/70 text-slate-400 border-white/[0.06] hover:text-slate-200 hover:border-white/15'
+                }`}
+              >
+                {item.name}
+              </button>
+            );
+          })}
+        </div>
       </main>
-
-      {/* Minimal Footer */}
-      <footer className="border-t border-zinc-900 px-4 sm:px-6 py-3 text-[11px] text-zinc-500 flex flex-wrap items-center justify-between gap-2">
-        <span>GameVibe Autopilot v1.0 · Автоматическая адаптация музыки под экран игры</span>
-        <a
-          href="/api/userscript"
-          target="_blank"
-          rel="noreferrer"
-          className="text-zinc-400 hover:text-white underline"
-        >
-          Скрипт авто-синхронизации для вкладки YouTube Music
-        </a>
-      </footer>
     </div>
   );
 }
