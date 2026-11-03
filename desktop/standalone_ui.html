@@ -7,107 +7,110 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #04050A;
-      background-image: radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.18) 0%, rgba(139, 92, 246, 0.08) 45%, transparent 75%);
-      color: #F1F5F9;
+      background: #0B0A0B;
+      color: #ECE8E6;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+      flex-direction: column;
       user-select: none;
       -webkit-font-smoothing: antialiased;
     }
-    main { max-width: 660px; width: 100%; display: flex; flex-direction: column; gap: 16px; }
-    .top-bar { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #94A3B8; padding: 0 4px; }
+    header {
+      border-bottom: 1px solid #221E20;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #8E8684;
+    }
+    main { max-width: 720px; width: 100%; margin: 40px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 20px; }
     .card {
-      background: rgba(10, 12, 22, 0.88);
-      border: 1px solid rgba(165, 180, 252, 0.14);
-      border-radius: 24px;
+      background: #121113;
+      border: 1px solid #221E20;
+      border-radius: 6px;
       padding: 28px;
-      box-shadow: 0 24px 80px rgba(4, 6, 20, 0.95);
     }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-    .track-box { display: flex; align-items: center; gap: 20px; margin: 22px 0; flex-wrap: wrap; }
-    .cover { width: 96px; height: 96px; border-radius: 16px; object-fit: cover; background: #0F172A; border: 1px solid rgba(255,255,255,0.1); }
-    h1 { font-size: 20px; font-weight: 700; color: #FFF; margin: 4px 0; }
-    .sub { font-size: 13px; color: #94A3B8; }
+    .track-box { display: flex; align-items: center; gap: 20px; margin: 24px 0; flex-wrap: wrap; }
+    .cover { width: 96px; height: 96px; border-radius: 4px; object-fit: cover; background: #1A181B; border: 1px solid #221E20; }
+    h1 { font-size: 20px; font-weight: 600; color: #ECE8E6; margin: 4px 0; letter-spacing: -0.02em; }
+    .sub { font-size: 13px; color: #8E8684; }
     .btn {
-      padding: 10px 18px;
-      border-radius: 12px;
+      padding: 9px 16px;
+      border-radius: 4px;
       font-size: 12px;
-      font-weight: 600;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(255,255,255,0.04);
-      color: #E2E8F0;
+      font-weight: 500;
+      border: 1px solid #221E20;
+      background: #181619;
+      color: #8E8684;
       cursor: pointer;
-      transition: 0.2s;
+      transition: 0.15s;
     }
-    .btn:hover { background: rgba(255,255,255,0.09); }
-    .btn-galactic {
-      background: linear-gradient(90deg, #6366F1, #8B5CF6);
-      color: #FFF;
-      border: none;
-      box-shadow: 0 0 24px rgba(139, 92, 246, 0.35);
+    .btn:hover { color: #ECE8E6; border-color: #6B1D2F; }
+    .btn-wine {
+      background: #6B1D2F;
+      color: #ECE8E6;
+      border: 1px solid #8E2940;
     }
     .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .pack {
-      padding: 12px;
-      border-radius: 16px;
-      background: rgba(10, 12, 22, 0.75);
-      border: 1px solid rgba(255,255,255,0.06);
-      color: #94A3B8;
+      padding: 14px;
+      border-radius: 4px;
+      background: #121113;
+      border: 1px solid #221E20;
+      color: #8E8684;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       cursor: pointer;
-      text-align: center;
+      text-align: left;
     }
     .pack.active {
-      background: rgba(99, 102, 241, 0.2);
-      border-color: rgba(129, 140, 248, 0.5);
-      color: #FFF;
+      background: #1B1316;
+      border-color: #6B1D2F;
+      color: #ECE8E6;
     }
-    .bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.07); border-radius: 99px; overflow: hidden; margin-top: 6px; }
-    .bar-fill { height: 100%; background: linear-gradient(90deg, #818CF8, #C084FC); width: 15%; transition: width 0.4s; }
+    .bar-bg { width: 100%; height: 4px; background: #221E20; border-radius: 2px; overflow: hidden; margin-top: 8px; }
+    .bar-fill { height: 100%; background: #8E2940; width: 15%; transition: width 0.4s; }
   </style>
 </head>
 <body>
   <audio id="audio" crossorigin="anonymous"></audio>
+  <header>
+    <div><strong style="color:#ECE8E6; letter-spacing:0.12em;">GAMEVIBE</strong> &nbsp;·&nbsp; <span id="winTitle">Ожидание игры</span></div>
+    <button class="btn" id="simBtn">Тест смены сцены</button>
+  </header>
   <main>
-    <div class="top-bar">
-      <div><strong style="color:#FFF;">GameVibe</strong> · <span id="winTitle">Ожидание игры</span></div>
-      <button class="btn" id="simBtn">Тест смены сцены</button>
-    </div>
-
     <div class="card">
-      <div class="row" style="padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.06);">
+      <div class="row" style="padding-bottom:18px; border-bottom:1px solid #221E20;">
         <div>
-          <div style="font-size:12px; color:#94A3B8;">Режим игры сейчас: <strong id="sceneLabel" style="color:#C4B5FD;">Спокойная сцена</strong></div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.12em; color:#8E8684;">Анализ экрана и управления</div>
+          <div id="sceneLabel" style="font-size:18px; font-weight:600; color:#ECE8E6; margin-top:4px;">Спокойная сцена</div>
         </div>
-        <button class="btn btn-galactic" id="autoBtn">Авторежим активен</button>
+        <button class="btn btn-wine" id="autoBtn">Автопилот: активен</button>
       </div>
 
       <div class="track-box">
         <img id="cover" class="cover" src="https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg" alt="cover" />
         <div style="flex:1; min-width:180px;">
-          <div id="genreLabel" style="font-size:11px; color:#A5B4FC;">Alternative</div>
+          <div id="genreLabel" style="font-size:11px; text-transform:uppercase; letter-spacing:0.1em; color:#B3475C;">Alternative</div>
           <h1 id="trackTitle">Entombed</h1>
           <div class="sub" id="trackArtist">Deftones</div>
         </div>
-        <div style="min-width:190px; background:rgba(255,255,255,0.03); padding:14px; border-radius:16px; border:1px solid rgba(255,255,255,0.06);">
-          <div class="row" style="font-size:11px; color:#94A3B8;">
-            <span>Активность в игре</span>
-            <span id="motionVal" style="color:#A5B4FC;">14%</span>
+        <div style="min-width:210px; background:#0B0A0B; padding:14px; border-radius:4px; border:1px solid #221E20;">
+          <div class="row" style="font-size:11px; color:#8E8684;">
+            <span>Интенсивность в игре</span>
+            <span id="motionVal" style="color:#ECE8E6;">14%</span>
           </div>
           <div class="bar-bg"><div class="bar-fill" id="motionBar"></div></div>
         </div>
       </div>
 
-      <div class="row" style="padding-top:16px; border-top:1px solid rgba(255,255,255,0.06);">
+      <div class="row" style="padding-top:18px; border-top:1px solid #221E20;">
         <div class="row">
-          <button class="btn btn-galactic" id="playBtn">Запустить звук</button>
-          <button class="btn" id="nextBtn">Следующий</button>
+          <button class="btn btn-wine" id="playBtn">Включить звук</button>
+          <button class="btn" id="nextBtn">Следующий трек</button>
         </div>
       </div>
     </div>
@@ -207,13 +210,13 @@
 
     document.getElementById('playBtn').onclick = () => {
       isPlaying = !isPlaying;
-      document.getElementById('playBtn').textContent = isPlaying ? 'Пауза' : 'Запустить звук';
+      document.getElementById('playBtn').textContent = isPlaying ? 'Пауза' : 'Включить звук';
       if (isPlaying) audio.play().catch(()=>{}); else audio.pause();
     };
     document.getElementById('nextBtn').onclick = () => loadTrackForVibe(currentVibe);
     document.getElementById('autoBtn').onclick = () => {
       autoEnabled = !autoEnabled;
-      document.getElementById('autoBtn').textContent = autoEnabled ? 'Авторежим активен' : 'Авторежим на паузе';
+      document.getElementById('autoBtn').textContent = autoEnabled ? 'Автопилот: активен' : 'Автопилот: пауза';
     };
     document.getElementById('simBtn').onclick = () => {
       const order = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];

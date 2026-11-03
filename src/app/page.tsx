@@ -6,7 +6,6 @@ import {
   Pin,
   Play,
   SkipForward,
-  Sparkles,
   Volume2,
   VolumeX,
 } from 'lucide-react';
@@ -20,6 +19,82 @@ import { TelemetrySnapshot, TrackItem, VibeStateId } from '@/types/vibe';
 
 const ACTIVE_VIBES: VibeStateId[] = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
 
+type NobleThemeId = 'burgundy' | 'emerald' | 'chocolate' | 'sapphire';
+
+interface NobleTheme {
+  id: NobleThemeId;
+  name: string;
+  bg: string;
+  surface: string;
+  surfaceElevated: string;
+  border: string;
+  accentBg: string;
+  accentHover: string;
+  accentBorder: string;
+  accentSoftBg: string;
+  accentText: string;
+  barFill: string;
+}
+
+const NOBLE_THEMES: Record<NobleThemeId, NobleTheme> = {
+  burgundy: {
+    id: 'burgundy',
+    name: 'Винный и Черный',
+    bg: '#0B0A0B',
+    surface: '#121113',
+    surfaceElevated: '#181619',
+    border: '#242125',
+    accentBg: '#6B1D2F',
+    accentHover: '#7E2338',
+    accentBorder: '#8E2B42',
+    accentSoftBg: '#211116',
+    accentText: '#D98A9C',
+    barFill: '#85243A',
+  },
+  chocolate: {
+    id: 'chocolate',
+    name: 'Шоколад и Графит',
+    bg: '#0C0B0A',
+    surface: '#141210',
+    surfaceElevated: '#1C1917',
+    border: '#292421',
+    accentBg: '#4E3021',
+    accentHover: '#5E3B29',
+    accentBorder: '#754B36',
+    accentSoftBg: '#211813',
+    accentText: '#C9A690',
+    barFill: '#6B4430',
+  },
+  emerald: {
+    id: 'emerald',
+    name: 'Изумруд и Черный',
+    bg: '#090B0A',
+    surface: '#101412',
+    surfaceElevated: '#161C19',
+    border: '#202925',
+    accentBg: '#164636',
+    accentHover: '#1C5744',
+    accentBorder: '#266E57',
+    accentSoftBg: '#0F211B',
+    accentText: '#84BBA8',
+    barFill: '#1F614C',
+  },
+  sapphire: {
+    id: 'sapphire',
+    name: 'Сапфир и Графит',
+    bg: '#090B0E',
+    surface: '#101318',
+    surfaceElevated: '#161B22',
+    border: '#212731',
+    accentBg: '#1B355A',
+    accentHover: '#224270',
+    accentBorder: '#2E558C',
+    accentSoftBg: '#111A29',
+    accentText: '#8CAAD6',
+    barFill: '#264A7D',
+  },
+};
+
 function formatSeconds(sec: number): string {
   if (!sec || !Number.isFinite(sec) || sec < 0) return '0:00';
   const m = Math.floor(sec / 60);
@@ -28,6 +103,7 @@ function formatSeconds(sec: number): string {
 }
 
 export default function GameVibeAutopilot() {
+  const [themeId, setThemeId] = useState<NobleThemeId>('burgundy');
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(true);
   const [selectedPack, setSelectedPack] = useState<GenrePackId>('mix');
   const [currentVibe, setCurrentVibe] = useState<VibeStateId>('EXPLORE');
@@ -71,7 +147,8 @@ export default function GameVibeAutopilot() {
     VICTORY: 0,
   });
 
-  // Preload tracks for all game scenes when Genre Pack changes
+  const theme = NOBLE_THEMES[themeId];
+
   const preloadPackPools = useCallback(
     async (packId: GenrePackId) => {
       try {
@@ -109,7 +186,7 @@ export default function GameVibeAutopilot() {
           setCurrentTrack(activePool[0]);
         }
       } catch {
-        // keep fallback pools
+        // keep fallback
       }
     },
     [currentVibe]
@@ -120,7 +197,6 @@ export default function GameVibeAutopilot() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPack]);
 
-  // Smoothly crossfade and switch track when game state changes
   const applyAutopilotVibe = useCallback(
     (nextVibe: VibeStateId, forceNow = false) => {
       const now = Date.now();
@@ -159,7 +235,6 @@ export default function GameVibeAutopilot() {
     [poolsByVibe, isMuted, volume]
   );
 
-  // Poll live Windows screen & input sensor every 1.5s
   useEffect(() => {
     if (!autopilotEnabled) return;
 
@@ -193,7 +268,6 @@ export default function GameVibeAutopilot() {
     return () => clearInterval(timer);
   }, [autopilotEnabled, actionThreshold, currentVibe, applyAutopilotVibe]);
 
-  // Sync HTML5 Audio element
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -268,20 +342,12 @@ export default function GameVibeAutopilot() {
   };
 
   const activeVibeCfg = VIBE_STATES[currentVibe];
-  const isHighIntensity = currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT';
 
   return (
-    <div className="min-h-screen bg-[#04050A] text-slate-100 flex flex-col justify-center items-center p-4 sm:p-6 relative overflow-hidden select-none">
-      {/* Galactic Nebula Background Glow */}
-      <div
-        className="pointer-events-none fixed inset-0 transition-all duration-1000"
-        style={{
-          background: isHighIntensity
-            ? 'radial-gradient(circle at 50% 25%, rgba(168, 85, 247, 0.22) 0%, rgba(99, 102, 241, 0.12) 40%, rgba(4, 5, 10, 0) 75%)'
-            : 'radial-gradient(circle at 50% 25%, rgba(99, 102, 241, 0.18) 0%, rgba(56, 189, 248, 0.08) 40%, rgba(4, 5, 10, 0) 75%)',
-        }}
-      />
-
+    <div
+      className="min-h-screen flex flex-col justify-between select-none transition-colors duration-500"
+      style={{ backgroundColor: theme.bg, color: '#F2EFE9' }}
+    >
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
@@ -289,121 +355,192 @@ export default function GameVibeAutopilot() {
         onEnded={handleNextInCurrentVibe}
       />
 
-      {/* Minimalist Centered Galactic Container */}
-      <main className="w-full max-w-[680px] relative z-10 space-y-5">
-        {/* Top Minimal Header Bar */}
-        <div
-          className="flex flex-wrap items-center justify-between gap-3 px-1"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-        >
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-4 h-4 text-violet-400" />
-            <span className="font-bold text-sm tracking-wide text-white">GameVibe</span>
-            <span className="text-xs text-slate-500">·</span>
-            <span className="text-xs text-slate-400">
-              {telemetry.detectedProcess}
-            </span>
-          </div>
-
-          <div
-            className="flex items-center gap-2"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            <button
-              type="button"
-              onClick={handleSimulateGameMomentChange}
-              className="min-h-[34px] px-3 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs text-slate-300 transition-colors"
-            >
-              Тест смены сцены
-            </button>
-
-            <button
-              type="button"
-              onClick={handleToggleAlwaysOnTop}
-              className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors ${
-                isPinnedOverlay
-                  ? 'bg-violet-500/25 text-violet-200 border-violet-400/40'
-                  : 'bg-white/[0.04] text-slate-300 border-white/[0.08] hover:bg-white/[0.08]'
-              }`}
-            >
-              <Pin className="w-3 h-3" />
-              <span>Поверх игры</span>
-            </button>
-          </div>
+      {/* Architectural Top Bar */}
+      <header
+        className="px-6 py-4 flex flex-wrap items-center justify-between gap-4 border-b"
+        style={
+          {
+            borderColor: theme.border,
+            WebkitAppRegion: 'drag',
+          } as React.CSSProperties
+        }
+      >
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-bold tracking-[0.22em] uppercase text-[#F2EFE9]">
+            GAMEVIBE
+          </span>
+          <span className="text-xs text-[#6E6A68]">/</span>
+          <span className="text-xs font-mono text-[#8F8A87]">
+            {telemetry.detectedProcess}
+          </span>
         </div>
 
-        {/* Main Galactic Autopilot Capsule */}
-        <section className="rounded-3xl bg-[#0A0C16]/85 backdrop-blur-2xl border border-indigo-300/15 shadow-[0_24px_80px_rgba(4,6,20,0.95)] p-6 sm:p-8 space-y-6">
-          {/* Status Row */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-white/[0.06]">
-            <div>
-              <div className="text-xs text-slate-400">
-                Режим игры сейчас:{' '}
-                <span className="text-violet-300 font-semibold">
-                  {activeVibeCfg.label}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                {activeVibeCfg.description}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setAutopilotEnabled((a) => !a)}
-              className={`min-h-[38px] px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                autopilotEnabled
-                  ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-[0_0_25px_rgba(139,92,246,0.4)]'
-                  : 'bg-white/[0.05] text-slate-400 border border-white/[0.08]'
-              }`}
-            >
-              {autopilotEnabled ? 'Авторежим активен' : 'Авторежим на паузе'}
-            </button>
+        <div
+          className="flex flex-wrap items-center gap-2 lg:pr-28"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          {/* Noble Dark Palette Switcher */}
+          <div
+            className="flex items-center p-0.5 rounded-[4px] border"
+            style={{ backgroundColor: theme.surface, borderColor: theme.border }}
+          >
+            {(Object.keys(NOBLE_THEMES) as NobleThemeId[]).map((tKey) => {
+              const t = NOBLE_THEMES[tKey];
+              const active = themeId === tKey;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setThemeId(t.id)}
+                  className="min-h-[30px] px-2.5 py-1 text-[11px] font-medium rounded-[3px] transition-colors"
+                  style={{
+                    backgroundColor: active ? theme.accentBg : 'transparent',
+                    color: active ? '#F2EFE9' : '#8F8A87',
+                  }}
+                >
+                  {t.name}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Track + Activity Sensor */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-6 items-center">
-            <div className="sm:col-span-7 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={handleToggleAlwaysOnTop}
+            className="min-h-[34px] px-3 py-1.5 rounded-[4px] text-xs font-medium flex items-center gap-1.5 border transition-colors"
+            style={{
+              backgroundColor: isPinnedOverlay ? theme.accentBg : theme.surface,
+              borderColor: isPinnedOverlay ? theme.accentBorder : theme.border,
+              color: '#E6E2DC',
+            }}
+          >
+            <Pin className="w-3 h-3" />
+            <span>Поверх окон</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Architectural Console */}
+      <main className="flex-1 max-w-[900px] w-full mx-auto px-6 py-8 sm:py-12 flex flex-col justify-center">
+        <div
+          className="rounded-[6px] border p-6 sm:p-10 space-y-8"
+          style={{
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
+          }}
+        >
+          {/* Top Section: Scene Status & Autopilot Switch */}
+          <div
+            className="flex flex-wrap items-start justify-between gap-4 pb-6 border-b"
+            style={{ borderColor: theme.border }}
+          >
+            <div className="space-y-1">
+              <div
+                className="text-[11px] font-mono uppercase tracking-[0.16em]"
+                style={{ color: theme.accentText }}
+              >
+                СОСТОЯНИЕ ИГРЫ · {activeVibeCfg.shortLabel}
+              </div>
+              <h2 className="text-lg sm:text-xl font-semibold text-[#F2EFE9]">
+                {activeVibeCfg.label}
+              </h2>
+              <p className="text-xs text-[#8A8582]">
+                {activeVibeCfg.description}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleSimulateGameMomentChange}
+                className="min-h-[40px] px-3.5 py-2 rounded-[4px] text-xs font-medium border transition-colors"
+                style={{
+                  backgroundColor: theme.surfaceElevated,
+                  borderColor: theme.border,
+                  color: '#C7C2BC',
+                }}
+              >
+                Сменить сцену (Тест)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAutopilotEnabled((a) => !a)}
+                className="min-h-[40px] px-4 py-2 rounded-[4px] text-xs font-semibold border transition-colors"
+                style={{
+                  backgroundColor: autopilotEnabled ? theme.accentBg : theme.surfaceElevated,
+                  borderColor: autopilotEnabled ? theme.accentBorder : theme.border,
+                  color: '#F2EFE9',
+                }}
+              >
+                {autopilotEnabled ? 'Автопилот: Включен' : 'Автопилот: Пауза'}
+              </button>
+            </div>
+          </div>
+
+          {/* Center Section: Album Cover, Track & Game Activity Sensor */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            <div className="md:col-span-7 flex items-center gap-5">
               <img
                 src={currentTrack.thumbnail}
                 alt={currentTrack.title}
-                className="w-24 h-24 rounded-2xl object-cover shrink-0 bg-slate-900 border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.6)]"
+                className="w-28 h-28 sm:w-32 sm:h-32 rounded-[4px] object-cover shrink-0 border"
+                style={{ borderColor: theme.border }}
               />
-              <div className="space-y-1 min-w-0">
-                <div className="text-xs text-violet-300/90 font-medium">
+              <div className="space-y-1.5 min-w-0">
+                <div
+                  className="text-[11px] font-mono uppercase tracking-[0.14em]"
+                  style={{ color: theme.accentText }}
+                >
                   {currentTrack.genreTag}
                 </div>
-                <h1 className="text-lg sm:text-xl font-bold text-white leading-snug">
+                <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#F2EFE9] leading-snug">
                   {currentTrack.title}
                 </h1>
-                <p className="text-sm text-slate-400">
+                <div className="text-sm text-[#B5B0AA]">
                   {currentTrack.artist}
-                </p>
-                <p className="text-xs text-slate-500">
+                </div>
+                <div className="text-xs text-[#787370]">
                   {currentTrack.album}
-                </p>
+                </div>
               </div>
             </div>
 
-            {/* Clean Activity & Sensitivity Box */}
-            <div className="sm:col-span-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 space-y-3">
-              <div className="space-y-1.5">
+            {/* Right Column: Clean Activity & Threshold Meters */}
+            <div
+              className="md:col-span-5 rounded-[4px] p-5 border space-y-4"
+              style={{
+                backgroundColor: theme.bg,
+                borderColor: theme.border,
+              }}
+            >
+              <div className="space-y-2">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Активность в игре</span>
-                  <span className="font-mono text-indigo-300">{telemetry.motionDelta}%</span>
+                  <span className="text-[#8F8A87]">Интенсивность в игре</span>
+                  <span className="font-mono text-[#E6E2DC]">
+                    {telemetry.motionDelta}%
+                  </span>
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-white/[0.07] overflow-hidden">
+                <div
+                  className="w-full h-[4px] overflow-hidden"
+                  style={{ backgroundColor: theme.surfaceElevated }}
+                >
                   <div
-                    className="h-full bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400 transition-all duration-500"
-                    style={{ width: `${telemetry.motionDelta}%` }}
+                    className="h-full transition-all duration-500"
+                    style={{
+                      width: `${telemetry.motionDelta}%`,
+                      backgroundColor: theme.barFill,
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="space-y-1 pt-1">
+              <div className="space-y-2 pt-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Порог экшена</span>
-                  <span className="font-mono text-slate-300">{actionThreshold}%</span>
+                  <span className="text-[#8F8A87]">Порог перехода в бой</span>
+                  <span className="font-mono text-[#E6E2DC]">
+                    {actionThreshold}%
+                  </span>
                 </div>
                 <input
                   type="range"
@@ -411,30 +548,38 @@ export default function GameVibeAutopilot() {
                   max={80}
                   value={actionThreshold}
                   onChange={(e) => setActionThreshold(Number(e.target.value))}
-                  className="w-full h-1 cursor-pointer"
-                  aria-label="Порог включения экшена"
+                  className="w-full cursor-pointer"
+                  aria-label="Порог перехода в бой"
                 />
               </div>
             </div>
           </div>
 
-          {/* Transport & Volume */}
-          <div className="pt-4 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-4">
+          {/* Transport Bar */}
+          <div
+            className="pt-6 border-t flex flex-wrap items-center justify-between gap-4"
+            style={{ borderColor: theme.border }}
+          >
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsPlaying((p) => !p)}
-                className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 text-white font-semibold text-xs flex items-center gap-2 shadow-[0_0_24px_rgba(124,58,237,0.35)] transition-all active:scale-95"
+                className="min-h-[44px] px-6 py-2.5 rounded-[4px] text-xs font-semibold flex items-center gap-2 border transition-colors"
+                style={{
+                  backgroundColor: theme.accentBg,
+                  borderColor: theme.accentBorder,
+                  color: '#F2EFE9',
+                }}
               >
                 {isPlaying ? (
                   <>
-                    <Pause className="w-4 h-4 fill-current" />
+                    <Pause className="w-3.5 h-3.5 fill-current" />
                     <span>Пауза</span>
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Запустить звук</span>
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    <span>Включить звук</span>
                   </>
                 )}
               </button>
@@ -442,15 +587,20 @@ export default function GameVibeAutopilot() {
               <button
                 type="button"
                 onClick={handleNextInCurrentVibe}
-                className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] text-xs flex items-center gap-1.5"
+                className="min-h-[44px] px-4 py-2.5 rounded-[4px] text-xs font-medium flex items-center gap-1.5 border transition-colors"
+                style={{
+                  backgroundColor: theme.surfaceElevated,
+                  borderColor: theme.border,
+                  color: '#D6D1CB',
+                }}
               >
-                <SkipForward className="w-4 h-4" />
+                <SkipForward className="w-3.5 h-3.5" />
                 <span>Следующий</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-1 min-w-[160px]">
-              <span className="text-[11px] font-mono text-slate-500 w-8 text-right">
+            <div className="flex items-center gap-3 flex-1 min-w-[160px] max-w-xs">
+              <span className="text-[11px] font-mono text-[#787370] w-8 text-right">
                 {formatSeconds(currentTime)}
               </span>
               <input
@@ -464,25 +614,25 @@ export default function GameVibeAutopilot() {
                   setCurrentTime(t);
                   if (audioRef.current) audioRef.current.currentTime = t;
                 }}
-                className="flex-1 h-1 cursor-pointer"
-                aria-label="Позиция трека"
+                className="flex-1 cursor-pointer"
+                aria-label="Позиция"
               />
-              <span className="text-[11px] font-mono text-slate-500 w-8">
+              <span className="text-[11px] font-mono text-[#787370] w-8">
                 {formatSeconds(duration)}
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsMuted((m) => !m)}
-                className="p-2 text-slate-400 hover:text-white"
+                className="p-2 text-[#8F8A87] hover:text-[#F2EFE9]"
                 aria-label="Звук"
               >
                 {isMuted ? (
-                  <VolumeX className="w-4 h-4 text-rose-400" />
+                  <VolumeX className="w-4 h-4" />
                 ) : (
-                  <Volume2 className="w-4 h-4 text-indigo-300" />
+                  <Volume2 className="w-4 h-4" />
                 )}
               </button>
               <input
@@ -499,34 +649,55 @@ export default function GameVibeAutopilot() {
               />
             </div>
           </div>
-        </section>
 
-        {/* Minimalist 4-Pill Taste Selector */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {[
-            { id: 'mix' as GenrePackId, name: 'Все лучшее' },
-            { id: 'rap-phonk' as GenrePackId, name: 'Рэп и Фонк' },
-            { id: 'rock-metal' as GenrePackId, name: 'Рок и Метал' },
-            { id: 'electronic' as GenrePackId, name: 'Электроника' },
-          ].map((item) => {
-            const active = selectedPack === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedPack(item.id)}
-                className={`min-h-[44px] px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all border ${
-                  active
-                    ? 'bg-indigo-500/20 text-white border-indigo-400/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                    : 'bg-[#0A0C16]/70 text-slate-400 border-white/[0.06] hover:text-slate-200 hover:border-white/15'
-                }`}
-              >
-                {item.name}
-              </button>
-            );
-          })}
+          {/* Bottom Section: 4 Architectural Genre Tiles */}
+          <div
+            className="pt-6 border-t space-y-3"
+            style={{ borderColor: theme.border }}
+          >
+            <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#787370]">
+              МУЗЫКАЛЬНОЕ НАПРАВЛЕНИЕ АВТОПИЛОТА
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { id: 'mix' as GenrePackId, title: 'Все лучшее', sub: 'Рок, Рэп, Электроника' },
+                { id: 'rap-phonk' as GenrePackId, title: 'Рэп и Фонк', sub: 'Travis Scott, Скриптонит, BONES' },
+                { id: 'rock-metal' as GenrePackId, title: 'Рок и Метал', sub: 'Deftones, Linkin Park, Rammstein' },
+                { id: 'electronic' as GenrePackId, title: 'Электроника', sub: 'The Prodigy, Kavinsky, Pendulum' },
+              ].map((pack) => {
+                const active = selectedPack === pack.id;
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => setSelectedPack(pack.id)}
+                    className="min-h-[60px] p-3.5 rounded-[4px] text-left border transition-colors flex flex-col justify-between"
+                    style={{
+                      backgroundColor: active ? theme.accentSoftBg : theme.bg,
+                      borderColor: active ? theme.accentBorder : theme.border,
+                    }}
+                  >
+                    <div className="text-xs font-semibold text-[#F2EFE9]">
+                      {pack.title}
+                    </div>
+                    <div className="text-[11px] text-[#8A8582] mt-1">
+                      {pack.sub}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </main>
+
+      <footer
+        className="px-6 py-3 border-t text-[11px] text-[#6E6A68] flex items-center justify-between"
+        style={{ borderColor: theme.border }}
+      >
+        <span>GameVibe · Автоматическая адаптация музыки под игру</span>
+        <span className="font-mono">{theme.name}</span>
+      </footer>
     </div>
   );
 }
