@@ -4,6 +4,13 @@ export const dynamic = 'force-dynamic';
 
 let cachedClientId = '2yeWkbX88QhTzS3OtZp8cLGaJRrOAWwF';
 
+// Strict blacklist for cheap remixes, garage covers, sped up/slowed edits, and tribute bands
+const NEGATIVE_TITLE_REGEX =
+  /\b(remix|remixed|rmx|slowed|reverb|sped\s*up|speed\s*up|speedup|nightcore|cover|karaoke|tribute|8-?bit|chiptune|bass\s*boost|bassboosted?|hardstyle|techno\s*edit|house\s*edit|dnb\s*edit|drill|type\s*beat|loop|parody|mashup|edit|bootleg|flip|rework|intense|guitar\s*cover|drum\s*cover|acoustic\s*cover|lo-?fi\s*remix|orchestral\s*cover|кавер|минус|ремикс|замедлен|ускорен|басс|на\s*русском|на\s*украинском|трибьют|перевод|караоке)\b/i;
+
+const NEGATIVE_ARTIST_REGEX =
+  /\b(tribute|karaoke|cover\s*band|orchestra|in\s*the\s*style\s*of|originally\s*performed\s*by|string\s*quartet|soundtrack\s*band|lo-?fi\s*producer)\b/i;
+
 async function getSoundCloudClientId(): Promise<string> {
   if (cachedClientId) return cachedClientId;
   try {
@@ -25,10 +32,87 @@ async function getSoundCloudClientId(): Promise<string> {
   return cachedClientId;
 }
 
+interface RankedTrack {
+  item: Record<string, unknown>;
+  score: number;
+}
+
+function scoreCandidate(
+  item: Record<string, unknown>,
+  expectedArtist: string,
+  expectedTitle: string,
+  expectedDurSec: number,
+  allowInstrumental: boolean
+): number {
+  const durS = Math.floor((Number(item.duration) || 0) / 1000);
+  // Full song length filter (reject 30s clips and 1-hour loops)
+  if (durS < 75 || durS > 620) return -9999;
+
+  const tTitle = String(item.title || '');
+  const userObj = (item.user as Record<string, unknown>) || {};
+  const uName = String(userObj.username || '');
+  const isVerified = Boolean(userObj.verified);
+  const plays = Number(item.playback_count) || 0;
+
+  let score = 50;
+
+  // Strict penalty for non-original buzzwords
+  if (NEGATIVE_TITLE_REGEX.test(tTitle)) {
+    score -= 350;
+  }
+  if (!allowInstrumental && /\binstrumental\b/i.test(tTitle)) {
+    score -= 300;
+  }
+  if (NEGATIVE_ARTIST_REGEX.test(uName)) {
+    score -= 400;
+  }
+
+  // Official verified artist uploader boost
+  if (isVerified) score += 140;
+
+  // Uploader username matches expected artist
+  const cleanExpArtist = expectedArtist.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '');
+  const cleanUploader = uName.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '');
+  if (cleanExpArtist.length > 2 && cleanUploader.includes(cleanExpArtist)) {
+    score += 120;
+  }
+
+  // Clean title match (boost when title contains the song name without extra noise)
+  const cleanExpTitle = expectedTitle.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '');
+  const cleanTrackTitle = tTitle.toLowerCase().replace(/[^a-z0-9а-яё]/gi, '');
+  if (cleanExpTitle.length > 2 && cleanTrackTitle.includes(cleanExpTitle)) {
+    score += 80;
+  }
+
+  // Official studio album duration match
+  if (expectedDurSec > 0) {
+    const diff = Math.abs(durS - expectedDurSec);
+    if (diff <= 8) {
+      // Almost exact album cut
+      score += 130;
+    } else if (diff <= 22) {
+      score += 60;
+    } else if (diff > 50) {
+      score -= 90;
+    }
+  }
+
+  // Popularity boost (original official releases have millions of plays)
+  if (plays > 3000000) score += 60;
+  else if (plays > 800000) score += 35;
+  else if (plays < 5000 && !isVerified) score -= 40;
+
+  return score;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
+  const expectedArtist = searchParams.get('artist') || '';
+  const expectedTitle = searchParams.get('title') || '';
+  const expectedDurSec = Number(searchParams.get('dur') || 0);
   const fallbackUrl = searchParams.get('fallback') || '';
+  const allowInstrumental = searchParams.get('vocal') === 'instrumental';
 
   if (!query.trim()) {
     if (fallbackUrl) return NextResponse.redirect(fallbackUrl);
@@ -37,9 +121,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const cid = await getSoundCloudClientId();
+    const cleanSearchQuery = `${expectedArtist} ${expectedTitle}`.trim() || query.trim();
+
     const searchUrl = `https://api-v2.soundcloud.com/search/tracks?q=${encodeURIComponent(
-      query.trim()
-    )}&client_id=${cid}&limit=12`;
+      cleanSearchQuery
+    )}&client_id=${cid}&limit=16`;
 
     const searchRes = await fetch(searchUrl);
     if (!searchRes.ok) {
@@ -53,16 +139,40 @@ export async function GET(request: NextRequest) {
       ? searchData.collection
       : [];
 
-    // Prefer full-length tracks (> 90 seconds) with unencrypted HLS audio/mp4 (fMP4 CMAF) or progressive MP3
+    // Score and rank all candidate tracks to find the TRUE ORIGINAL song
+    const ranked: RankedTrack[] = [];
+    for (const item of collection) {
+      const score = scoreCandidate(
+        item,
+        expectedArtist,
+        expectedTitle,
+        expectedDurSec,
+        allowInstrumental
+      );
+      if (score > 0) {
+        ranked.push({ item, score });
+      }
+    }
+
+    ranked.sort((a, b) => b.score - a.score);
+
+    // If no candidate scored well or all were low-quality remixes/covers, fall back to authentic studio master
+    if (ranked.length === 0 || ranked[0].score < 40) {
+      if (fallbackUrl) {
+        return NextResponse.redirect(fallbackUrl);
+      }
+    }
+
+    const candidatePool = ranked.length > 0 ? ranked.map((r) => r.item) : collection;
+
+    // Pick top scored track that has unencrypted stream
     let chosenTranscoding: { url: string; protocol: string; mime: string } | null = null;
 
-    for (const item of collection) {
-      const dur = typeof item.duration === 'number' ? item.duration : 0;
-      if (dur < 85000) continue;
-
+    for (const item of candidatePool) {
       const media = item.media as { transcodings?: Array<Record<string, unknown>> } | undefined;
       const transcodings = Array.isArray(media?.transcodings) ? media!.transcodings : [];
 
+      // 1. Prefer progressive MP3
       const prog = transcodings.find((tr) => {
         const fmt = tr.format as { protocol?: string } | undefined;
         return fmt?.protocol === 'progressive';
@@ -76,6 +186,7 @@ export async function GET(request: NextRequest) {
         break;
       }
 
+      // 2. Fall back to HLS fMP4
       const hlsMp4 = transcodings.find((tr) => {
         const fmt = tr.format as { protocol?: string; mime_type?: string } | undefined;
         return fmt?.protocol === 'hls' && fmt?.mime_type?.startsWith('audio/mp4');
@@ -112,7 +223,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(manifestOrMp3Url);
     }
 
-    // Fetch the HLS fMP4 M3U8 playlist and stream init.mp4 + all dataNNN.m4s segments continuously
+    // Fetch the HLS fMP4 M3U8 playlist and stream init.mp4 + data segments
     const m3u8Text = await fetch(manifestOrMp3Url).then((r) => r.text());
     const initMatch = m3u8Text.match(/#EXT-X-MAP:URI="([^"]+)"/);
     const segmentUrls = m3u8Text

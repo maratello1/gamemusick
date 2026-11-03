@@ -178,6 +178,14 @@ fn main() {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
 
+    // Ensure 50Hz high-precision interactive sensor is active in the user session
+    let sensor_exe = project_dir.join("desktop").join("interactive_sensor.exe");
+    if sensor_exe.exists() {
+        let _ = Command::new(&sensor_exe)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+
     if is_port_open(3000) {
         open_app_window("http://localhost:3000");
         return;

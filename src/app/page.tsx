@@ -164,7 +164,7 @@ export default function GameVibeSpotifyApp() {
 
   // Autonomous Autopilot state
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(true);
-  const [sensitivity, setSensitivity] = useState<number>(42);
+  const [sensitivity, setSensitivity] = useState<number>(34); // Sensible default: triggers combat fast on real game actions
   const [alwaysOnTop, setAlwaysOnTop] = useState<boolean>(false);
   const [systemMediaSync, setSystemMediaSync] = useState<boolean>(false);
   const [userMoodHint, setUserMoodHint] = useState<string>('');
@@ -173,6 +173,15 @@ export default function GameVibeSpotifyApp() {
   );
   const [liveStreamTracks, setLiveStreamTracks] = useState<TrackItem[]>(FALLBACK_REAL_TRACKS);
   const [loadingStream, setLoadingStream] = useState<boolean>(false);
+
+  // Preloaded decks for instant zero-latency scene switching (EXPLORE, STEALTH, COMBAT, BOSSFIGHT)
+  const decksRef = useRef<Record<VibeStateId, TrackItem[]>>({
+    EXPLORE: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'EXPLORE'),
+    STEALTH: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'STEALTH'),
+    COMBAT: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'COMBAT'),
+    BOSSFIGHT: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'BOSSFIGHT'),
+    VICTORY: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'VICTORY' || t.vibe === 'EXPLORE'),
+  });
 
   // Playback state (Full-length audio stream)
   const [currentTrack, setCurrentTrack] = useState<TrackItem>(FALLBACK_REAL_TRACKS[0]);
@@ -205,17 +214,43 @@ export default function GameVibeSpotifyApp() {
 
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>({
     timestamp: Date.now(),
-    detectedProcess: 'Ожидание игры',
-    windowTitle: 'Рабочий стол Windows',
-    motionDelta: 12,
-    redAlertRatio: 2,
-    brightness: 46,
+    detectedProcess: 'Castlevania Belmont\'s Curse',
+    windowTitle: 'Castlevania Belmont\'s Curse',
+    motionDelta: 14,
+    redAlertRatio: 0,
+    brightness: 25,
     inferredVibe: 'EXPLORE',
-    sensorMode: 'win32-live',
+    sensorMode: 'win32-interactive-50hz',
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const lastSwitchRef = useRef<number>(0);
+  const activeVibeRef = useRef<VibeStateId>('EXPLORE');
+  const autopilotRef = useRef<boolean>(true);
+  const sensitivityRef = useRef<number>(34);
+  const currentTrackRef = useRef<TrackItem>(FALLBACK_REAL_TRACKS[0]);
+  const isPlayingRef = useRef<boolean>(false);
+  const lastCombatSpikeRef = useRef<number>(0);
+
+  // Keep refs synchronized
+  useEffect(() => {
+    activeVibeRef.current = activeVibe;
+  }, [activeVibe]);
+
+  useEffect(() => {
+    autopilotRef.current = autopilotEnabled;
+  }, [autopilotEnabled]);
+
+  useEffect(() => {
+    sensitivityRef.current = sensitivity;
+  }, [sensitivity]);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
 
   // Load saved account profile & user playlists from disk
   useEffect(() => {
@@ -237,86 +272,55 @@ export default function GameVibeSpotifyApp() {
           setDraftDriveMode(p.driveMode || 'balanced');
           setDraftLanguagePref(p.languagePref || 'all');
           setDraftVocalPref(p.vocalPref || 'mixed');
+          preloadAllDecks(p);
         }
       })
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /**
-   * Autonomous Dynamic Autopilot Stream Fetcher:
-   * Uses the user's Account Taste Profile (genres, favorite artists, language, vocal pref)
-   * combined with live game telemetry (scene, brightness, motion) to stream full tracks on the fly.
+   * Preload track decks for all scenes (EXPLORE, STEALTH, COMBAT, BOSSFIGHT)
+   * so combat switching is 100% instant (< 100ms) with zero network waiting.
    */
-  const fetchDynamicStreamForScene = useCallback(
-    async (
-      scene: VibeStateId,
-      snap: TelemetrySnapshot,
-      hintText: string,
-      autoPlayFirst: boolean,
-      overrideProfile?: UserAccountProfile | null
-    ) => {
-      if (useCustomPlaylistInAutopilot && selectedPlaylistId) {
-        const activePl = userPlaylists.find((p) => p.id === selectedPlaylistId);
-        if (activePl && activePl.tracks.length > 0) {
-          const matching = activePl.tracks.filter((t) => t.vibe === scene);
-          const pool = matching.length > 0 ? matching : activePl.tracks;
-          const chosen = pool[Math.floor(Math.random() * pool.length)];
-          setCurrentTrack(chosen);
-          setDurationSec(parseDurationStringToSec(chosen.duration));
-          setProgressSec(0);
-          if (autoPlayFirst) setIsPlaying(true);
-          return;
-        }
-      }
-
-      const activeProf = overrideProfile !== undefined ? overrideProfile : accountProfile;
-      const genresList = activeProf?.favoriteGenres || draftGenres;
-      const customExtra = (activeProf?.customArtistsText || draftCustomArtists)
+  const preloadAllDecks = useCallback(
+    async (profileToUse?: UserAccountProfile | null) => {
+      const prof = profileToUse !== undefined ? profileToUse : accountProfile;
+      const genresList = prof?.favoriteGenres || draftGenres;
+      const customExtra = (prof?.customArtistsText || draftCustomArtists)
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const artistsList = [...(activeProf?.favoriteArtists || draftArtists), ...customExtra];
+      const artistsList = [...(prof?.favoriteArtists || draftArtists), ...customExtra];
+      const scenes: VibeStateId[] = ['EXPLORE', 'COMBAT', 'BOSSFIGHT', 'STEALTH'];
 
-      setLoadingStream(true);
-      try {
-        const params = new URLSearchParams({
-          mode: 'autopilot',
-          vibe: scene,
-          brightness: String(snap.brightness),
-          motion: String(snap.motionDelta),
-          process: snap.detectedProcess,
-          hint: hintText,
-          genres: genresList.join(','),
-          artists: artistsList.join(','),
-          lang: activeProf?.languagePref || draftLanguagePref,
-          vocal: activeProf?.vocalPref || draftVocalPref,
-        });
-        const res = await fetch(`/api/ytmusic?${params.toString()}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.resolvedMoodQuery) {
-          setResolvedMoodQuery(data.resolvedMoodQuery);
-        }
-        if (Array.isArray(data.tracks) && data.tracks.length > 0) {
-          setLiveStreamTracks(data.tracks);
-          const first = data.tracks[0];
-          setCurrentTrack(first);
-          setDurationSec(parseDurationStringToSec(first.duration));
-          setProgressSec(0);
-          if (autoPlayFirst) {
-            setIsPlaying(true);
+      await Promise.all(
+        scenes.map(async (sc) => {
+          try {
+            const params = new URLSearchParams({
+              mode: 'autopilot',
+              vibe: sc,
+              genres: genresList.join(','),
+              artists: artistsList.join(','),
+              lang: prof?.languagePref || draftLanguagePref,
+              vocal: prof?.vocalPref || draftVocalPref,
+            });
+            const res = await fetch(`/api/ytmusic?${params.toString()}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+              decksRef.current[sc] = data.tracks;
+              if (sc === activeVibeRef.current) {
+                setLiveStreamTracks(data.tracks);
+              }
+            }
+          } catch {
+            // Keep fallback deck
           }
-        }
-      } catch {
-        // ignore
-      } finally {
-        setLoadingStream(false);
-      }
+        })
+      );
     },
     [
-      useCustomPlaylistInAutopilot,
-      selectedPlaylistId,
-      userPlaylists,
       accountProfile,
       draftGenres,
       draftArtists,
@@ -326,13 +330,63 @@ export default function GameVibeSpotifyApp() {
     ]
   );
 
-  // Initial autonomous stream discovery on mount
+  /**
+   * Instant Zero-Latency Scene Switcher:
+   * Immediately switches the playing track to the corresponding scene's preloaded deck.
+   */
+  const switchToSceneImmediately = useCallback(
+    (targetVibe: VibeStateId) => {
+      if (activeVibeRef.current === targetVibe) return;
+      activeVibeRef.current = targetVibe;
+      setActiveVibe(targetVibe);
+
+      // 1. Check custom user playlist if selected
+      if (useCustomPlaylistInAutopilot && selectedPlaylistId) {
+        const activePl = userPlaylists.find((p) => p.id === selectedPlaylistId);
+        if (activePl && activePl.tracks.length > 0) {
+          const matching = activePl.tracks.filter((t) => t.vibe === targetVibe);
+          const pool = matching.length > 0 ? matching : activePl.tracks;
+          const chosen = pool[Math.floor(Math.random() * pool.length)];
+          currentTrackRef.current = chosen;
+          setCurrentTrack(chosen);
+          setDurationSec(parseDurationStringToSec(chosen.duration));
+          setProgressSec(0);
+          setIsPlaying(true);
+          if (audioRef.current) {
+            audioRef.current.src = chosen.previewUrl;
+            audioRef.current.play().catch(() => {});
+          }
+          return;
+        }
+      }
+
+      // 2. Select authentic original track from the target scene's preloaded deck
+      const deck = decksRef.current[targetVibe] || [];
+      if (deck.length > 0) {
+        const chosen =
+          deck.find((t) => t.id !== currentTrackRef.current?.id) || deck[0];
+        currentTrackRef.current = chosen;
+        setCurrentTrack(chosen);
+        setLiveStreamTracks(deck);
+        setDurationSec(parseDurationStringToSec(chosen.duration));
+        setProgressSec(0);
+        setIsPlaying(true);
+        if (audioRef.current) {
+          audioRef.current.src = chosen.previewUrl;
+          audioRef.current.play().catch(() => {});
+        }
+      }
+    },
+    [useCustomPlaylistInAutopilot, selectedPlaylistId, userPlaylists]
+  );
+
+  // Initial preload on mount
   useEffect(() => {
-    fetchDynamicStreamForScene('EXPLORE', telemetry, '', false);
+    preloadAllDecks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autonomous real-time game screen & input telemetry loop
+  // Autonomous real-time game screen & input telemetry loop (every 750ms)
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -346,51 +400,57 @@ export default function GameVibeSpotifyApp() {
               ? raw.brightness
               : typeof raw.screenBrightness === 'number'
               ? raw.screenBrightness
-              : 46,
+              : 25,
         };
         setTelemetry(data);
 
-        if (autopilotEnabled) {
-          let targetVibe: VibeStateId = data.inferredVibe;
-          if (data.motionDelta >= sensitivity + 26 || data.redAlertRatio >= 16) {
-            targetVibe = 'BOSSFIGHT';
-          } else if (data.motionDelta >= sensitivity) {
-            targetVibe = 'COMBAT';
-          } else if (data.brightness < 24 && data.motionDelta >= 12) {
-            targetVibe = 'STEALTH';
-          } else {
-            targetVibe = 'EXPLORE';
-          }
-
+        if (autopilotRef.current) {
+          const currentVibe = activeVibeRef.current;
+          const motion = data.motionDelta;
+          const redAlert = data.redAlertRatio;
+          const sens = sensitivityRef.current;
+          const inferred = data.inferredVibe;
           const now = Date.now();
-          if (targetVibe !== activeVibe && now - lastSwitchRef.current > 8500) {
-            lastSwitchRef.current = now;
-            setActiveVibe(targetVibe);
-            fetchDynamicStreamForScene(targetVibe, data, userMoodHint, true);
 
-            if (systemMediaSync) {
-              fetch('/api/system-media', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'next' }),
-              }).catch(() => {});
+          // Combat trigger condition: either inferred by 50Hz sensor or motion exceeds threshold
+          const isCombatMotion =
+            inferred === 'COMBAT' ||
+            inferred === 'BOSSFIGHT' ||
+            motion >= sens ||
+            redAlert >= 18;
+
+          if (isCombatMotion) {
+            lastCombatSpikeRef.current = now;
+            const targetCombatVibe: VibeStateId =
+              inferred === 'BOSSFIGHT' || motion >= sens + 22 || redAlert >= 45
+                ? 'BOSSFIGHT'
+                : 'COMBAT';
+
+            if (currentVibe !== targetCombatVibe) {
+              switchToSceneImmediately(targetCombatVibe);
+            }
+          } else {
+            // Calm state: either explore or stealth
+            const targetCalmVibe: VibeStateId =
+              data.brightness < 20 && motion >= 16 ? 'STEALTH' : 'EXPLORE';
+
+            // When in combat, only return to calm if at least 9.5 seconds of peace have passed
+            if (currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT') {
+              if (now - lastCombatSpikeRef.current > 9500) {
+                switchToSceneImmediately(targetCalmVibe);
+              }
+            } else if (currentVibe !== targetCalmVibe) {
+              switchToSceneImmediately(targetCalmVibe);
             }
           }
         }
       } catch {
         // ignore
       }
-    }, 1500);
+    }, 750);
 
     return () => clearInterval(interval);
-  }, [
-    autopilotEnabled,
-    activeVibe,
-    sensitivity,
-    userMoodHint,
-    systemMediaSync,
-    fetchDynamicStreamForScene,
-  ]);
+  }, [switchToSceneImmediately]);
 
   // Full-length audio playback lifecycle
   useEffect(() => {
@@ -446,7 +506,21 @@ export default function GameVibeSpotifyApp() {
         const saved = data.accountProfile || profilePayload;
         setAccountProfile(saved);
         setActiveSection('autopilot');
-        await fetchDynamicStreamForScene(activeVibe, telemetry, userMoodHint, true, saved);
+        await preloadAllDecks(saved);
+        const deck = decksRef.current[activeVibeRef.current] || [];
+        if (deck.length > 0) {
+          const first = deck[0];
+          currentTrackRef.current = first;
+          setCurrentTrack(first);
+          setLiveStreamTracks(deck);
+          setDurationSec(parseDurationStringToSec(first.duration));
+          setProgressSec(0);
+          setIsPlaying(true);
+          if (audioRef.current) {
+            audioRef.current.src = first.previewUrl;
+            audioRef.current.play().catch(() => {});
+          }
+        }
       }
     } catch {
       // ignore
@@ -618,10 +692,17 @@ export default function GameVibeSpotifyApp() {
   };
 
   const playSpecificTrack = (track: TrackItem) => {
+    currentTrackRef.current = track;
     setCurrentTrack(track);
     setDurationSec(parseDurationStringToSec(track.duration));
     setProgressSec(0);
     setIsPlaying(true);
+    if (audioRef.current) {
+      if (audioRef.current.src !== track.previewUrl) {
+        audioRef.current.src = track.previewUrl;
+      }
+      audioRef.current.play().catch(() => {});
+    }
   };
 
   const skipTrack = useCallback(
@@ -632,20 +713,37 @@ export default function GameVibeSpotifyApp() {
           : liveStreamTracks;
       if (activePool.length === 0) return;
 
-      const idx = activePool.findIndex((t) => t.id === currentTrack?.id);
+      const idx = activePool.findIndex((t) => t.id === currentTrackRef.current?.id);
       const nextIdx = idx + dir;
 
       if (nextIdx >= activePool.length && activeSection === 'autopilot') {
-        fetchDynamicStreamForScene(activeVibe, telemetry, userMoodHint, true);
+        const deck = decksRef.current[activeVibeRef.current] || [];
+        if (deck.length > 0) {
+          const nextTrack = deck[0];
+          currentTrackRef.current = nextTrack;
+          setCurrentTrack(nextTrack);
+          setDurationSec(parseDurationStringToSec(nextTrack.duration));
+          setProgressSec(0);
+          setIsPlaying(true);
+          if (audioRef.current) {
+            audioRef.current.src = nextTrack.previewUrl;
+            audioRef.current.play().catch(() => {});
+          }
+        }
         return;
       }
 
       const wrappedIdx = (nextIdx + activePool.length) % activePool.length;
       const nextTrack = activePool[wrappedIdx];
+      currentTrackRef.current = nextTrack;
       setCurrentTrack(nextTrack);
       setDurationSec(parseDurationStringToSec(nextTrack.duration));
       setProgressSec(0);
       setIsPlaying(true);
+      if (audioRef.current) {
+        audioRef.current.src = nextTrack.previewUrl;
+        audioRef.current.play().catch(() => {});
+      }
 
       if (systemMediaSync) {
         fetch('/api/system-media', {
@@ -659,12 +757,7 @@ export default function GameVibeSpotifyApp() {
       activeSection,
       searchResults,
       liveStreamTracks,
-      currentTrack,
-      activeVibe,
-      telemetry,
-      userMoodHint,
       systemMediaSync,
-      fetchDynamicStreamForScene,
     ]
   );
 
@@ -730,7 +823,10 @@ export default function GameVibeSpotifyApp() {
                   GameVibe
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-[#8C8482]">
+              <span
+                className="text-[11px] font-mono text-[#8C8482] truncate max-w-[125px] sm:max-w-[160px] text-right"
+                title={telemetry.detectedProcess}
+              >
                 {telemetry.detectedProcess}
               </span>
             </div>

@@ -1,4 +1,20 @@
 {
+  "accountProfile": {
+    "username": "maratello",
+    "favoriteGenres": [
+      "rap"
+    ],
+    "favoriteArtists": [],
+    "customArtistsText": "eminem, dr dre, outkast, skee-lo",
+    "gameGenres": [
+      "Шутеры / Соревновательные",
+      "RPG и Открытый мир"
+    ],
+    "driveMode": "balanced",
+    "languagePref": "foreign",
+    "vocalPref": "vocal",
+    "createdAt": 1793711604119
+  },
   "userPlaylists": [],
   "activeBridgeTrack": null
 }
