@@ -11,11 +11,6 @@ function formatDurationMs(ms?: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-/**
- * Automatic Audio Energy & Scene Classifier:
- * Analyzes artist, genre, and track metadata so the program determines on its own
- * which in-game moment (EXPLORE, STEALTH, COMBAT, BOSSFIGHT) a song fits best.
- */
 function classifyTrackSceneAutomatically(
   title: string,
   artist: string,
@@ -59,115 +54,48 @@ function classifyTrackSceneAutomatically(
   return fallbackVibe;
 }
 
-const SCENE_ARTIST_MOOD_POOLS: Record<
-  VibeStateId,
-  { dark: string[]; bright: string[]; description: string }
-> = {
-  EXPLORE: {
-    description: 'Спокойная игра и исследование',
-    dark: [
-      'Deftones Entombed',
-      'Kavinsky Nightcall',
-      'Скриптонит Положение',
-      'Кино Спокойная ночь',
-      'Radiohead',
-      'The Neighbourhood',
-      'Massive Attack',
-      'M83',
-      'Placebo',
-    ],
-    bright: [
-      'Arctic Monkeys',
-      'Tame Impala',
-      'Gorillaz',
-      'Daft Punk',
-      'A$AP Rocky',
-      'Miyagi',
-      'Nirvana Come As You Are',
-      'Red Hot Chili Peppers',
-      'The Weeknd',
-    ],
+const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
+  rock: {
+    EXPLORE: ['Deftones Entombed', 'Кино Спокойная ночь', 'Arctic Monkeys 505', 'Radiohead', 'Nirvana Come As You Are', 'Placebo'],
+    STEALTH: ['Muse Supermassive', 'Deftones Change', 'Nine Inch Nails', 'Король и Шут', 'Depeche Mode'],
+    COMBAT: ['Linkin Park Faint', 'Nirvana Smells Like Teen Spirit', 'Muse Hysteria', 'Royal Blood', 'Кино Группа крови'],
+    BOSSFIGHT: ['Deftones My Own Summer', 'Linkin Park Given Up', 'Bring Me The Horizon', 'Queens of the Stone Age'],
+    VICTORY: ['Linkin Park In The End', 'Deftones Rosemary', 'Arctic Monkeys'],
   },
-  STEALTH: {
-    description: 'Скрытность, ночь и напряжение',
-    dark: [
-      'BONES HDMI',
-      'Crystal Castles Kerosene',
-      'Gesaffelstein',
-      '$uicideboy$',
-      'DVRST Close Eyes',
-      'PHARAOH',
-      '21 Savage',
-      'Metro Boomin',
-      'Night Lovell',
-      'Interworld Metamorphosis',
-    ],
-    bright: [
-      'Muse Supermassive',
-      'Depeche Mode',
-      'Travis Scott',
-      'Playboi Carti',
-      'Future',
-      'Perturbator',
-      'Kavinsky',
-      'Justice',
-    ],
+  metal: {
+    EXPLORE: ['Deftones Sextape', 'System Of A Down Aerials', 'Metallica Nothing Else Matters', 'Slipknot Vermilion'],
+    STEALTH: ['Rammstein Mein Herz Brennt', 'Korn', 'Deftones Change', 'Marilyn Manson'],
+    COMBAT: ['System Of A Down Toxicity', 'Bring Me The Horizon Throne', 'Limp Bizkit Break Stuff', 'Disturbed'],
+    BOSSFIGHT: ['Rammstein Sonne', 'Slipknot Duality', 'System Of A Down Chop Suey', 'Metallica Master of Puppets', 'Pantera Walk', 'Slayer'],
+    VICTORY: ['System Of A Down Lonely Day', 'Metallica Fade to Black', 'Linkin Park'],
   },
-  COMBAT: {
-    description: 'Активный экшен и динамика',
-    dark: [
-      'Travis Scott FE!N',
-      'Playboi Carti Sky',
-      'The Prodigy Omen',
-      'Pendulum Propane Nightmares',
-      'Denzel Curry Ultimate',
-      'Linkin Park',
-      'Bring Me The Horizon',
-      'Big Baby Tape',
-      'Yeat',
-      'Carpenter Brut Turbo Killer',
-    ],
-    bright: [
-      'Linkin Park Faint',
-      'Nirvana Smells Like Teen Spirit',
-      'Muse Hysteria',
-      'System Of A Down',
-      'Kanye West',
-      'Travis Scott',
-      'The Chemical Brothers',
-      'Royal Blood',
-      'Pendulum',
-    ],
+  rap: {
+    EXPLORE: ['Скриптонит Положение', 'A$AP Rocky Sundress', 'Miyagi Silhouette', 'Kanye West Flashing Lights', 'Kid Cudi'],
+    STEALTH: ['BONES HDMI', '$uicideboy$ Paris', 'PHARAOH Black Siemens', '21 Savage redrum', 'Night Lovell'],
+    COMBAT: ['Travis Scott FE!N', 'Playboi Carti Sky', 'Denzel Curry Ultimate', 'Big Baby Tape 99 Problems', 'Yeat', 'Future'],
+    BOSSFIGHT: ['Playboi Carti Stop Breathing', 'Ghostemane Mercury', 'XXXTENTACION Look At Me', 'Denzel Curry Sumo', 'BONES RestInPeace'],
+    VICTORY: ['Kanye West Stronger', 'A$AP Rocky Praise The Lord', 'Travis Scott Goosebumps'],
   },
-  BOSSFIGHT: {
-    description: 'Максимальный накал и пик боя',
-    dark: [
-      'Rammstein Sonne',
-      'Slipknot Duality',
-      'Deftones My Own Summer',
-      'System Of A Down Chop Suey',
-      'Metallica Master of Puppets',
-      'Ghostemane Mercury',
-      'Korn',
-      'Slayer',
-      'Pantera Walk',
-      'The Prodigy Breathe',
-    ],
-    bright: [
-      'Rammstein',
-      'Metallica',
-      'Linkin Park Faint',
-      'System Of A Down',
-      'Slipknot',
-      'Bring Me The Horizon Kingslayer',
-      'Deftones',
-      'Disturbed',
-    ],
+  phonk: {
+    EXPLORE: ['DVRST Dream Space', 'Skeler Tel Aviv', 'LXST CXNTURY Odium', 'Interworld'],
+    STEALTH: ['DVRST Close Eyes', 'Interworld Metamorphosis', 'Kaito Shoma', 'Hensonn Sahara'],
+    COMBAT: ['Kordhell Murder In My Mind', 'PlayaPhonk Phonky Town', 'MoonDeity Wake Up', 'Shadxwbxrn'],
+    BOSSFIGHT: ['Kordhell Live Another Day', 'Ghostface Playa Why Not', 'raze', 'Dxrk ダーク RAVE'],
+    VICTORY: ['DVRST Close Eyes', 'LXST CXNTURY'],
   },
-  VICTORY: {
-    description: 'Завершение боя',
-    dark: ['Deftones Change', 'Кино Группа крови', 'Kanye West', 'Linkin Park In The End'],
-    bright: ['Kanye West Flashing Lights', 'Daft Punk', 'Gorillaz Feel Good Inc', 'Arctic Monkeys'],
+  electronic: {
+    EXPLORE: ['Kavinsky Nightcall', 'Daft Punk Veridis Quo', 'M83 Midnight City', 'Aphex Twin Xtal', 'Burial Archangel'],
+    STEALTH: ['Crystal Castles Kerosene', 'Gesaffelstein Aleph', 'Massive Attack Angel', 'Portishead Roads'],
+    COMBAT: ['The Prodigy Omen', 'Pendulum Propane Nightmares', 'Gesaffelstein Pursuit', 'Justice Stress'],
+    BOSSFIGHT: ['The Prodigy Breathe', 'Carpenter Brut Turbo Killer', 'Pendulum Watercolour', 'Perturbator Future Club'],
+    VICTORY: ['Daft Punk Instant Crush', 'Gorillaz Feel Good Inc', 'The Weeknd Blinding Lights'],
+  },
+  indie: {
+    EXPLORE: ['Tame Impala Let It Happen', 'Mac DeMarco Chamber of Reflection', 'The Neighbourhood Sweater Weather', 'Gorillaz Melancholy Hill', 'Cigarettes After Sex'],
+    STEALTH: ['Radiohead Everything In Its Right Place', 'Massive Attack Teardrop', 'Beach House Space Song', 'Alt-J'],
+    COMBAT: ['Franz Ferdinand Take Me Out', 'Arctic Monkeys Brianstorm', 'The Strokes Reptilia', 'Kasabian Club Foot'],
+    BOSSFIGHT: ['Muse Knights of Cydonia', 'The White Stripes Seven Nation Army', 'Yeah Yeah Yeahs Heads Will Roll'],
+    VICTORY: ['M83 Midnight City', 'Tame Impala The Less I Know The Better', 'MGMT Little Dark Age'],
   },
 };
 
@@ -196,7 +124,6 @@ function mapItunesItemToTrack(
     ? classifyTrackSceneAutomatically(title, artist, genre, defaultVibe)
     : defaultVibe;
 
-  // Point previewUrl to our full-length stream resolver (/api/full-stream) with iTunes fallback
   const fullStreamUrl = `/api/full-stream?q=${encodeURIComponent(
     `${artist} ${title}`
   )}&fallback=${encodeURIComponent(fallbackPreview)}`;
@@ -222,11 +149,14 @@ export async function GET(request: NextRequest) {
   const mode = searchParams.get('mode') || 'autopilot';
   const query = searchParams.get('q') || '';
   const vibe = (searchParams.get('vibe') as VibeStateId) || 'EXPLORE';
-  const brightness = Number(searchParams.get('brightness') ?? 45);
   const userHint = searchParams.get('hint') || '';
+  const genresParam = searchParams.get('genres') || '';
+  const artistsParam = searchParams.get('artists') || '';
+  const langPref = searchParams.get('lang') || 'all';
+  const vocalPref = searchParams.get('vocal') || 'mixed';
 
   try {
-    // 1. Direct User Search (auto-classifies every track's scene so user never has to pick)
+    // 1. Direct User Search
     if (mode === 'search' && query.trim().length > 0) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3500);
@@ -253,7 +183,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Unscripted Dynamic Autopilot Stream
+    // 2. Manual Hint Override
     if (userHint.trim().length > 0) {
       const offset = Math.floor(Math.random() * 6);
       const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
@@ -272,27 +202,58 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({
             source: 'autopilot-hint',
             vibe,
-            resolvedMoodQuery: `${SCENE_ARTIST_MOOD_POOLS[vibe]?.description} · ${userHint.trim()}`,
+            resolvedMoodQuery: `По запросу: ${userHint.trim()}`,
             tracks: tracks.sort(() => Math.random() - 0.5),
           });
         }
       }
     }
 
-    const poolConfig = SCENE_ARTIST_MOOD_POOLS[vibe] || SCENE_ARTIST_MOOD_POOLS.EXPLORE;
-    const isDark = brightness < 35;
-    const candidateArtists = isDark
-      ? [...poolConfig.dark, ...pickRandomItems(poolConfig.bright, 3)]
-      : [...poolConfig.bright, ...pickRandomItems(poolConfig.dark, 3)];
+    // 3. Autonomous Discovery Tailored to User Account Taste Profile (Genres + Favorite Artists + Scene)
+    const selectedGenres = genresParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const selectedArtists = artistsParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const chosenArtists = pickRandomItems(Array.from(new Set(candidateArtists)), 6);
+    const candidateSeeds: string[] = [];
+
+    // Add pools from user's chosen genres (or all genres if none selected yet)
+    const activeGenreKeys =
+      selectedGenres.length > 0 ? selectedGenres : Object.keys(GENRE_SCENE_ARTISTS);
+
+    for (const gKey of activeGenreKeys) {
+      const gPool = GENRE_SCENE_ARTISTS[gKey]?.[vibe];
+      if (gPool) {
+        candidateSeeds.push(...gPool);
+      }
+    }
+
+    // Add user's favorite artists adapted to the current scene
+    if (selectedArtists.length > 0) {
+      const sampledUserArtists = pickRandomItems(selectedArtists, 4);
+      for (const art of sampledUserArtists) {
+        candidateSeeds.push(art);
+      }
+    }
+
+    if (langPref === 'ru') {
+      candidateSeeds.push('Кино', 'Скриптонит', 'Miyagi', 'PHARAOH', 'Big Baby Tape', 'Король и Шут', 'Три дня дождя');
+    }
+
+    const chosenQueries = pickRandomItems(Array.from(new Set(candidateSeeds)), 6);
 
     const artistResponses = await Promise.all(
-      chosenArtists.map(async (artist) => {
+      chosenQueries.map(async (qTerm) => {
         try {
+          const finalTerm =
+            vocalPref === 'instrumental' ? `${qTerm} instrumental` : qTerm;
           const offset = Math.floor(Math.random() * 4);
           const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-            artist
+            finalTerm
           )}&media=music&entity=song&limit=3&offset=${offset}`;
           const r = await fetch(url);
           if (!r.ok) return [];
@@ -315,10 +276,15 @@ export async function GET(request: NextRequest) {
         )
         .sort(() => Math.random() - 0.5);
 
+      const labelSummary =
+        selectedGenres.length > 0 || selectedArtists.length > 0
+          ? `По твоим вкусам (${chosenQueries.slice(0, 3).join(', ')})`
+          : `Автономный поток под игру (${chosenQueries.slice(0, 3).join(', ')})`;
+
       return NextResponse.json({
         source: 'autopilot-dynamic',
         vibe,
-        resolvedMoodQuery: `${poolConfig.description}`,
+        resolvedMoodQuery: labelSummary,
         tracks,
       });
     }

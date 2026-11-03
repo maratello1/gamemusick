@@ -7,6 +7,18 @@ export const dynamic = 'force-dynamic';
 
 const STORE_PATH = path.join(process.cwd(), 'data', 'user-playlists.json');
 
+export interface UserAccountProfile {
+  username: string;
+  favoriteGenres: string[];
+  favoriteArtists: string[];
+  customArtistsText: string;
+  gameGenres: string[];
+  driveMode: 'immersion' | 'balanced' | 'high-drive';
+  languagePref: 'all' | 'foreign' | 'ru';
+  vocalPref: 'vocal' | 'mixed' | 'instrumental';
+  createdAt: number;
+}
+
 export interface UserPlaylist {
   id: string;
   name: string;
@@ -16,6 +28,7 @@ export interface UserPlaylist {
 }
 
 interface UserStoreSchema {
+  accountProfile: UserAccountProfile | null;
   userPlaylists: UserPlaylist[];
   activeBridgeTrack: {
     videoId: string;
@@ -33,6 +46,7 @@ function readStore(): UserStoreSchema {
       const raw = fs.readFileSync(STORE_PATH, 'utf-8');
       const parsed = JSON.parse(raw);
       return {
+        accountProfile: parsed.accountProfile || null,
         userPlaylists: Array.isArray(parsed.userPlaylists) ? parsed.userPlaylists : [],
         activeBridgeTrack: parsed.activeBridgeTrack || null,
       };
@@ -42,6 +56,7 @@ function readStore(): UserStoreSchema {
   }
 
   const initial: UserStoreSchema = {
+    accountProfile: null,
     userPlaylists: [],
     activeBridgeTrack: null,
   };
@@ -76,6 +91,26 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const store = readStore();
+
+    if (body.action === 'SAVE_ACCOUNT_PROFILE' && body.profile) {
+      store.accountProfile = {
+        username: String(body.profile.username || 'Игрок').trim(),
+        favoriteGenres: Array.isArray(body.profile.favoriteGenres)
+          ? body.profile.favoriteGenres
+          : [],
+        favoriteArtists: Array.isArray(body.profile.favoriteArtists)
+          ? body.profile.favoriteArtists
+          : [],
+        customArtistsText: String(body.profile.customArtistsText || '').trim(),
+        gameGenres: Array.isArray(body.profile.gameGenres) ? body.profile.gameGenres : [],
+        driveMode: body.profile.driveMode || 'balanced',
+        languagePref: body.profile.languagePref || 'all',
+        vocalPref: body.profile.vocalPref || 'mixed',
+        createdAt: Date.now(),
+      };
+      writeStore(store);
+      return NextResponse.json({ ok: true, accountProfile: store.accountProfile, store });
+    }
 
     if (body.action === 'CREATE_PLAYLIST' && body.name) {
       const created: UserPlaylist = {

@@ -19,9 +19,22 @@ import {
   Plus,
   Trash2,
   ListMusic,
+  User,
 } from 'lucide-react';
 import { FALLBACK_REAL_TRACKS, VIBE_STATES } from '@/lib/defaultData';
 import { TelemetrySnapshot, TrackItem, VibeStateId } from '@/types/vibe';
+
+interface UserAccountProfile {
+  username: string;
+  favoriteGenres: string[];
+  favoriteArtists: string[];
+  customArtistsText: string;
+  gameGenres: string[];
+  driveMode: 'immersion' | 'balanced' | 'high-drive';
+  languagePref: 'all' | 'foreign' | 'ru';
+  vocalPref: 'vocal' | 'mixed' | 'instrumental';
+  createdAt: number;
+}
 
 interface UserPlaylist {
   id: string;
@@ -31,7 +44,86 @@ interface UserPlaylist {
   createdAt: number;
 }
 
-type ActiveSection = 'autopilot' | 'search' | 'user-playlist' | 'local' | 'integrations';
+type ActiveSection =
+  | 'autopilot'
+  | 'account'
+  | 'search'
+  | 'user-playlist'
+  | 'local'
+  | 'integrations';
+
+const GENRE_OPTIONS = [
+  {
+    id: 'rock',
+    label: 'Рок и Альтернатива',
+    desc: 'Alternative Rock, Shoegaze, Post-Punk, Grunge',
+  },
+  {
+    id: 'metal',
+    label: 'Метал и Тяжелый звук',
+    desc: 'Nu-Metal, Industrial, Heavy Metal, Metalcore',
+  },
+  {
+    id: 'rap',
+    label: 'Рэп, Трэп и Хип-Хоп',
+    desc: 'Rage Trap, Cloud Rap, RU Rap, Melodic Rap',
+  },
+  {
+    id: 'phonk',
+    label: 'Фонк и Ночной драйв',
+    desc: 'Drift Phonk, Dark Phonk, Wave, Witch House',
+  },
+  {
+    id: 'electronic',
+    label: 'Электроника и Синт',
+    desc: 'Synthwave, Darksynth, Drum & Bass, Cyberpunk',
+  },
+  {
+    id: 'indie',
+    label: 'Инди и Атмосфера',
+    desc: 'Indie Rock, Post-Rock, Lo-Fi, Trip-Hop',
+  },
+];
+
+const POPULAR_ARTIST_CHIPS = [
+  'Deftones',
+  'Travis Scott',
+  'Playboi Carti',
+  'Скриптонит',
+  'Кино',
+  'Linkin Park',
+  'Rammstein',
+  'BONES',
+  '$uicideboy$',
+  'The Prodigy',
+  'Kavinsky',
+  'Slipknot',
+  'System Of A Down',
+  'Arctic Monkeys',
+  'DVRST',
+  'Miyagi',
+  'Crystal Castles',
+  'Pendulum',
+  'Nirvana',
+  'Metallica',
+  'Kanye West',
+  'Radiohead',
+  'PHARAOH',
+  'Big Baby Tape',
+  'Gesaffelstein',
+  'Tame Impala',
+  'Bring Me The Horizon',
+  'Denzel Curry',
+];
+
+const GAME_GENRE_OPTIONS = [
+  'Шутеры / Соревновательные',
+  'Гонки и Дрифт',
+  'RPG и Открытый мир',
+  'Экшен и Слэшеры',
+  'Мрачные / Хорроры',
+  'Стратегии и Выживание',
+];
 
 function parseDurationStringToSec(dur?: string): number {
   if (!dur || !dur.includes(':')) return 220;
@@ -44,6 +136,32 @@ export default function GameVibeSpotifyApp() {
   const [activeSection, setActiveSection] = useState<ActiveSection>('autopilot');
   const [activeVibe, setActiveVibe] = useState<VibeStateId>('EXPLORE');
 
+  // Account & Taste Profile State
+  const [accountProfile, setAccountProfile] = useState<UserAccountProfile | null>(null);
+  const [draftUsername, setDraftUsername] = useState<string>('');
+  const [draftGenres, setDraftGenres] = useState<string[]>(['rock', 'rap', 'electronic']);
+  const [draftArtists, setDraftArtists] = useState<string[]>([
+    'Deftones',
+    'Travis Scott',
+    'Кино',
+    'Kavinsky',
+  ]);
+  const [draftCustomArtists, setDraftCustomArtists] = useState<string>('');
+  const [draftGameGenres, setDraftGameGenres] = useState<string[]>([
+    'Шутеры / Соревновательные',
+    'RPG и Открытый мир',
+  ]);
+  const [draftDriveMode, setDraftDriveMode] = useState<
+    'immersion' | 'balanced' | 'high-drive'
+  >('balanced');
+  const [draftLanguagePref, setDraftLanguagePref] = useState<'all' | 'foreign' | 'ru'>(
+    'all'
+  );
+  const [draftVocalPref, setDraftVocalPref] = useState<
+    'vocal' | 'mixed' | 'instrumental'
+  >('mixed');
+  const [savingProfile, setSavingProfile] = useState<boolean>(false);
+
   // Autonomous Autopilot state
   const [autopilotEnabled, setAutopilotEnabled] = useState<boolean>(true);
   const [sensitivity, setSensitivity] = useState<number>(42);
@@ -51,7 +169,7 @@ export default function GameVibeSpotifyApp() {
   const [systemMediaSync, setSystemMediaSync] = useState<boolean>(false);
   const [userMoodHint, setUserMoodHint] = useState<string>('');
   const [resolvedMoodQuery, setResolvedMoodQuery] = useState<string>(
-    'Спокойная игра и исследование'
+    'Автономный поток под игру'
   );
   const [liveStreamTracks, setLiveStreamTracks] = useState<TrackItem[]>(FALLBACK_REAL_TRACKS);
   const [loadingStream, setLoadingStream] = useState<boolean>(false);
@@ -75,7 +193,8 @@ export default function GameVibeSpotifyApp() {
   // User-created playlists (empty by default — created by the user)
   const [userPlaylists, setUserPlaylists] = useState<UserPlaylist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
-  const [useCustomPlaylistInAutopilot, setUseCustomPlaylistInAutopilot] = useState<boolean>(false);
+  const [useCustomPlaylistInAutopilot, setUseCustomPlaylistInAutopilot] =
+    useState<boolean>(false);
   const [creatingPlaylist, setCreatingPlaylist] = useState<boolean>(false);
   const [newPlaylistName, setNewPlaylistName] = useState<string>('');
 
@@ -98,13 +217,26 @@ export default function GameVibeSpotifyApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSwitchRef = useRef<number>(0);
 
-  // Load user-created playlists from disk (empty by default)
+  // Load saved account profile & user playlists from disk
   useEffect(() => {
     fetch('/api/presets')
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data && Array.isArray(data.userPlaylists)) {
+        if (!data) return;
+        if (Array.isArray(data.userPlaylists)) {
           setUserPlaylists(data.userPlaylists);
+        }
+        if (data.accountProfile) {
+          const p: UserAccountProfile = data.accountProfile;
+          setAccountProfile(p);
+          setDraftUsername(p.username || '');
+          setDraftGenres(p.favoriteGenres || []);
+          setDraftArtists(p.favoriteArtists || []);
+          setDraftCustomArtists(p.customArtistsText || '');
+          setDraftGameGenres(p.gameGenres || []);
+          setDraftDriveMode(p.driveMode || 'balanced');
+          setDraftLanguagePref(p.languagePref || 'all');
+          setDraftVocalPref(p.vocalPref || 'mixed');
         }
       })
       .catch(() => {});
@@ -112,15 +244,16 @@ export default function GameVibeSpotifyApp() {
 
   /**
    * Autonomous Dynamic Autopilot Stream Fetcher:
-   * Automatically reads live game process, screen brightness, and input/screen motion
-   * and fetches a full-length stream of tracks from the global music catalog on the fly.
+   * Uses the user's Account Taste Profile (genres, favorite artists, language, vocal pref)
+   * combined with live game telemetry (scene, brightness, motion) to stream full tracks on the fly.
    */
   const fetchDynamicStreamForScene = useCallback(
     async (
       scene: VibeStateId,
       snap: TelemetrySnapshot,
       hintText: string,
-      autoPlayFirst: boolean
+      autoPlayFirst: boolean,
+      overrideProfile?: UserAccountProfile | null
     ) => {
       if (useCustomPlaylistInAutopilot && selectedPlaylistId) {
         const activePl = userPlaylists.find((p) => p.id === selectedPlaylistId);
@@ -136,6 +269,14 @@ export default function GameVibeSpotifyApp() {
         }
       }
 
+      const activeProf = overrideProfile !== undefined ? overrideProfile : accountProfile;
+      const genresList = activeProf?.favoriteGenres || draftGenres;
+      const customExtra = (activeProf?.customArtistsText || draftCustomArtists)
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const artistsList = [...(activeProf?.favoriteArtists || draftArtists), ...customExtra];
+
       setLoadingStream(true);
       try {
         const params = new URLSearchParams({
@@ -145,6 +286,10 @@ export default function GameVibeSpotifyApp() {
           motion: String(snap.motionDelta),
           process: snap.detectedProcess,
           hint: hintText,
+          genres: genresList.join(','),
+          artists: artistsList.join(','),
+          lang: activeProf?.languagePref || draftLanguagePref,
+          vocal: activeProf?.vocalPref || draftVocalPref,
         });
         const res = await fetch(`/api/ytmusic?${params.toString()}`);
         if (!res.ok) return;
@@ -168,7 +313,17 @@ export default function GameVibeSpotifyApp() {
         setLoadingStream(false);
       }
     },
-    [useCustomPlaylistInAutopilot, selectedPlaylistId, userPlaylists]
+    [
+      useCustomPlaylistInAutopilot,
+      selectedPlaylistId,
+      userPlaylists,
+      accountProfile,
+      draftGenres,
+      draftArtists,
+      draftCustomArtists,
+      draftLanguagePref,
+      draftVocalPref,
+    ]
   );
 
   // Initial autonomous stream discovery on mount
@@ -255,6 +410,53 @@ export default function GameVibeSpotifyApp() {
       }
     }
   }, [currentTrack, isPlaying, volume, isMuted]);
+
+  const handleSaveAccountProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingProfile(true);
+    try {
+      const profilePayload: UserAccountProfile = {
+        username: draftUsername.trim() || 'Игрок',
+        favoriteGenres: draftGenres,
+        favoriteArtists: draftArtists,
+        customArtistsText: draftCustomArtists.trim(),
+        gameGenres: draftGameGenres,
+        driveMode: draftDriveMode,
+        languagePref: draftLanguagePref,
+        vocalPref: draftVocalPref,
+        createdAt: Date.now(),
+      };
+
+      // Adjust sensor sensitivity automatically based on user's chosen drive mode
+      if (draftDriveMode === 'immersion') setSensitivity(54);
+      else if (draftDriveMode === 'high-drive') setSensitivity(28);
+      else setSensitivity(42);
+
+      const res = await fetch('/api/presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'SAVE_ACCOUNT_PROFILE',
+          profile: profilePayload,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const saved = data.accountProfile || profilePayload;
+        setAccountProfile(saved);
+        setActiveSection('autopilot');
+        await fetchDynamicStreamForScene(activeVibe, telemetry, userMoodHint, true, saved);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const toggleItemInList = (list: string[], item: string): string[] =>
+    list.includes(item) ? list.filter((i) => i !== item) : [...list, item];
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -547,6 +749,29 @@ export default function GameVibeSpotifyApp() {
               </button>
 
               <button
+                onClick={() => setActiveSection('account')}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs font-medium transition ${
+                  activeSection === 'account'
+                    ? 'bg-[#1D1619] text-[#EDE9E8] border border-[#441924]'
+                    : 'text-[#8C8482] hover:text-[#EDE9E8] hover:bg-[#171518]'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <User className="w-4 h-4 text-[#B84A62] shrink-0" />
+                  <span>
+                    {accountProfile
+                      ? `Аккаунт: ${accountProfile.username}`
+                      : 'Аккаунт и мои вкусы'}
+                  </span>
+                </div>
+                {!accountProfile && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#6E1D2F] text-[10px] text-white">
+                    Настроить
+                  </span>
+                )}
+              </button>
+
+              <button
                 onClick={() => {
                   setActiveSection('search');
                   searchInputRef.current?.focus();
@@ -639,7 +864,7 @@ export default function GameVibeSpotifyApp() {
 
               {userPlaylists.length === 0 ? (
                 <div className="p-3.5 rounded-md bg-[#0D0C0E] border border-[#1B181B] text-xs text-[#8C8482] leading-relaxed">
-                  Программа работает полностью автономно: сама определяет сцену в игре и ставит полные треки на лету.
+                  Программа работает полностью автономно: сама определяет сцену в игре и ставит полные треки по твоим вкусам.
                   <div className="mt-2 text-[#B84A62]">
                     Свои собственные подборки можно создать кнопкой «Создать».
                   </div>
@@ -760,7 +985,7 @@ export default function GameVibeSpotifyApp() {
 
         {/* CENTER MAIN VIEW */}
         <main className="flex-1 bg-[#111012] border border-[#1E1B1D] rounded-lg flex flex-col min-h-0 overflow-hidden">
-          {/* Top Bar inside Main Panel (Clean: Search + Pin over game, zero manual scene buttons) */}
+          {/* Top Bar inside Main Panel */}
           <header className="px-4 sm:px-6 py-3 border-b border-[#1E1B1D] flex flex-wrap items-center justify-between gap-3 bg-[#111012]">
             <form onSubmit={handleSearch} className="relative flex-1 min-w-[200px] max-w-lg">
               <Search className="w-4 h-4 text-[#8C8482] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -783,6 +1008,18 @@ export default function GameVibeSpotifyApp() {
             </form>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setActiveSection('account')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-xs text-[#EDE9E8] transition"
+              >
+                <User className="w-3.5 h-3.5 text-[#B84A62]" />
+                <span>
+                  {accountProfile
+                    ? `${accountProfile.username} · Мои вкусы`
+                    : 'Создать аккаунт и вкусы'}
+                </span>
+              </button>
+
               <button
                 onClick={toggleAlwaysOnTop}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition ${
@@ -827,27 +1064,10 @@ export default function GameVibeSpotifyApp() {
                     </h1>
 
                     <p className="text-xs text-[#9E9694] max-w-2xl leading-relaxed">
-                      Программа работает в фоне, сама считывает происходящее в игре ({telemetry.detectedProcess}) и включает полные версии подходящих песен без отвлечения от игрового процесса.
+                      Программа работает в фоне, сама считывает происходящее в игре ({telemetry.detectedProcess}) и включает полные версии подходящих песен по твоим вкусам без отвлечения от игрового процесса.
                     </p>
 
                     <div className="pt-1 flex flex-wrap items-center gap-2">
-                      <input
-                        type="text"
-                        value={userMoodHint}
-                        onChange={(e) => setUserMoodHint(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            fetchDynamicStreamForScene(
-                              activeVibe,
-                              telemetry,
-                              userMoodHint,
-                              true
-                            );
-                          }
-                        }}
-                        placeholder="Пожелание по жанру или артисту (необязательно)..."
-                        className="w-full sm:w-96 px-3 py-1.5 rounded bg-[#141215] border border-[#2C2528] text-xs text-[#EDE9E8] placeholder-[#8C8482] outline-none"
-                      />
                       <button
                         onClick={() =>
                           fetchDynamicStreamForScene(
@@ -857,12 +1077,20 @@ export default function GameVibeSpotifyApp() {
                             true
                           )
                         }
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#6E1D2F] hover:bg-[#822238] text-xs font-medium text-white transition"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#6E1D2F] hover:bg-[#822238] text-xs font-medium text-white transition"
                       >
                         <RefreshCw
                           className={`w-3.5 h-3.5 ${loadingStream ? 'animate-spin' : ''}`}
                         />
                         <span>Обновить волну</span>
+                      </button>
+
+                      <button
+                        onClick={() => setActiveSection('account')}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#181518] hover:bg-[#221D22] border border-[#2E272B] text-xs text-[#EDE9E8] transition"
+                      >
+                        <User className="w-3.5 h-3.5 text-[#B84A62]" />
+                        <span>Настроить жанры и предпочтения аккаунта</span>
                       </button>
                     </div>
                   </div>
@@ -915,7 +1143,7 @@ export default function GameVibeSpotifyApp() {
                   </div>
                 </div>
 
-                {/* Clean Spotify-Style Track Table (Zero manual scene selectors) */}
+                {/* Clean Spotify-Style Track Table */}
                 <div className="px-4 sm:px-6 py-2">
                   <div className="grid grid-cols-[28px_1fr_100px] sm:grid-cols-[36px_1fr_200px_120px_54px] gap-3 px-3 py-2 text-[11px] uppercase tracking-wider font-medium text-[#8C8482] border-b border-[#1E1B1D]">
                     <span>#</span>
@@ -988,7 +1216,273 @@ export default function GameVibeSpotifyApp() {
               </>
             )}
 
-            {/* 2. SEARCH VIEW */}
+            {/* 2. ACCOUNT CREATION & MUSICAL TASTE ONBOARDING VIEW */}
+            {activeSection === 'account' && (
+              <form
+                onSubmit={handleSaveAccountProfile}
+                className="p-5 sm:p-7 space-y-6 max-w-4xl"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-[#1E1B1D]">
+                  <div className="space-y-1">
+                    <div className="text-[11px] uppercase tracking-widest font-semibold text-[#D47A8D]">
+                      ПРОФИЛЬ ИГРОКА И МУЗЫКАЛЬНЫЕ ПРЕДПОЧТЕНИЯ
+                    </div>
+                    <h2 className="text-2xl font-bold text-[#EDE9E8]">
+                      {accountProfile
+                        ? `Аккаунт: ${accountProfile.username}`
+                        : 'Создание аккаунта и настройка вкусов'}
+                    </h2>
+                    <p className="text-xs text-[#8C8482] max-w-2xl">
+                      Выбери любимые жанры, артистов и характер переходов. Автономный движок будет опираться на твой вкус, подстраивая музыку под происходящее на экране игры.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="px-5 py-2.5 rounded-md bg-[#6E1D2F] hover:bg-[#842238] text-xs font-semibold text-white transition shrink-0"
+                  >
+                    {savingProfile
+                      ? 'Сохранение...'
+                      : 'Сохранить профиль и применить вкусы'}
+                  </button>
+                </div>
+
+                {/* Block 1: Nickname & Favorite Game Genres */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-3">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      1. Никнейм аккаунта
+                    </label>
+                    <input
+                      type="text"
+                      value={draftUsername}
+                      onChange={(e) => setDraftUsername(e.target.value)}
+                      placeholder="Введи свой никнейм..."
+                      className="w-full px-3.5 py-2 rounded-md bg-[#0D0C0E] border border-[#2A2629] focus:border-[#6E1D2F] text-sm text-[#EDE9E8] outline-none"
+                    />
+                    <p className="text-[11px] text-[#8C8482]">
+                      К аккаунту привязываются твои вкусы, чувствительность сенсора и сохраненные подборки.
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-3">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      2. В какие игры играешь чаще всего
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {GAME_GENRE_OPTIONS.map((gName) => {
+                        const selected = draftGameGenres.includes(gName);
+                        return (
+                          <button
+                            type="button"
+                            key={gName}
+                            onClick={() =>
+                              setDraftGameGenres((prev) => toggleItemInList(prev, gName))
+                            }
+                            className={`px-2.5 py-1.5 rounded text-xs font-medium border transition ${
+                              selected
+                                ? 'bg-[#2B141B] border-[#6E1D2F] text-[#EDE9E8]'
+                                : 'bg-[#0D0C0E] border-[#242023] text-[#8C8482] hover:text-[#EDE9E8]'
+                            }`}
+                          >
+                            {gName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Block 2: Musical Genres */}
+                <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      3. Любимые музыкальные жанры (выбери один или несколько)
+                    </label>
+                    <span className="text-[11px] text-[#B84A62]">
+                      Выбрано: {draftGenres.length}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {GENRE_OPTIONS.map((genre) => {
+                      const active = draftGenres.includes(genre.id);
+                      return (
+                        <button
+                          type="button"
+                          key={genre.id}
+                          onClick={() =>
+                            setDraftGenres((prev) => toggleItemInList(prev, genre.id))
+                          }
+                          className={`p-3 rounded-md text-left border transition ${
+                            active
+                              ? 'bg-[#251218] border-[#6E1D2F]'
+                              : 'bg-[#0D0C0E] border-[#221E21] hover:border-[#362E33]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-[#EDE9E8]">
+                              {genre.label}
+                            </span>
+                            {active && <Check className="w-3.5 h-3.5 text-[#D47A8D]" />}
+                          </div>
+                          <div className="text-[11px] text-[#8C8482] mt-1 leading-snug">
+                            {genre.desc}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Block 3: Favorite Artists */}
+                <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      4. Любимые артисты и группы
+                    </label>
+                    <span className="text-[11px] text-[#B84A62]">
+                      Выбрано: {draftArtists.length}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {POPULAR_ARTIST_CHIPS.map((artist) => {
+                      const selected = draftArtists.includes(artist);
+                      return (
+                        <button
+                          type="button"
+                          key={artist}
+                          onClick={() =>
+                            setDraftArtists((prev) => toggleItemInList(prev, artist))
+                          }
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
+                            selected
+                              ? 'bg-[#6E1D2F] border-[#8E2940] text-white'
+                              : 'bg-[#0D0C0E] border-[#242023] text-[#8C8482] hover:text-[#EDE9E8]'
+                          }`}
+                        >
+                          {artist}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-2">
+                    <input
+                      type="text"
+                      value={draftCustomArtists}
+                      onChange={(e) => setDraftCustomArtists(e.target.value)}
+                      placeholder="Или впиши своих любимых исполнителей через запятую..."
+                      className="w-full px-3.5 py-2 rounded-md bg-[#0D0C0E] border border-[#2A2629] focus:border-[#6E1D2F] text-xs text-[#EDE9E8] outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Block 4: Autonomous Behavior Preferences */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-2.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      Характер Авторежима
+                    </label>
+                    {[
+                      {
+                        id: 'immersion',
+                        label: 'Плавное погружение',
+                        sub: 'Больше атмосферы, смена только в жестком бою',
+                      },
+                      {
+                        id: 'balanced',
+                        label: 'Точный баланс по игре',
+                        sub: 'Оптимальная реакция на покой и экшен',
+                      },
+                      {
+                        id: 'high-drive',
+                        label: 'Максимум драйва',
+                        sub: 'Быстрое включение бодрых треков при движении',
+                      },
+                    ].map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() =>
+                          setDraftDriveMode(
+                            opt.id as 'immersion' | 'balanced' | 'high-drive'
+                          )
+                        }
+                        className={`w-full p-2.5 rounded text-left border transition ${
+                          draftDriveMode === opt.id
+                            ? 'bg-[#251218] border-[#6E1D2F]'
+                            : 'bg-[#0D0C0E] border-[#221E21]'
+                        }`}
+                      >
+                        <div className="text-xs font-medium text-[#EDE9E8]">
+                          {opt.label}
+                        </div>
+                        <div className="text-[11px] text-[#8C8482] mt-0.5">{opt.sub}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-2.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      Язык и сцена
+                    </label>
+                    {[
+                      { id: 'all', label: 'Любые (Мировые + СНГ)' },
+                      { id: 'foreign', label: 'Преимущественно зарубежные' },
+                      { id: 'ru', label: 'Больше русскоязычных треков' },
+                    ].map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() =>
+                          setDraftLanguagePref(opt.id as 'all' | 'foreign' | 'ru')
+                        }
+                        className={`w-full p-2.5 rounded text-left text-xs font-medium border transition ${
+                          draftLanguagePref === opt.id
+                            ? 'bg-[#251218] border-[#6E1D2F] text-[#EDE9E8]'
+                            : 'bg-[#0D0C0E] border-[#221E21] text-[#8C8482]'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-[#151316] border border-[#242023] space-y-2.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#EDE9E8]">
+                      Вокал или Инструментал
+                    </label>
+                    {[
+                      { id: 'vocal', label: 'Песни с вокалом и хиты' },
+                      { id: 'mixed', label: 'Смешанно (вокал + биты)' },
+                      { id: 'instrumental', label: 'Больше музыки без слов' },
+                    ].map((opt) => (
+                      <button
+                        type="button"
+                        key={opt.id}
+                        onClick={() =>
+                          setDraftVocalPref(
+                            opt.id as 'vocal' | 'mixed' | 'instrumental'
+                          )
+                        }
+                        className={`w-full p-2.5 rounded text-left text-xs font-medium border transition ${
+                          draftVocalPref === opt.id
+                            ? 'bg-[#251218] border-[#6E1D2F] text-[#EDE9E8]'
+                            : 'bg-[#0D0C0E] border-[#221E21] text-[#8C8482]'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* 3. SEARCH VIEW */}
             {activeSection === 'search' && (
               <div className="p-5 sm:p-6 space-y-4">
                 <div className="space-y-1">
@@ -1057,7 +1551,7 @@ export default function GameVibeSpotifyApp() {
               </div>
             )}
 
-            {/* 3. USER-CREATED PLAYLIST VIEW (No manual scene dropdowns — program classifies automatically) */}
+            {/* 4. USER-CREATED PLAYLIST VIEW */}
             {activeSection === 'user-playlist' && activeUserPlaylist && (
               <div className="p-5 sm:p-6 space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#1E1B1D]">
@@ -1149,7 +1643,7 @@ export default function GameVibeSpotifyApp() {
               </div>
             )}
 
-            {/* 4. LOCAL PC MUSIC SECTION */}
+            {/* 5. LOCAL PC MUSIC SECTION */}
             {activeSection === 'local' && (
               <div className="p-6 space-y-5">
                 <div className="space-y-1">
@@ -1206,7 +1700,7 @@ export default function GameVibeSpotifyApp() {
               </div>
             )}
 
-            {/* 5. PLAYER INTEGRATIONS SECTION */}
+            {/* 6. PLAYER INTEGRATIONS SECTION */}
             {activeSection === 'integrations' && (
               <div className="p-6 space-y-5 max-w-2xl">
                 <div className="space-y-1">
