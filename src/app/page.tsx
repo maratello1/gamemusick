@@ -225,6 +225,8 @@ export default function GameVibeSpotifyApp() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeVibeRef = useRef<VibeStateId>('EXPLORE');
+  const activeMacroModeRef = useRef<'EXPLORE' | 'COMBAT'>('EXPLORE');
+  const currentTrackStartTimeRef = useRef<number>(Date.now());
   const autopilotRef = useRef<boolean>(true);
   const sensitivityRef = useRef<number>(34);
   const currentTrackRef = useRef<TrackItem>(FALLBACK_REAL_TRACKS[0]);
@@ -331,14 +333,17 @@ export default function GameVibeSpotifyApp() {
   );
 
   /**
-   * Instant Zero-Latency Scene Switcher:
-   * Immediately switches the playing track to the corresponding scene's preloaded deck.
+   * Smooth Intelligent Scene Switcher:
+   * Transitions between Explore and Combat with full song stability and zero frantic skipping.
    */
-  const switchToSceneImmediately = useCallback(
-    (targetVibe: VibeStateId) => {
-      if (activeVibeRef.current === targetVibe) return;
+  const switchToSceneSmoothly = useCallback(
+    (targetMacro: 'EXPLORE' | 'COMBAT') => {
+      const targetVibe: VibeStateId =
+        targetMacro === 'COMBAT' ? 'COMBAT' : 'EXPLORE';
+      activeMacroModeRef.current = targetMacro;
       activeVibeRef.current = targetVibe;
       setActiveVibe(targetVibe);
+      currentTrackStartTimeRef.current = Date.now();
 
       // 1. Check custom user playlist if selected
       if (useCustomPlaylistInAutopilot && selectedPlaylistId) {
@@ -386,7 +391,7 @@ export default function GameVibeSpotifyApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autonomous real-time game screen & input telemetry loop (every 750ms)
+  // Autonomous real-time game screen & input telemetry loop (every 800ms)
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -405,52 +410,55 @@ export default function GameVibeSpotifyApp() {
         setTelemetry(data);
 
         if (autopilotRef.current) {
-          const currentVibe = activeVibeRef.current;
-          const motion = data.motionDelta;
-          const redAlert = data.redAlertRatio;
-          const sens = sensitivityRef.current;
-          const inferred = data.inferredVibe;
           const now = Date.now();
+          const trackPlayDurationSec =
+            (now - currentTrackStartTimeRef.current) / 1000;
+          const currentMacro = activeMacroModeRef.current;
 
-          // Combat trigger condition: either inferred by 50Hz sensor or motion exceeds threshold
-          const isCombatMotion =
-            inferred === 'COMBAT' ||
-            inferred === 'BOSSFIGHT' ||
-            motion >= sens ||
-            redAlert >= 18;
+          // Real combat is signaled by the 50Hz attack cadence sensor
+          const isActivelyFighting =
+            data.inferredVibe === 'COMBAT' ||
+            data.inferredVibe === 'BOSSFIGHT' ||
+            data.motionDelta >= 48;
 
-          if (isCombatMotion) {
+          if (isActivelyFighting) {
             lastCombatSpikeRef.current = now;
-            const targetCombatVibe: VibeStateId =
-              inferred === 'BOSSFIGHT' || motion >= sens + 22 || redAlert >= 45
-                ? 'BOSSFIGHT'
-                : 'COMBAT';
+          }
 
-            if (currentVibe !== targetCombatVibe) {
-              switchToSceneImmediately(targetCombatVibe);
-            }
-          } else {
-            // Calm state: either explore or stealth
-            const targetCalmVibe: VibeStateId =
-              data.brightness < 20 && motion >= 16 ? 'STEALTH' : 'EXPLORE';
+          // Combat session stays active during brief lulls for 14 seconds after the last attack blow
+          const inCombatSession =
+            isActivelyFighting || now - lastCombatSpikeRef.current < 14000;
 
-            // When in combat, only return to calm if at least 9.5 seconds of peace have passed
-            if (currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT') {
-              if (now - lastCombatSpikeRef.current > 9500) {
-                switchToSceneImmediately(targetCalmVibe);
+          if (inCombatSession) {
+            // Player is in battle!
+            if (currentMacro !== 'COMBAT') {
+              // Entering battle: only interrupt peaceful explore track if it has played at least 25s
+              // OR if the player is actively hammering attack keys
+              if (trackPlayDurationSec >= 25 || isActivelyFighting) {
+                switchToSceneSmoothly('COMBAT');
               }
-            } else if (currentVibe !== targetCalmVibe) {
-              switchToSceneImmediately(targetCalmVibe);
             }
+            // CRITICAL: If currentMacro is ALREADY 'COMBAT', do NOT change the track!
+            // Let the battle song play through the fight without skipping!
+          } else {
+            // Player is peaceful / exploring!
+            if (currentMacro === 'COMBAT') {
+              // Returning from battle to peaceful exploration:
+              // Only switch back once the battle song has played for at least 45 seconds!
+              if (trackPlayDurationSec >= 45) {
+                switchToSceneSmoothly('EXPLORE');
+              }
+            }
+            // If already in EXPLORE, the explorer song continues playing peacefully!
           }
         }
       } catch {
         // ignore
       }
-    }, 750);
+    }, 800);
 
     return () => clearInterval(interval);
-  }, [switchToSceneImmediately]);
+  }, [switchToSceneSmoothly]);
 
   // Full-length audio playback lifecycle
   useEffect(() => {
@@ -692,6 +700,9 @@ export default function GameVibeSpotifyApp() {
   };
 
   const playSpecificTrack = (track: TrackItem) => {
+    currentTrackStartTimeRef.current = Date.now();
+    activeMacroModeRef.current =
+      track.vibe === 'COMBAT' || track.vibe === 'BOSSFIGHT' ? 'COMBAT' : 'EXPLORE';
     currentTrackRef.current = track;
     setCurrentTrack(track);
     setDurationSec(parseDurationStringToSec(track.duration));
@@ -735,6 +746,7 @@ export default function GameVibeSpotifyApp() {
 
       const wrappedIdx = (nextIdx + activePool.length) % activePool.length;
       const nextTrack = activePool[wrappedIdx];
+      currentTrackStartTimeRef.current = Date.now();
       currentTrackRef.current = nextTrack;
       setCurrentTrack(nextTrack);
       setDurationSec(parseDurationStringToSec(nextTrack.duration));

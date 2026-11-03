@@ -15,7 +15,7 @@ const BAD_ITUNES_ARTISTS =
   /\b(tribute|karaoke|orchestra|string quartet|in the style of|originally performed by|cover band|soundtrack band)\b/i;
 
 const BAD_ITUNES_TITLES =
-  /\b(tribute|karaoke|in the style of|string quartet|piano cover|lullaby version)\b/i;
+  /\b(tribute|karaoke|in the style of|string quartet|piano cover|lullaby version|remix|remixed|rmx|cover|кавер|ремикс|slowed|reverb)\b/i;
 
 function classifyTrackSceneAutomatically(
   title: string,
