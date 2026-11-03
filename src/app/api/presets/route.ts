@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { INITIAL_GAME_PROFILES } from '@/lib/defaultData';
-import { GameRuleProfile, TrackItem } from '@/types/vibe';
+import { TrackItem, VibeStateId } from '@/types/vibe';
 
 export const dynamic = 'force-dynamic';
 
-const STORE_PATH = path.join(process.cwd(), 'data', 'store-v2.json');
+const STORE_PATH = path.join(process.cwd(), 'data', 'user-playlists.json');
 
-interface CleanStoreSchema {
-  gameProfiles: GameRuleProfile[];
-  activeGameProfileId: string;
-  savedTracks: TrackItem[];
-  autoSwitchEnabled: boolean;
-  cooldownSec: number;
+export interface UserPlaylist {
+  id: string;
+  name: string;
+  gameTag: string;
+  tracks: TrackItem[];
+  createdAt: number;
+}
+
+interface UserStoreSchema {
+  userPlaylists: UserPlaylist[];
   activeBridgeTrack: {
     videoId: string;
     title: string;
@@ -24,22 +27,22 @@ interface CleanStoreSchema {
   } | null;
 }
 
-function readStore(): CleanStoreSchema {
+function readStore(): UserStoreSchema {
   try {
     if (fs.existsSync(STORE_PATH)) {
       const raw = fs.readFileSync(STORE_PATH, 'utf-8');
-      return JSON.parse(raw) as CleanStoreSchema;
+      const parsed = JSON.parse(raw);
+      return {
+        userPlaylists: Array.isArray(parsed.userPlaylists) ? parsed.userPlaylists : [],
+        activeBridgeTrack: parsed.activeBridgeTrack || null,
+      };
     }
   } catch {
-    // fallback
+    // ignore
   }
 
-  const initial: CleanStoreSchema = {
-    gameProfiles: INITIAL_GAME_PROFILES,
-    activeGameProfileId: 'universal',
-    savedTracks: [],
-    autoSwitchEnabled: true,
-    cooldownSec: 10,
+  const initial: UserStoreSchema = {
+    userPlaylists: [],
     activeBridgeTrack: null,
   };
 
@@ -53,7 +56,7 @@ function readStore(): CleanStoreSchema {
   return initial;
 }
 
-function writeStore(data: CleanStoreSchema) {
+function writeStore(data: UserStoreSchema) {
   try {
     fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
     fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), 'utf-8');
@@ -74,32 +77,67 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const store = readStore();
 
-    if (body.action === 'SELECT_GAME_PROFILE' && body.profileId) {
-      store.activeGameProfileId = String(body.profileId);
-    } else if (body.action === 'ADD_GAME_PROFILE' && body.gameProfile) {
-      const created: GameRuleProfile = {
-        ...INITIAL_GAME_PROFILES[0],
-        ...body.gameProfile,
-        id: `game-${Date.now()}`,
+    if (body.action === 'CREATE_PLAYLIST' && body.name) {
+      const created: UserPlaylist = {
+        id: `pl-${Date.now()}`,
+        name: String(body.name).trim(),
+        gameTag: String(body.gameTag || 'Любая игра').trim(),
+        tracks: [],
+        createdAt: Date.now(),
       };
-      store.gameProfiles = [created, ...store.gameProfiles];
-      store.activeGameProfileId = created.id;
-    } else if (body.action === 'TOGGLE_SAVE_TRACK' && body.track) {
-      const t = body.track as TrackItem;
-      const exists = store.savedTracks.some((item) => item.id === t.id);
-      if (exists) {
-        store.savedTracks = store.savedTracks.filter((item) => item.id !== t.id);
-      } else {
-        store.savedTracks = [t, ...store.savedTracks];
+      store.userPlaylists.push(created);
+      writeStore(store);
+      return NextResponse.json({ ok: true, playlist: created, store });
+    }
+
+    if (body.action === 'DELETE_PLAYLIST' && body.playlistId) {
+      store.userPlaylists = store.userPlaylists.filter((p) => p.id !== body.playlistId);
+      writeStore(store);
+      return NextResponse.json({ ok: true, store });
+    }
+
+    if (body.action === 'ADD_TRACK_TO_PLAYLIST' && body.playlistId && body.track) {
+      const pl = store.userPlaylists.find((p) => p.id === body.playlistId);
+      if (pl) {
+        const track = body.track as TrackItem;
+        const exists = pl.tracks.some((t) => t.id === track.id);
+        if (!exists) {
+          pl.tracks.push(track);
+        }
       }
-    } else if (body.action === 'SYNC_BRIDGE' && body.bridgeTrack) {
+      writeStore(store);
+      return NextResponse.json({ ok: true, store });
+    }
+
+    if (body.action === 'UPDATE_TRACK_VIBE' && body.playlistId && body.trackId && body.vibe) {
+      const pl = store.userPlaylists.find((p) => p.id === body.playlistId);
+      if (pl) {
+        pl.tracks = pl.tracks.map((t) =>
+          t.id === body.trackId ? { ...t, vibe: body.vibe as VibeStateId } : t
+        );
+      }
+      writeStore(store);
+      return NextResponse.json({ ok: true, store });
+    }
+
+    if (body.action === 'REMOVE_TRACK_FROM_PLAYLIST' && body.playlistId && body.trackId) {
+      const pl = store.userPlaylists.find((p) => p.id === body.playlistId);
+      if (pl) {
+        pl.tracks = pl.tracks.filter((t) => t.id !== body.trackId);
+      }
+      writeStore(store);
+      return NextResponse.json({ ok: true, store });
+    }
+
+    if (body.action === 'SYNC_BRIDGE' && body.bridgeTrack) {
       store.activeBridgeTrack = {
         ...body.bridgeTrack,
         updatedAt: Date.now(),
       };
+      writeStore(store);
+      return NextResponse.json({ ok: true, store });
     }
 
-    writeStore(store);
     return NextResponse.json({ ok: true, store });
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 400 });

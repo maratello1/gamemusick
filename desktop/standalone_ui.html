@@ -18,7 +18,7 @@
       -webkit-font-smoothing: antialiased;
     }
     .workspace { flex: 1; display: flex; gap: 8px; padding: 8px; min-height: 0; overflow: hidden; }
-    aside { width: 260px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+    aside { width: 265px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
     .panel { background: #111012; border: 1px solid #1E1B1D; border-radius: 8px; padding: 14px; }
     .lib-panel { flex: 1; display: flex; flex-direction: column; justify-content: space-between; overflow-y: auto; }
     main { flex: 1; background: #111012; border: 1px solid #1E1B1D; border-radius: 8px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
@@ -35,14 +35,8 @@
     }
     .hero-cover { width: 120px; height: 120px; border-radius: 6px; object-fit: cover; border: 1px solid rgba(255,255,255,0.1); }
     .scroll-area { flex: 1; overflow-y: auto; }
-    .wave-item {
-      display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 6px;
-      cursor: pointer; border: 1px solid transparent; margin-top: 4px;
-    }
-    .wave-item.active { background: #1C1417; border-color: #4A1C28; }
-    .wave-item img { width: 38px; height: 38px; border-radius: 4px; object-fit: cover; }
     .track-row {
-      display: grid; grid-template-columns: 32px 1fr 160px 130px 56px; gap: 12px;
+      display: grid; grid-template-columns: 32px 1fr 180px 130px 56px; gap: 12px;
       align-items: center; padding: 8px 16px; border-bottom: 1px solid #181619; cursor: pointer; font-size: 13px;
     }
     .track-row:hover { background: #171518; }
@@ -69,20 +63,22 @@
           <strong style="font-size:14px;">GameVibe</strong>
           <span id="winTitle" style="font-size:11px; color:#8C8482;">Windows</span>
         </div>
-        <div style="margin-top:10px; font-size:12px; color:#EDE9E8;">Главная и Автопилот</div>
+        <div style="margin-top:10px; font-size:12px; color:#EDE9E8;">Живой Авторежим</div>
       </div>
       <div class="panel lib-panel">
         <div>
-          <div style="font-size:11px; color:#8C8482; text-transform:uppercase; margin-bottom:8px;">Плейлисты Автопилота</div>
-          <div id="wavesList"></div>
+          <div style="font-size:11px; color:#8C8482; text-transform:uppercase; margin-bottom:8px;">Мои подборки</div>
+          <div style="font-size:12px; color:#8C8482; line-height:1.5; background:#0D0C0E; padding:10px; border-radius:6px; border:1px solid #1B181B;">
+            В Авторежиме программа сама читает сцену и настроение игры на лету без заготовленных плейлистов.
+          </div>
         </div>
         <div style="border-top:1px solid #1E1B1D; padding-top:12px;">
           <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:8px;">
-            <span>Сенсор игры</span>
+            <span>Чтение игры</span>
             <span id="sceneBadge" style="color:#D47A8D;">Спокойно</span>
           </div>
           <div style="font-size:11px; color:#8C8482; display:flex; justify-content:space-between;">
-            <span>Активность</span><span id="motionVal">12%</span>
+            <span>Динамика</span><span id="motionVal">12%</span>
           </div>
           <div style="height:5px; background:#1E1B1D; border-radius:4px; margin-top:5px; overflow:hidden;">
             <div id="motionBar" style="height:100%; width:12%; background:#8E2940;"></div>
@@ -100,9 +96,9 @@
         <div class="hero">
           <img id="heroCover" class="hero-cover" src="https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg" alt="cover" />
           <div>
-            <div style="font-size:11px; color:#D47A8D; text-transform:uppercase; letter-spacing:0.08em;">АВТОПИЛОТ-ПЛЕЙЛИСТ</div>
-            <h1 id="heroTitle" style="font-size:26px; margin:6px 0;">Все лучшее (Рок + Рэп + Электроника)</h1>
-            <div id="heroSub" style="font-size:12px; color:#9E9694;">Deftones, Travis Scott, Linkin Park, Скриптонит, Rammstein, Кино</div>
+            <div style="font-size:11px; color:#D47A8D; text-transform:uppercase; letter-spacing:0.08em;">ЖИВОЙ АВТОРЕЖИМ · ПРЯМОЙ ПОДБОР ПОД ИГРУ</div>
+            <h1 id="heroTitle" style="font-size:24px; margin:6px 0;">Подбор под экран игры</h1>
+            <div id="heroSub" style="font-size:12px; color:#9E9694;">Программа анализирует сцену, яркость и динамику игры в реальном времени и ставит подходящую музыку на лету.</div>
           </div>
         </div>
         <div id="tracksTable"></div>
@@ -114,58 +110,49 @@
     <div style="display:flex; align-items:center; gap:12px; width:30%;">
       <img id="playerCover" src="https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg" style="width:52px; height:52px; border-radius:4px; object-fit:cover;" />
       <div>
-        <div id="playerTitle" style="font-size:14px; font-weight:600;">Entombed</div>
-        <div id="playerArtist" style="font-size:12px; color:#8C8482;">Deftones</div>
+        <div id="playerTitle" style="font-size:14px; font-weight:600;">Ожидание...</div>
+        <div id="playerArtist" style="font-size:12px; color:#8C8482;">GameVibe Autopilot</div>
       </div>
     </div>
     <div style="display:flex; align-items:center; gap:12px;">
       <button class="btn btn-wine" id="playBtn">▶ Воспроизвести</button>
     </div>
-    <div style="width:30%; text-align:right; font-size:12px; color:#8C8482;">Автопилот активен</div>
+    <div style="width:30%; text-align:right; font-size:12px; color:#8C8482;">Живой Авторежим</div>
   </footer>
 
   <script>
-    const WAVES = {
-      mix: { label: 'Все лучшее (Микс)', sub: 'Deftones, Travis Scott, Кино', query: 'Deftones Travis Scott Linkin Park' },
-      rap: { label: 'Рэп, Трэп и Фонк', sub: 'Playboi Carti, Скриптонит, BONES', query: 'Travis Scott Playboi Carti Bones' },
-      rock: { label: 'Рок и Метал', sub: 'Deftones, Rammstein, Slipknot', query: 'Deftones Linkin Park Rammstein' },
-      electro: { label: 'Электроника', sub: 'The Prodigy, Kavinsky, Pendulum', query: 'The Prodigy Kavinsky Pendulum' }
+    const DYNAMIC_MOODS = {
+      EXPLORE: ['indie rock road trip', 'darkwave synth night drive', 'shoegaze atmospheric rock', 'synthwave retro chill'],
+      STEALTH: ['dark phonk drift', 'cyberpunk darksynth', 'witch house dark electronic', 'underground trap bass'],
+      COMBAT: ['aggressive phonk drift', 'drum and bass neurofunk', 'alternative metal rock', 'rage trap hype'],
+      BOSSFIGHT: ['industrial metal heavy', 'nu metal aggressive', 'hardcore phonk rage', 'heavy metal thrash']
     };
-    const SCENES = ['Спокойно', 'Напряжение', 'Экшен / Бой', 'Пик боя'];
-    let activeWave = 'mix';
+    const SCENE_LABELS = { EXPLORE: 'Спокойно', STEALTH: 'Напряжение', COMBAT: 'Экшен / Бой', BOSSFIGHT: 'Пик боя' };
+    let currentScene = 'EXPLORE';
     let tracks = [];
     let currentTrack = null;
     let isPlaying = false;
     const audio = document.getElementById('audio');
 
-    function renderWaves() {
-      const el = document.getElementById('wavesList');
-      el.innerHTML = '';
-      Object.entries(WAVES).forEach(([id, w]) => {
-        const div = document.createElement('div');
-        div.className = 'wave-item ' + (id === activeWave ? 'active' : '');
-        div.innerHTML = '<div><div style="font-size:12px; font-weight:600;">' + w.label + '</div><div style="font-size:11px; color:#8C8482;">' + w.sub + '</div></div>';
-        div.onclick = () => { activeWave = id; renderWaves(); loadTracks(w.query, w.label, w.sub); };
-        el.appendChild(div);
-      });
-    }
-
-    async function loadTracks(query, title, sub) {
-      if (title) document.getElementById('heroTitle').textContent = title;
-      if (sub) document.getElementById('heroSub').textContent = sub;
+    async function discoverForScene(scene, playImmediately) {
+      currentScene = scene;
+      document.getElementById('sceneBadge').textContent = SCENE_LABELS[scene] || scene;
+      const pool = DYNAMIC_MOODS[scene] || DYNAMIC_MOODS.EXPLORE;
+      const term = pool[Math.floor(Math.random() * pool.length)];
+      const offset = Math.floor(Math.random() * 12);
       try {
-        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(query) + '&media=music&entity=song&limit=15');
+        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(term) + '&media=music&entity=song&limit=15&offset=' + offset);
         const data = await res.json();
-        tracks = (data.results || []).map((item, i) => ({
+        tracks = (data.results || []).map((item) => ({
           title: item.trackName,
           artist: item.artistName,
           album: item.collectionName || 'Single',
           cover: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
           preview: item.previewUrl,
-          scene: SCENES[i % SCENES.length]
+          scene: SCENE_LABELS[scene]
         }));
         renderTable();
-        if (tracks[0] && !currentTrack) selectTrack(tracks[0], false);
+        if (tracks[0]) selectTrack(tracks[0], playImmediately);
       } catch (e) {}
     }
 
@@ -192,6 +179,7 @@
       document.getElementById('playerArtist').textContent = t.artist;
       document.getElementById('playerCover').src = t.cover;
       document.getElementById('heroCover').src = t.cover;
+      document.getElementById('heroTitle').textContent = t.title + ' — ' + t.artist;
       if (t.preview) {
         audio.src = t.preview;
         if (playNow) { isPlaying = true; audio.play().catch(()=>{}); }
@@ -206,22 +194,30 @@
       document.getElementById('playBtn').textContent = isPlaying ? '❚❚ Пауза' : '▶ Воспроизвести';
     };
 
-    document.getElementById('searchInput').onkeydown = (e) => {
+    document.getElementById('searchInput').onkeydown = async (e) => {
       if (e.key === 'Enter' && e.target.value.trim()) {
-        loadTracks(e.target.value.trim(), 'Поиск: ' + e.target.value.trim(), 'Результаты поиска');
+        const q = e.target.value.trim();
+        const res = await fetch('https://itunes.apple.com/search?term=' + encodeURIComponent(q) + '&media=music&entity=song&limit=15');
+        const data = await res.json();
+        tracks = (data.results || []).map((item) => ({
+          title: item.trackName,
+          artist: item.artistName,
+          album: item.collectionName || 'Single',
+          cover: (item.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
+          preview: item.previewUrl,
+          scene: SCENE_LABELS[currentScene]
+        }));
+        renderTable();
       }
     };
 
     document.getElementById('simBtn').onclick = () => {
-      if (tracks.length > 0) {
-        const next = tracks[Math.floor(Math.random() * tracks.length)];
-        document.getElementById('sceneBadge').textContent = next.scene;
-        selectTrack(next, true);
-      }
+      const order = ['EXPLORE', 'STEALTH', 'COMBAT', 'BOSSFIGHT'];
+      const next = order[(order.indexOf(currentScene) + 1) % order.length];
+      discoverForScene(next, true);
     };
 
-    renderWaves();
-    loadTracks(WAVES.mix.query, WAVES.mix.label, WAVES.mix.sub);
+    discoverForScene('EXPLORE', false);
   </script>
 </body>
 </html>
