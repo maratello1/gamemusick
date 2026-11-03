@@ -174,9 +174,11 @@ export default function GameVibeSpotifyApp() {
   const [liveStreamTracks, setLiveStreamTracks] = useState<TrackItem[]>(FALLBACK_REAL_TRACKS);
   const [loadingStream, setLoadingStream] = useState<boolean>(false);
 
-  // Preloaded decks for instant zero-latency scene switching (EXPLORE, STEALTH, COMBAT, BOSSFIGHT)
+  // Preloaded decks for instant zero-latency scene switching (EXPLORE, MAJESTIC, DRAMA, STEALTH, COMBAT, BOSSFIGHT)
   const decksRef = useRef<Record<VibeStateId, TrackItem[]>>({
     EXPLORE: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'EXPLORE'),
+    MAJESTIC: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'MAJESTIC'),
+    DRAMA: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'DRAMA'),
     STEALTH: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'STEALTH'),
     COMBAT: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'COMBAT'),
     BOSSFIGHT: FALLBACK_REAL_TRACKS.filter((t) => t.vibe === 'BOSSFIGHT'),
@@ -294,7 +296,14 @@ export default function GameVibeSpotifyApp() {
         .map((s) => s.trim())
         .filter(Boolean);
       const artistsList = [...(prof?.favoriteArtists || draftArtists), ...customExtra];
-      const scenes: VibeStateId[] = ['EXPLORE', 'COMBAT', 'BOSSFIGHT', 'STEALTH'];
+      const scenes: VibeStateId[] = [
+        'EXPLORE',
+        'MAJESTIC',
+        'DRAMA',
+        'COMBAT',
+        'BOSSFIGHT',
+        'STEALTH',
+      ];
 
       await Promise.all(
         scenes.map(async (sc) => {
@@ -334,15 +343,16 @@ export default function GameVibeSpotifyApp() {
 
   /**
    * Smooth Intelligent Scene Switcher:
-   * Transitions between Explore and Combat with full song stability and zero frantic skipping.
+   * Transitions between narrative/game scenes (Explore, Majestic Vista, Tragic Drama, Combat)
+   * with musical crossfade and strict hysteresis so songs play stably.
    */
   const switchToSceneSmoothly = useCallback(
-    (targetMacro: 'EXPLORE' | 'COMBAT') => {
-      const targetVibe: VibeStateId =
-        targetMacro === 'COMBAT' ? 'COMBAT' : 'EXPLORE';
-      activeMacroModeRef.current = targetMacro;
+    (targetVibe: VibeStateId) => {
+      if (activeVibeRef.current === targetVibe) return;
       activeVibeRef.current = targetVibe;
       setActiveVibe(targetVibe);
+      activeMacroModeRef.current =
+        targetVibe === 'COMBAT' || targetVibe === 'BOSSFIGHT' ? 'COMBAT' : 'EXPLORE';
       currentTrackStartTimeRef.current = Date.now();
 
       // 1. Check custom user playlist if selected
@@ -413,12 +423,12 @@ export default function GameVibeSpotifyApp() {
           const now = Date.now();
           const trackPlayDurationSec =
             (now - currentTrackStartTimeRef.current) / 1000;
-          const currentMacro = activeMacroModeRef.current;
+          const currentVibe = activeVibeRef.current;
+          const targetVibe: VibeStateId = data.inferredVibe || 'EXPLORE';
 
-          // Real combat is signaled by the 50Hz attack cadence sensor
           const isActivelyFighting =
-            data.inferredVibe === 'COMBAT' ||
-            data.inferredVibe === 'BOSSFIGHT' ||
+            targetVibe === 'COMBAT' ||
+            targetVibe === 'BOSSFIGHT' ||
             data.motionDelta >= 48;
 
           if (isActivelyFighting) {
@@ -431,25 +441,31 @@ export default function GameVibeSpotifyApp() {
 
           if (inCombatSession) {
             // Player is in battle!
-            if (currentMacro !== 'COMBAT') {
-              // Entering battle: only interrupt peaceful explore track if it has played at least 25s
+            if (currentVibe !== 'COMBAT' && currentVibe !== 'BOSSFIGHT') {
+              // Entering battle: interrupt peaceful exploration track if it has played at least 25s
               // OR if the player is actively hammering attack keys
               if (trackPlayDurationSec >= 25 || isActivelyFighting) {
                 switchToSceneSmoothly('COMBAT');
               }
             }
-            // CRITICAL: If currentMacro is ALREADY 'COMBAT', do NOT change the track!
+            // CRITICAL: If currentVibe is ALREADY 'COMBAT' or 'BOSSFIGHT', do NOT change the track!
             // Let the battle song play through the fight without skipping!
           } else {
-            // Player is peaceful / exploring!
-            if (currentMacro === 'COMBAT') {
-              // Returning from battle to peaceful exploration:
+            // PEACEFUL OR CINEMATIC MODE (MAJESTIC, DRAMA, STEALTH, EXPLORE)
+            if (currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT') {
+              // Returning from battle to peace:
               // Only switch back once the battle song has played for at least 45 seconds!
               if (trackPlayDurationSec >= 45) {
-                switchToSceneSmoothly('EXPLORE');
+                switchToSceneSmoothly(targetVibe);
+              }
+            } else if (currentVibe !== targetVibe) {
+              // Transitioning between scenes (Cutscene, Majestic Vista, Tragic Drama, Stealth, Explore):
+              // If a cutscene triggers (data.isCutscene), respond immediately with narrative immersion!
+              // During regular roaming, require at least 45s of current track so songs never skip wildly.
+              if (data.isCutscene || trackPlayDurationSec >= 45) {
+                switchToSceneSmoothly(targetVibe);
               }
             }
-            // If already in EXPLORE, the explorer song continues playing peacefully!
           }
         }
       } catch {
@@ -1163,7 +1179,7 @@ export default function GameVibeSpotifyApp() {
                   <div className="space-y-2 min-w-0 flex-1">
                     <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-semibold text-[#D47A8D]">
                       <span>
-                        АВТОНОМНЫЙ ПОТОК · ОПРЕДЕЛЕНО В ИГРЕ: {currentSceneMeta.label.toUpperCase()}
+                        {telemetry.isCutscene ? '🎬 КАТСЦЕНА В ИГРЕ' : 'АВТОНОМНЫЙ ПОТОК'} · ОПРЕДЕЛЕНО: {currentSceneMeta.label.toUpperCase()}
                       </span>
                     </div>
 
@@ -1172,19 +1188,17 @@ export default function GameVibeSpotifyApp() {
                     </h1>
 
                     <p className="text-xs text-[#9E9694] max-w-2xl leading-relaxed">
-                      Программа работает в фоне, сама считывает происходящее в игре ({telemetry.detectedProcess}) и включает полные версии подходящих песен по твоим вкусам без отвлечения от игрового процесса.
+                      Программа работает в фоне, считывает катсцены, панорамы и битвы в игре ({telemetry.detectedProcess}) и адаптирует оригинальную музыку под эмоции момента без отвлечения от геймплея.
                     </p>
 
                     <div className="pt-1 flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() =>
-                          fetchDynamicStreamForScene(
-                            activeVibe,
-                            telemetry,
-                            userMoodHint,
-                            true
-                          )
-                        }
+                        onClick={async () => {
+                          setLoadingStream(true);
+                          await preloadAllDecks(accountProfile);
+                          switchToSceneSmoothly(activeVibeRef.current);
+                          setLoadingStream(false);
+                        }}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#6E1D2F] hover:bg-[#822238] text-xs font-medium text-white transition"
                       >
                         <RefreshCw

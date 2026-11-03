@@ -63,6 +63,8 @@ function classifyTrackSceneAutomatically(
 const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   rock: {
     EXPLORE: ['Deftones Entombed', 'Кино Спокойная ночь', 'Arctic Monkeys 505', 'Radiohead Karma Police', 'Nirvana Come As You Are'],
+    MAJESTIC: ['M83 Outro', 'Tame Impala Let It Happen', 'Deftones Sextape', 'Arctic Monkeys 505', 'Coldplay Fix You', 'U2 Beautiful Day'],
+    DRAMA: ['Radiohead Exit Music', 'Deftones Change', 'Linkin Park Leave Out All The Rest', 'Nirvana Something In The Way', 'Placebo Twenty Years'],
     STEALTH: ['Muse Supermassive Black Hole', 'Deftones Change', 'Nine Inch Nails Closer', 'Король и Шут Лесник'],
     COMBAT: ['Linkin Park Faint', 'Nirvana Smells Like Teen Spirit', 'Muse Hysteria', 'Royal Blood Figure It Out', 'Кино Группа крови'],
     BOSSFIGHT: ['Deftones My Own Summer', 'Linkin Park Given Up', 'Bring Me The Horizon Can You Feel My Heart', 'Queens of the Stone Age No One Knows'],
@@ -70,6 +72,8 @@ const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   },
   metal: {
     EXPLORE: ['Deftones Sextape', 'System Of A Down Aerials', 'Metallica Nothing Else Matters', 'Slipknot Vermilion'],
+    MAJESTIC: ['System Of A Down Aerials', 'Metallica Nothing Else Matters', 'Ghost Cirice', 'Slipknot Snuff', 'Deftones Sextape'],
+    DRAMA: ['Rammstein Ohne Dich', 'Deftones Digital Bath', 'Korn Alone I Break', 'Marilyn Manson Coma White', 'Metallica The Unforgiven'],
     STEALTH: ['Rammstein Mein Herz Brennt', 'Korn Freak on a Leash', 'Deftones Change', 'Marilyn Manson Sweet Dreams'],
     COMBAT: ['System Of A Down Toxicity', 'Bring Me The Horizon Throne', 'Limp Bizkit Break Stuff', 'Disturbed Down with the Sickness'],
     BOSSFIGHT: ['Rammstein Sonne', 'Slipknot Duality', 'System Of A Down Chop Suey', 'Metallica Master of Puppets', 'Pantera Walk'],
@@ -77,6 +81,8 @@ const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   },
   rap: {
     EXPLORE: ['Скриптонит Положение', 'A$AP Rocky Sundress', 'Miyagi Silhouette', 'Kanye West Flashing Lights', 'Kid Cudi Day N Nite'],
+    MAJESTIC: ['Kanye West Flashing Lights', 'Kid Cudi Day N Nite', 'Travis Scott ASTROTHUNDER', 'A$AP Rocky Sundress', 'Miyagi Utopia'],
+    DRAMA: ['Скриптонит Это любовь', 'Miyagi Silhouette', 'PHARAOH Беги от меня', 'XXXTENTACION Jocelyn Flores', 'Lil Peep Star Shopping'],
     STEALTH: ['BONES HDMI', '$uicideboy$ Paris', 'PHARAOH Black Siemens', '21 Savage redrum', 'Night Lovell Dark Light'],
     COMBAT: ['Travis Scott FE!N', 'Playboi Carti Sky', 'Denzel Curry Ultimate', 'Big Baby Tape 99 Problems', 'Yeat Monëy so big'],
     BOSSFIGHT: ['Playboi Carti Stop Breathing', 'Ghostemane Mercury', 'XXXTENTACION Look At Me', 'Denzel Curry Sumo', 'BONES RestInPeace'],
@@ -84,6 +90,8 @@ const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   },
   phonk: {
     EXPLORE: ['DVRST Dream Space', 'Skeler Tel Aviv', 'LXST CXNTURY Odium'],
+    MAJESTIC: ['DVRST Dream Space', 'Skeler Tel Aviv', 'LXST CXNTURY Andromeda', 'Interworld Metamorphosis'],
+    DRAMA: ['Skeler Waste', 'LXST CXNTURY Odium', 'DVRST Autumn Wind', 'Kordhell Scared'],
     STEALTH: ['DVRST Close Eyes', 'Interworld Metamorphosis', 'Kaito Shoma Scary Garry'],
     COMBAT: ['Kordhell Murder In My Mind', 'PlayaPhonk Phonky Town', 'MoonDeity Wake Up'],
     BOSSFIGHT: ['Kordhell Live Another Day', 'Ghostface Playa Why Not', 'Dxrk RAVE'],
@@ -91,6 +99,8 @@ const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   },
   electronic: {
     EXPLORE: ['Kavinsky Nightcall', 'Daft Punk Veridis Quo', 'M83 Midnight City', 'Aphex Twin Xtal'],
+    MAJESTIC: ['M83 Outro', 'M83 Midnight City', 'Daft Punk Veridis Quo', 'Porter Robinson Language', 'Deadmau5 Strobe'],
+    DRAMA: ['Massive Attack Angel', 'Burial Archangel', 'Portishead Roads', 'Gesaffelstein Opr', 'Crystal Castles Suffocation'],
     STEALTH: ['Crystal Castles Kerosene', 'Gesaffelstein Aleph', 'Massive Attack Angel'],
     COMBAT: ['The Prodigy Omen', 'Pendulum Propane Nightmares', 'Gesaffelstein Pursuit'],
     BOSSFIGHT: ['The Prodigy Breathe', 'Carpenter Brut Turbo Killer', 'Pendulum Watercolour'],
@@ -98,6 +108,8 @@ const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
   },
   indie: {
     EXPLORE: ['Tame Impala Let It Happen', 'Mac DeMarco Chamber of Reflection', 'The Neighbourhood Sweater Weather', 'Gorillaz Melancholy Hill'],
+    MAJESTIC: ['Tame Impala Let It Happen', 'The Neighbourhood Sweater Weather', 'Beach House Space Song', 'MGMT Kids', 'Cigarettes After Sex Apocalypse'],
+    DRAMA: ['Radiohead Exit Music', 'Radiohead Karma Police', 'Lana Del Rey Video Games', 'Lord Huron The Night We Met', 'Joji Glimpse of Us'],
     STEALTH: ['Radiohead Everything In Its Right Place', 'Massive Attack Teardrop', 'Beach House Space Song'],
     COMBAT: ['Franz Ferdinand Take Me Out', 'Arctic Monkeys Brianstorm', 'The Strokes Reptilia', 'Kasabian Club Foot'],
     BOSSFIGHT: ['Muse Knights of Cydonia', 'The White Stripes Seven Nation Army'],

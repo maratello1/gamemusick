@@ -1,4 +1,11 @@
-export type VibeStateId = 'EXPLORE' | 'STEALTH' | 'COMBAT' | 'BOSSFIGHT' | 'VICTORY';
+export type VibeStateId =
+  | 'EXPLORE'
+  | 'MAJESTIC'
+  | 'DRAMA'
+  | 'STEALTH'
+  | 'COMBAT'
+  | 'BOSSFIGHT'
+  | 'VICTORY';
 
 export type MusicPlatformId =
   | 'builtin'
@@ -57,4 +64,7 @@ export interface TelemetrySnapshot {
   luminance: number;
   compositeIntensity: number;
   inferredVibe: VibeStateId;
+  isCutscene?: boolean;
+  sceneEmotion?: string;
+  sceneLabel?: string;
 }

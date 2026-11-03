@@ -106,6 +106,9 @@ export async function GET() {
         luminance: luma,
         compositeIntensity: intensity,
         inferredVibe: (parsed.inferredVibe as VibeStateId) || vibe,
+        isCutscene: Boolean(parsed.isCutscene),
+        sceneEmotion: typeof parsed.sceneEmotion === 'string' ? parsed.sceneEmotion : undefined,
+        sceneLabel: typeof parsed.sceneLabel === 'string' ? parsed.sceneLabel : undefined,
       };
     }
   } catch {

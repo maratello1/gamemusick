@@ -190,7 +190,6 @@ public class GameSensor
     }
 
     const int SRCCOPY = 0x00CC0020;
-    const int CAPTUREBLT = 0x40000000;
 
     static readonly HashSet<string> IgnoredProcesses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -204,20 +203,23 @@ public class GameSensor
         "NVIDIA Share", "NVIDIA Overlay", "GameBar", "XboxPcAppFt"
     };
 
-    // Dedicated attack and action keys in PC games:
-    // Mouse: LMB(0x01), RMB(0x02)
-    // Keys: Z, X, C, V (classic platformer attack/jump/special)
-    // Q, E, R, F, G, Space (skill / action / dodge)
-    // J, K, L, U, I, O (arcade combat)
-    // 1, 2, 3, 4 (ability hotkeys)
     static readonly HashSet<int> AttackKeys = new HashSet<int>
     {
         0x01, 0x02,             // LMB, RMB
-        0x5A, 0x58, 0x43, 0x56, // Z, X, C, V
+        0x5A, 0x58, 0x43, 0x56, // Z, X, C, V (classic platformer attack/jump/special)
         0x51, 0x45, 0x52, 0x46, 0x47, // Q, E, R, F, G
         0x4A, 0x4B, 0x4C, 0x55, 0x49, 0x4F, // J, K, L, U, I, O
         0x20,                   // Space (action / attack)
         0x31, 0x32, 0x33, 0x34  // 1, 2, 3, 4
+    };
+
+    static readonly HashSet<int> AnyControlKeys = new HashSet<int>
+    {
+        0x01, 0x02, 0x04,
+        0x57, 0x41, 0x53, 0x44, // WASD
+        0x25, 0x26, 0x27, 0x28, // Arrows
+        0x5A, 0x58, 0x43, 0x56,
+        0x20, 0x10, 0x11, 0x0D
     };
 
     static string CleanJson(string s)
@@ -286,10 +288,20 @@ public class GameSensor
         return list;
     }
 
-    static void SampleScreenAverage(out int avgLuma, out bool isFullscreenDamageFlash)
+    // High-performance cinematic vision analyzer:
+    // Detects 21:9 letterbox cutscenes, open majestic vistas (warm awe), and tragic/tense drama (cold contrast)
+    static void SampleCinematicVision(
+        out int avgLuma,
+        out bool isLetterboxCutscene,
+        out int warmAweScore,
+        out int coldDramaScore
+    )
     {
         avgLuma = 30;
-        isFullscreenDamageFlash = false;
+        isLetterboxCutscene = false;
+        warmAweScore = 0;
+        coldDramaScore = 0;
+
         try
         {
             int w = Math.Max(800, GetSystemMetrics(0));
@@ -299,33 +311,71 @@ public class GameSensor
             IntPtr hbm = CreateCompatibleBitmap(hdcScreen, 1, 1);
             IntPtr oldObj = SelectObject(hdcMem, hbm);
 
-            // Sample 9 spread points to gauge overall scene brightness
-            int[] xs = new int[] { w / 4, w / 2, (w * 3) / 4 };
-            int[] ys = new int[] { h / 4, h / 2, (h * 3) / 4 };
+            // 1. Cinematic Letterbox Bars: top 2.5% and bottom 97.5%
+            int[] borderYs = new int[] { (int)(h * 0.025), (int)(h * 0.975) };
+            int[] borderXs = new int[] { (int)(w * 0.25), (int)(w * 0.50), (int)(w * 0.75) };
+            int blackBorderCount = 0;
 
-            int lumaSum = 0;
-            int redDominatedCount = 0;
-
-            foreach (int y in ys)
+            foreach (int by in borderYs)
             {
-                foreach (int x in xs)
+                foreach (int bx in borderXs)
                 {
-                    BitBlt(hdcMem, 0, 0, 1, 1, hdcScreen, x, y, SRCCOPY);
+                    BitBlt(hdcMem, 0, 0, 1, 1, hdcScreen, bx, by, SRCCOPY);
                     uint color = GetPixel(hdcMem, 0, 0);
                     if (color != 0xFFFFFFFF)
                     {
                         int r = (int)(color & 0xFF);
                         int g = (int)((color >> 8) & 0xFF);
                         int b = (int)((color >> 16) & 0xFF);
-                        lumaSum += (299 * r + 587 * g + 114 * b) / 2550;
-                        if (r > 150 && r > (g + b) * 1.2) redDominatedCount++;
+                        if (r <= 20 && g <= 20 && b <= 20) blackBorderCount++;
+                    }
+                }
+            }
+
+            // 2. Active Screen Area: 3x3 grid across the middle 70% of viewport
+            int[] cXs = new int[] { (int)(w * 0.25), (int)(w * 0.50), (int)(w * 0.75) };
+            int[] cYs = new int[] { (int)(h * 0.25), (int)(h * 0.50), (int)(h * 0.75) };
+
+            int lumaSum = 0;
+            int warmSum = 0;
+            int dramaSum = 0;
+
+            foreach (int cy in cYs)
+            {
+                foreach (int cx in cXs)
+                {
+                    BitBlt(hdcMem, 0, 0, 1, 1, hdcScreen, cx, cy, SRCCOPY);
+                    uint color = GetPixel(hdcMem, 0, 0);
+                    if (color != 0xFFFFFFFF)
+                    {
+                        int r = (int)(color & 0xFF);
+                        int g = (int)((color >> 8) & 0xFF);
+                        int b = (int)((color >> 16) & 0xFF);
+                        int l = (299 * r + 587 * g + 114 * b) / 2550;
+                        lumaSum += l;
+
+                        int maxC = Math.Max(r, Math.Max(g, b));
+                        int minC = Math.Min(r, Math.Min(g, b));
+                        int sat = maxC - minC;
+
+                        // Warm Majestic: bright golden hour, sunny vista, azure skies, rich landscape colors
+                        if (l > 36 && (r > b + 10 || (g > 95 && b > 95)) && sat > 20)
+                        {
+                            warmSum += 12;
+                        }
+                        // Cold Drama: desaturated slate, bleak shadows, tragic dark palette, cold blue tints
+                        if ((sat < 30 && l < 52) || (b > r + 15 && l < 70))
+                        {
+                            dramaSum += 12;
+                        }
                     }
                 }
             }
 
             avgLuma = Math.Max(5, Math.Min(100, lumaSum / 9));
-            // Only true fullscreen red flash if at least 7 of 9 points across the entire screen turn red at once
-            isFullscreenDamageFlash = (redDominatedCount >= 7);
+            isLetterboxCutscene = (blackBorderCount >= 5 && avgLuma > 18);
+            warmAweScore = Math.Min(100, warmSum);
+            coldDramaScore = Math.Min(100, dramaSum);
 
             SelectObject(hdcMem, oldObj);
             DeleteObject(hbm);
@@ -349,13 +399,17 @@ public class GameSensor
         bool[] prevPadRT = new bool[4];
         uint[] prevJoyButtons = new uint[4];
 
-        // 8 slots x 250ms = 2.0s sliding window for combat action frequency
-        int[] combatActionsHistory = new int[8];
+        int[] combatActionsHistory = new int[8]; // 8 x 250ms = 2.0s sliding window
         int historyIdx = 0;
 
         float rollingAudioBaseline = -1.0f;
         long lastCombatDetectedMs = 0;
+        long lastPlayerInputMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
         string activeState = "EXPLORE";
+        string emotionTag = "EXPLORE";
+        string sceneLabel = "Спокойное исследование";
+
         int cycleCounter = 0;
         List<TrackedAudioSession> cachedSessions = DiscoverGameAudioSessions();
 
@@ -370,7 +424,7 @@ public class GameSensor
             }
             cycleCounter++;
 
-            // 1. Check Foreground Window
+            // 1. Foreground Window Check
             bool isGameInForeground = false;
             string fgName = "";
             string fgTitle = "";
@@ -403,27 +457,31 @@ public class GameSensor
             float sumAudioPeak = 0f;
 
             int tickAttackPresses = 0;
+            bool anyControlDown = false;
 
-            // 10 ticks x 25ms = 250ms measurement window
+            // 10 ticks x 25ms = 250ms
             int ticks = 10;
             for (int t = 0; t < ticks; t++)
             {
-                // Only count inputs if the user is in the game or if controller is used
                 if (isGameInForeground)
                 {
+                    foreach (int vk in AnyControlKeys)
+                    {
+                        if ((GetAsyncKeyState(vk) & 0x8000) != 0) anyControlDown = true;
+                    }
+
                     foreach (int vk in AttackKeys)
                     {
                         bool isDown = (GetAsyncKeyState(vk) & 0x8000) != 0;
                         if (isDown && !prevKeyStates[vk])
                         {
-                            // Fresh attack button press (Z, X, C, LMB, etc.)
                             tickAttackPresses++;
                         }
                         prevKeyStates[vk] = isDown;
                     }
                 }
 
-                // Gamepad checks (XInput + DirectInput)
+                // Gamepads
                 for (uint padIdx = 0; padIdx < 4; padIdx++)
                 {
                     XINPUT_STATE xs;
@@ -433,7 +491,11 @@ public class GameSensor
                         ushort newly = (ushort)(btns & ~prevPadButtons[padIdx]);
                         prevPadButtons[padIdx] = btns;
 
-                        // A, B, X, Y (0xF000) + Bumpers (0x0300)
+                        if (btns != 0 || xs.Gamepad.bLeftTrigger > 40 || xs.Gamepad.bRightTrigger > 40)
+                        {
+                            anyControlDown = true;
+                        }
+
                         if ((newly & 0xF300) != 0) tickAttackPresses++;
 
                         bool ltDown = xs.Gamepad.bLeftTrigger > 45;
@@ -455,6 +517,7 @@ public class GameSensor
                                 uint btns = ji.dwButtons;
                                 uint newly = btns & ~prevJoyButtons[padIdx];
                                 prevJoyButtons[padIdx] = btns;
+                                if (btns != 0) anyControlDown = true;
                                 if (newly != 0) tickAttackPresses++;
                             }
                         }
@@ -462,7 +525,7 @@ public class GameSensor
                     }
                 }
 
-                // Sample game audio peak
+                // Game audio peak
                 float p = 0f;
                 foreach (var gs in cachedSessions)
                 {
@@ -484,6 +547,12 @@ public class GameSensor
                 Thread.Sleep(25);
             }
 
+            long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (anyControlDown)
+            {
+                lastPlayerInputMs = nowMs;
+            }
+
             if (!string.IsNullOrEmpty(fgName))
             {
                 lastKnownGame = fgName;
@@ -495,7 +564,6 @@ public class GameSensor
                 lastKnownTitle = !string.IsNullOrEmpty(audioGameTitle) ? audioGameTitle : audioGameName;
             }
 
-            // Update 2-second sliding window of combat action frequency
             combatActionsHistory[historyIdx] = tickAttackPresses;
             historyIdx = (historyIdx + 1) % combatActionsHistory.Length;
 
@@ -505,7 +573,6 @@ public class GameSensor
                 totalAttackPressesIn2s += combatActionsHistory[i];
             }
 
-            // Audio surge calculation
             float avgPeak = sumAudioPeak / ticks;
             if (avgPeak > 0.001f)
             {
@@ -514,51 +581,100 @@ public class GameSensor
             }
             bool isAudioSurging = (rollingAudioBaseline > 0.002f && maxAudioPeak > rollingAudioBaseline * 1.6f && maxAudioPeak > 0.04f);
 
+            // 2. Cinematic Vision Analysis
             int avgLuma = 30;
-            bool isDamageFlash = false;
-            SampleScreenAverage(out avgLuma, out isDamageFlash);
+            bool isLetterboxCutscene = false;
+            int warmAweScore = 0;
+            int coldDramaScore = 0;
+            SampleCinematicVision(out avgLuma, out isLetterboxCutscene, out warmAweScore, out coldDramaScore);
 
-            long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            // Hands-off cutscene test: player hasn't touched controls for 2.2+ seconds
+            bool isHandsOffCutscene = (nowMs - lastPlayerInputMs > 2200 && isLetterboxCutscene);
 
-            // Intelligent State Machine with Strong Hysteresis:
-            // What defines COMBAT:
-            // 1) The player pressed at least 2 attack keys in the last 2 seconds, OR
-            // 2) A sudden damage flash occurred while game audio is surging.
-            // Casual walking (holding D/Right) or jumping has ZERO attack presses -> stays in EXPLORE!
-            bool isActivelyFighting = (totalAttackPressesIn2s >= 2) || (totalAttackPressesIn2s >= 1 && isAudioSurging) || isDamageFlash;
+            bool isActivelyFighting = (totalAttackPressesIn2s >= 2) || (totalAttackPressesIn2s >= 1 && isAudioSurging);
 
+            // State Machine with Intelligent Emotional Classification:
             if (isActivelyFighting)
             {
                 lastCombatDetectedMs = nowMs;
                 activeState = "COMBAT";
+                emotionTag = "COMBAT";
+                sceneLabel = "Бой / Экшен";
+            }
+            else if (nowMs - lastCombatDetectedMs < 14000)
+            {
+                // Hold battle mode during pauses between enemies
+                activeState = "COMBAT";
+                emotionTag = "COMBAT";
+                sceneLabel = "Бой / Экшен";
+            }
+            else if (isHandsOffCutscene || isLetterboxCutscene)
+            {
+                // In-Game Cinematic Cutscene
+                if (coldDramaScore >= 42)
+                {
+                    activeState = "DRAMA";
+                    emotionTag = "DRAMA";
+                    sceneLabel = "Трагическая катсцена / Драма";
+                }
+                else if (warmAweScore >= 42)
+                {
+                    activeState = "MAJESTIC";
+                    emotionTag = "MAJESTIC";
+                    sceneLabel = "Воодушевляющая катсцена / Панорама";
+                }
+                else
+                {
+                    activeState = "DRAMA";
+                    emotionTag = "DRAMA";
+                    sceneLabel = "Кинематографический сюжет";
+                }
             }
             else
             {
-                // Once combat is triggered, hold combat mode for 12.0 seconds after the last attack blow
-                // This prevents music from cutting off during short pauses or between enemy waves!
-                if (nowMs - lastCombatDetectedMs < 12000)
+                // Peaceful Exploration & Discovery
+                if (warmAweScore >= 55)
                 {
-                    activeState = "COMBAT";
+                    activeState = "MAJESTIC";
+                    emotionTag = "MAJESTIC";
+                    sceneLabel = "Красивая локация / Панорама";
+                }
+                else if (coldDramaScore >= 60)
+                {
+                    activeState = "DRAMA";
+                    emotionTag = "DRAMA";
+                    sceneLabel = "Мрачная локация / Напряжение";
+                }
+                else if (avgLuma <= 18)
+                {
+                    activeState = "STEALTH";
+                    emotionTag = "STEALTH";
+                    sceneLabel = "Таинственная атмосфера / Ночь";
                 }
                 else
                 {
                     activeState = "EXPLORE";
+                    emotionTag = "EXPLORE";
+                    sceneLabel = "Спокойное исследование";
                 }
             }
 
             int displayMotion = (activeState == "COMBAT")
                 ? Math.Min(95, 52 + totalAttackPressesIn2s * 8)
-                : Math.Max(10, 14 + totalAttackPressesIn2s * 5);
+                : (activeState == "MAJESTIC" ? 28 : (activeState == "DRAMA" ? 22 : 14));
 
             string json = string.Format(
                 CultureInfo.InvariantCulture,
-                "{{\"timestamp\":{0},\"detectedProcess\":\"{1}\",\"windowTitle\":\"{2}\",\"motionDelta\":{3},\"redAlertRatio\":0,\"brightness\":{4},\"inferredVibe\":\"{5}\",\"sensorMode\":\"combat-cadence-50hz\"}}",
+                "{{\"timestamp\":{0},\"detectedProcess\":\"{1}\",\"windowTitle\":\"{2}\",\"motionDelta\":{3},\"redAlertRatio\":0,\"brightness\":{4},\"inferredVibe\":\"{5}\",\"sceneEmotion\":\"{6}\",\"sceneLabel\":\"{7}\",\"isCutscene\":{8},\"sensorMode\":\"cinematic-vision-50hz\"}}",
                 nowMs,
                 CleanJson(lastKnownGame),
                 CleanJson(lastKnownTitle),
                 displayMotion,
                 avgLuma,
-                activeState
+                activeState,
+                emotionTag,
+                CleanJson(sceneLabel),
+                isHandsOffCutscene || isLetterboxCutscene ? "true" : "false"
             );
 
             try
