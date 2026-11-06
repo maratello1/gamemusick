@@ -7,6 +7,14 @@ export const dynamic = 'force-dynamic';
 
 const STORE_PATH = path.join(process.cwd(), 'data', 'user-playlists.json');
 
+export interface AiLearningModel {
+  artistWeights: Record<string, number>;
+  genreWeights: Record<string, number>;
+  gameProfiles: Record<string, { preferredGenres: string[]; favoriteArtists: string[] }>;
+  totalListens: number;
+  totalSkips: number;
+}
+
 export interface UserAccountProfile {
   username: string;
   favoriteGenres: string[];
@@ -30,6 +38,7 @@ export interface UserPlaylist {
 interface UserStoreSchema {
   accountProfile: UserAccountProfile | null;
   userPlaylists: UserPlaylist[];
+  aiLearningModel?: AiLearningModel;
   activeBridgeTrack: {
     videoId: string;
     title: string;
@@ -48,6 +57,13 @@ function readStore(): UserStoreSchema {
       return {
         accountProfile: parsed.accountProfile || null,
         userPlaylists: Array.isArray(parsed.userPlaylists) ? parsed.userPlaylists : [],
+        aiLearningModel: parsed.aiLearningModel || {
+          artistWeights: {},
+          genreWeights: {},
+          gameProfiles: {},
+          totalListens: 0,
+          totalSkips: 0,
+        },
         activeBridgeTrack: parsed.activeBridgeTrack || null,
       };
     }
@@ -171,6 +187,44 @@ export async function POST(request: NextRequest) {
       };
       writeStore(store);
       return NextResponse.json({ ok: true, store });
+    }
+
+    if (body.action === 'RECORD_AI_FEEDBACK') {
+      if (!store.aiLearningModel) {
+        store.aiLearningModel = {
+          artistWeights: {},
+          genreWeights: {},
+          gameProfiles: {},
+          totalListens: 0,
+          totalSkips: 0,
+        };
+      }
+      const model = store.aiLearningModel;
+      const { artist, genre, game, isCompletion, isFastSkip } = body;
+
+      if (artist) {
+        const aKey = String(artist).toLowerCase().trim();
+        model.artistWeights[aKey] = (model.artistWeights[aKey] || 0) + (isCompletion ? 2 : isFastSkip ? -1 : 0);
+      }
+      if (genre) {
+        const gKey = String(genre).toLowerCase().trim();
+        model.genreWeights[gKey] = (model.genreWeights[gKey] || 0) + (isCompletion ? 2 : isFastSkip ? -1 : 0);
+      }
+      if (game && artist && isCompletion) {
+        const gKey = String(game).toLowerCase().trim();
+        if (!model.gameProfiles[gKey]) {
+          model.gameProfiles[gKey] = { preferredGenres: [], favoriteArtists: [] };
+        }
+        const prof = model.gameProfiles[gKey];
+        const aKey = String(artist).trim();
+        if (!prof.favoriteArtists.includes(aKey)) prof.favoriteArtists.push(aKey);
+      }
+
+      if (isCompletion) model.totalListens++;
+      if (isFastSkip) model.totalSkips++;
+
+      writeStore(store);
+      return NextResponse.json({ ok: true, aiLearningModel: model, store });
     }
 
     return NextResponse.json({ ok: true, store });

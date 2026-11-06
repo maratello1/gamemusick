@@ -1,0 +1,21 @@
+{
+  "playbackEngine": "youtube",
+  "gemini": {
+    "enabled": false,
+    "apiKey": "",
+    "model": "gemini-2.5-flash",
+    "intervalSec": 10,
+    "isValidated": false
+  },
+  "spotify": {
+    "enabled": false,
+    "clientId": "",
+    "clientSecret": "",
+    "connected": false
+  },
+  "appleMusic": {
+    "enabled": false,
+    "developerToken": "",
+    "connected": false
+  }
+}

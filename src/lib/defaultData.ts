@@ -6,7 +6,7 @@ export interface GenrePackConfig {
   id: GenrePackId;
   label: string;
   artistsSummary: string;
-  seedsByVibe: Record<VibeStateId, string[]>;
+  seedsByVibe: Partial<Record<VibeStateId, string[]>>;
 }
 
 export const VIBE_STATES: Record<VibeStateId, VibeStateConfig> = {
@@ -405,5 +405,77 @@ export const FALLBACK_REAL_TRACKS: TrackItem[] = [
     previewUrl: '/api/full-stream?q=System%20Of%20A%20Down%20Chop%20Suey&artist=System%20Of%20A%20Down&title=Chop%20Suey!&dur=210',
     vibe: 'BOSSFIGHT',
     genreTag: 'Metal',
+  },
+  {
+    id: 'brian-eno-ascent',
+    videoId: 'aKw5mbcE7VY',
+    title: 'An Ending (Ascent)',
+    artist: 'Brian Eno',
+    album: 'Apollo: Atmospheres and Soundtracks',
+    duration: '04:26',
+    thumbnail: 'https://i.ytimg.com/vi/aKw5mbcE7VY/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'EXPLORE',
+    genreTag: 'Ambient',
+  },
+  {
+    id: 'c418-subwoofer',
+    videoId: 'g34x1gX949c',
+    title: 'Subwoofer Lullaby',
+    artist: 'C418',
+    album: 'Minecraft - Volume Alpha',
+    duration: '03:28',
+    thumbnail: 'https://i.ytimg.com/vi/g34x1gX949c/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'EXPLORE',
+    genreTag: 'Ambient',
+  },
+  {
+    id: 'keiichi-okabe-weight',
+    videoId: 'Egn_VNVKzI8',
+    title: 'Weight of the World (the End of YoRHa)',
+    artist: 'Keiichi Okabe',
+    album: 'NieR:Automata Original Soundtrack',
+    duration: '05:44',
+    thumbnail: 'https://i.ytimg.com/vi/Egn_VNVKzI8/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'MAJESTIC',
+    genreTag: 'Cinematic Orchestral',
+  },
+  {
+    id: 'hans-zimmer-time',
+    videoId: 'RxabLA7UQ9k',
+    title: 'Time',
+    artist: 'Hans Zimmer',
+    album: 'Inception (Original Motion Picture Soundtrack)',
+    duration: '04:35',
+    thumbnail: 'https://i.ytimg.com/vi/RxabLA7UQ9k/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'MAJESTIC',
+    genreTag: 'Neo-Classical',
+  },
+  {
+    id: 'max-richter-daylight',
+    videoId: 'b_YHE4Sx-08',
+    title: 'On the Nature of Daylight',
+    artist: 'Max Richter',
+    album: 'The Blue Notebooks',
+    duration: '06:11',
+    thumbnail: 'https://i.ytimg.com/vi/b_YHE4Sx-08/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'DRAMA',
+    genreTag: 'Neo-Classical / Drama',
+  },
+  {
+    id: 'two-steps-victory',
+    videoId: 'hKRUPYrAQoE',
+    title: 'Victory',
+    artist: 'Two Steps From Hell',
+    album: 'Battlecry',
+    duration: '05:20',
+    thumbnail: 'https://i.ytimg.com/vi/hKRUPYrAQoE/hqdefault.jpg',
+    previewUrl: '',
+    vibe: 'VICTORY',
+    genreTag: 'Epic Orchestral',
   },
 ];

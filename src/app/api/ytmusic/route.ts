@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TrackItem, VibeStateId } from '@/types/vibe';
+import { searchYouTubeDirect } from '@/lib/youtubeSearch';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,110 +12,274 @@ function formatDurationMs(ms?: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+const ITUNES_HEADERS = {
+  'User-Agent': 'iTunes/12.9.5 (Windows; Microsoft Windows 10.0; x64) AppleWebKit/7607.2001.3001.9',
+  Accept: 'application/json',
+};
+
 const BAD_ITUNES_ARTISTS =
-  /\b(tribute|karaoke|orchestra|string quartet|in the style of|originally performed by|cover band|soundtrack band)\b/i;
+  /\b(tribute|karaoke|orchestra|string quartet|in the style of|originally performed by|cover band|soundtrack band|etrusco music|myers music|obsidian silence|age of valour|drakula|sordid ghosting|dark music specialist|camuna music|mystic rpg|inkwell & ivy|relaxing music|spa music|sleep music|study music|meditation|background music|royalty free|sound effects|halloween)\b/i;
 
 const BAD_ITUNES_TITLES =
-  /\b(tribute|karaoke|in the style of|string quartet|piano cover|lullaby version|remix|remixed|rmx|cover|кавер|ремикс|slowed|reverb)\b/i;
+  /\b(tribute|karaoke|in the style of|string quartet|piano cover|lullaby version|remix|remixed|rmx|cover|кавер|ремикс|slowed|reverb|radio mix|club mix|extended mix|live at|live from|acoustic version|mashup|bootleg|demo version)\b/i;
 
-function classifyTrackSceneAutomatically(
-  title: string,
-  artist: string,
-  genre: string,
-  fallbackVibe: VibeStateId
-): VibeStateId {
-  const combined = `${title} ${artist} ${genre}`.toLowerCase();
-
-  if (
-    /rammstein|slipknot|meshuggah|slayer|pantera|ghostemane|korn|system of a down|chop suey|duality|sonne|my own summer|faint|rage|hardcore|metal|thrash|death/.test(
-      combined
-    )
-  ) {
-    return 'BOSSFIGHT';
-  }
-
-  if (
-    /prodigy|pendulum|travis scott|playboi carti|denzel curry|yeat|big baby tape|kizaru|bring me the horizon|limp bizkit|carpenter brut|fe!n|omen|drum|dnb|action|fight|combat|hype/.test(
-      combined
-    )
-  ) {
-    return 'COMBAT';
-  }
-
-  if (
-    /bones|crystal castles|gesaffelstein|suicideboy|dvrst|pharaoh|21 savage|metro boomin|night lovell|kordhell|interworld|nine inch nails|dark|night|shadow|phonk|underground|witch/.test(
-      combined
-    )
-  ) {
-    return 'STEALTH';
-  }
-
-  if (
-    /entombed|sextape|nightcall|кино|спокойная|скриптонит|radiohead|arctic monkeys|tame impala|gorillaz|daft punk|miyagi|mac demarco|the weeknd|chill|ambient|indie|acoustic|melodic|dream/.test(
-      combined
-    )
-  ) {
-    return 'EXPLORE';
-  }
-
-  return fallbackVibe;
+// Procedural Atmosphere Archetypes: Infinite dynamic variety, ZERO hardcoded fixed song lists!
+interface AtmosphereArchetype {
+  name: string;
+  artists: string[];
+  descriptors: Record<VibeStateId, string[]>;
 }
 
-const GENRE_SCENE_ARTISTS: Record<string, Record<VibeStateId, string[]>> = {
-  rock: {
-    EXPLORE: ['Deftones Entombed', 'Кино Спокойная ночь', 'Arctic Monkeys 505', 'Radiohead Karma Police', 'Nirvana Come As You Are'],
-    MAJESTIC: ['M83 Outro', 'Tame Impala Let It Happen', 'Deftones Sextape', 'Arctic Monkeys 505', 'Coldplay Fix You', 'U2 Beautiful Day'],
-    DRAMA: ['Radiohead Exit Music', 'Deftones Change', 'Linkin Park Leave Out All The Rest', 'Nirvana Something In The Way', 'Placebo Twenty Years'],
-    STEALTH: ['Muse Supermassive Black Hole', 'Deftones Change', 'Nine Inch Nails Closer', 'Король и Шут Лесник'],
-    COMBAT: ['Linkin Park Faint', 'Nirvana Smells Like Teen Spirit', 'Muse Hysteria', 'Royal Blood Figure It Out', 'Кино Группа крови'],
-    BOSSFIGHT: ['Deftones My Own Summer', 'Linkin Park Given Up', 'Bring Me The Horizon Can You Feel My Heart', 'Queens of the Stone Age No One Knows'],
-    VICTORY: ['Linkin Park In The End', 'Deftones Rosemary', 'Arctic Monkeys Do I Wanna Know'],
+const ATMOSPHERE_ARCHETYPES: Record<string, AtmosphereArchetype> = {
+  gothic: {
+    name: 'Gothic & Dark Fantasy',
+    artists: [
+      'Michiru Yamane',
+      'Christopher Larkin',
+      'Bohren & der Club of Gore',
+      'Atrium Carceri',
+      'Lustmord',
+      'Wojciech Kilar',
+      'Peter Gundry',
+      'Adrian von Ziegler',
+      'Trevor Morris',
+      'Castlevania Sound Team',
+      'Motoi Sakuraba',
+      'Borislav Slavov',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'dungeon synth dark ambient',
+        'dark gothic ambient exploration',
+        'dark fantasy soundtrack atmospheric',
+        'neoclassical dark cathedral organ',
+      ],
+      MAJESTIC: [
+        'gothic choir majestic triumph',
+        'epic dark fantasy crescendo choir',
+        'sacred organ triumph orchestra',
+      ],
+      DRAMA: [
+        'dark cello tragedy sorrow',
+        'requiem strings dark ambient',
+        'melancholic gothic piano',
+      ],
+      STEALTH: [
+        'dark ambient drone crypt',
+        'subtle suspense dungeon synth',
+        'shadow infiltration dark tension',
+      ],
+      COMBAT: [
+        'gothic battle orchestral action',
+        'dark symphonic combat choir',
+        'epic organ battle furious',
+      ],
+      BOSSFIGHT: [
+        'epic dark choir boss fight',
+        'gothic boss battle orchestral',
+        'furious symphonic climax boss',
+      ],
+      VICTORY: [
+        'gothic cathedral bells victory triumph',
+        'dark fantasy triumph orchestra',
+      ],
+    },
   },
-  metal: {
-    EXPLORE: ['Deftones Sextape', 'System Of A Down Aerials', 'Metallica Nothing Else Matters', 'Slipknot Vermilion'],
-    MAJESTIC: ['System Of A Down Aerials', 'Metallica Nothing Else Matters', 'Ghost Cirice', 'Slipknot Snuff', 'Deftones Sextape'],
-    DRAMA: ['Rammstein Ohne Dich', 'Deftones Digital Bath', 'Korn Alone I Break', 'Marilyn Manson Coma White', 'Metallica The Unforgiven'],
-    STEALTH: ['Rammstein Mein Herz Brennt', 'Korn Freak on a Leash', 'Deftones Change', 'Marilyn Manson Sweet Dreams'],
-    COMBAT: ['System Of A Down Toxicity', 'Bring Me The Horizon Throne', 'Limp Bizkit Break Stuff', 'Disturbed Down with the Sickness'],
-    BOSSFIGHT: ['Rammstein Sonne', 'Slipknot Duality', 'System Of A Down Chop Suey', 'Metallica Master of Puppets', 'Pantera Walk'],
-    VICTORY: ['System Of A Down Lonely Day', 'Metallica Fade to Black', 'Linkin Park Numb'],
+  scifi: {
+    name: 'Sci-Fi, Choral & Cyberpunk',
+    artists: [
+      'Keiichi Okabe',
+      'Brian Eno',
+      'Sigur Ros',
+      'M83',
+      'Max Richter',
+      'Olafur Arnalds',
+      'Hammock',
+      'Carbon Based Lifeforms',
+      'Solar Fields',
+      'Trent Reznor',
+      'Cliff Martinez',
+      'Vangelis',
+      'Hans Zimmer',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'ethereal sci-fi ambient space',
+        'ambient electronic cyberpunk drone',
+        'peaceful ruins ambient piano',
+      ],
+      MAJESTIC: [
+        'epic choral post rock space',
+        'ethereal choir crescendo vista',
+        'celestial orchestra majestic',
+      ],
+      DRAMA: [
+        'melancholic piano string orchestra',
+        'sorrowful ethereal vocal ambient',
+        'sad cello post-rock',
+      ],
+      STEALTH: [
+        'dark cyber synth drone',
+        'minimalist suspense electronic tension',
+      ],
+      COMBAT: [
+        'cyberpunk dark battle synth action',
+        'epic choral combat soundtrack',
+      ],
+      BOSSFIGHT: [
+        'colossal boss synth choir battle',
+        'heavy electronic battle crescendo',
+      ],
+      VICTORY: [
+        'celestial choir triumph space',
+        'post-rock euphoric crescendo',
+      ],
+    },
   },
-  rap: {
-    EXPLORE: ['Скриптонит Положение', 'A$AP Rocky Sundress', 'Miyagi Silhouette', 'Kanye West Flashing Lights', 'Kid Cudi Day N Nite'],
-    MAJESTIC: ['Kanye West Flashing Lights', 'Kid Cudi Day N Nite', 'Travis Scott ASTROTHUNDER', 'A$AP Rocky Sundress', 'Miyagi Utopia'],
-    DRAMA: ['Скриптонит Это любовь', 'Miyagi Silhouette', 'PHARAOH Беги от меня', 'XXXTENTACION Jocelyn Flores', 'Lil Peep Star Shopping'],
-    STEALTH: ['BONES HDMI', '$uicideboy$ Paris', 'PHARAOH Black Siemens', '21 Savage redrum', 'Night Lovell Dark Light'],
-    COMBAT: ['Travis Scott FE!N', 'Playboi Carti Sky', 'Denzel Curry Ultimate', 'Big Baby Tape 99 Problems', 'Yeat Monëy so big'],
-    BOSSFIGHT: ['Playboi Carti Stop Breathing', 'Ghostemane Mercury', 'XXXTENTACION Look At Me', 'Denzel Curry Sumo', 'BONES RestInPeace'],
-    VICTORY: ['Kanye West Stronger', 'A$AP Rocky Praise The Lord', 'Travis Scott Goosebumps'],
+  moba: {
+    name: 'MOBA & Competitive Adrenaline',
+    artists: [
+      'The Prodigy',
+      'Pendulum',
+      'Two Steps From Hell',
+      'Hans Zimmer',
+      'Mick Gordon',
+      'Carpenter Brut',
+      'The Glitch Mob',
+      'Celldweller',
+      'Kordhell',
+      'DVRST',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'chill focus electronic ambient',
+        'calm atmospheric laning synth beat',
+        'meditative game score',
+      ],
+      MAJESTIC: [
+        'epic victory horn orchestra',
+        'cinematic brass crescendo triumph',
+      ],
+      DRAMA: [
+        'cinematic tension countdown dark',
+        'heavy suspense strings bass',
+      ],
+      STEALTH: [
+        'dark espionage synth tension',
+        'suspense stealth tension drone',
+      ],
+      COMBAT: [
+        'high energy battle hybrid combat',
+        'furious synth drum battle',
+        'epic teamfight orchestral',
+      ],
+      BOSSFIGHT: [
+        'colossal boss hybrid battle',
+        'relentless dark synth combat',
+      ],
+      VICTORY: [
+        'epic stadium triumph fanfare',
+        'euphoric victory hybrid',
+      ],
+    },
   },
-  phonk: {
-    EXPLORE: ['DVRST Dream Space', 'Skeler Tel Aviv', 'LXST CXNTURY Odium'],
-    MAJESTIC: ['DVRST Dream Space', 'Skeler Tel Aviv', 'LXST CXNTURY Andromeda', 'Interworld Metamorphosis'],
-    DRAMA: ['Skeler Waste', 'LXST CXNTURY Odium', 'DVRST Autumn Wind', 'Kordhell Scared'],
-    STEALTH: ['DVRST Close Eyes', 'Interworld Metamorphosis', 'Kaito Shoma Scary Garry'],
-    COMBAT: ['Kordhell Murder In My Mind', 'PlayaPhonk Phonky Town', 'MoonDeity Wake Up'],
-    BOSSFIGHT: ['Kordhell Live Another Day', 'Ghostface Playa Why Not', 'Dxrk RAVE'],
-    VICTORY: ['DVRST Close Eyes', 'LXST CXNTURY Andromeda'],
+  fantasy: {
+    name: 'Epic Fantasy & Medieval RPG',
+    artists: [
+      'Marcin Przybylowicz',
+      'Percival Schuttenbach',
+      'Jeremy Soule',
+      'Yuka Kitamura',
+      'Borislav Slavov',
+      'Gareth Coker',
+      'Austin Wintory',
+      'Inon Zur',
+      'Two Steps From Hell',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'medieval tavern lute ambient exploration',
+        'ancient forest ambient strings fantasy',
+        'peaceful fantasy valley exploration',
+      ],
+      MAJESTIC: [
+        'nordic horns mountain vista triumph',
+        'epic fantasy mountain panorama orchestra',
+      ],
+      DRAMA: [
+        'sorrowful medieval viola cello',
+        'sad fantasy violin tragedy',
+      ],
+      STEALTH: [
+        'dark dungeon footsteps ambient',
+        'shadowy crypt tension fantasy',
+      ],
+      COMBAT: [
+        'furious pagan sword battle drums',
+        'epic fantasy combat orchestra',
+      ],
+      BOSSFIGHT: [
+        'colossal mythical beast battle choir',
+        'epic dark souls style boss battle',
+      ],
+      VICTORY: [
+        'triumphant kingdom fanfare brass',
+        'victory bard song fantasy',
+      ],
+    },
   },
-  electronic: {
-    EXPLORE: ['Kavinsky Nightcall', 'Daft Punk Veridis Quo', 'M83 Midnight City', 'Aphex Twin Xtal'],
-    MAJESTIC: ['M83 Outro', 'M83 Midnight City', 'Daft Punk Veridis Quo', 'Porter Robinson Language', 'Deadmau5 Strobe'],
-    DRAMA: ['Massive Attack Angel', 'Burial Archangel', 'Portishead Roads', 'Gesaffelstein Opr', 'Crystal Castles Suffocation'],
-    STEALTH: ['Crystal Castles Kerosene', 'Gesaffelstein Aleph', 'Massive Attack Angel'],
-    COMBAT: ['The Prodigy Omen', 'Pendulum Propane Nightmares', 'Gesaffelstein Pursuit'],
-    BOSSFIGHT: ['The Prodigy Breathe', 'Carpenter Brut Turbo Killer', 'Pendulum Watercolour'],
-    VICTORY: ['Daft Punk Instant Crush', 'Gorillaz Feel Good Inc', 'The Weeknd Blinding Lights'],
+  universal: {
+    name: 'Atmospheric Cinematic & Ambient',
+    artists: [
+      'Brian Eno',
+      'Max Richter',
+      'Hans Zimmer',
+      'Ludovico Einaudi',
+      'C418',
+      'Christopher Larkin',
+      'Disasterpeace',
+      'Lena Raine',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'relaxing game ambient soundtrack',
+        'peaceful atmospheric exploration music',
+        'lofi game ambient background',
+      ],
+      MAJESTIC: [
+        'cinematic mountain panorama vista',
+        'epic orchestral triumph hope',
+      ],
+      DRAMA: [
+        'cinematic emotional piano tragedy',
+        'sorrowful cello melancholic',
+      ],
+      STEALTH: [
+        'minimalist dark drone suspense',
+        'ambient tension heartbeat',
+      ],
+      COMBAT: [
+        'adrenaline battle soundtrack intense',
+        'driving action orchestral score',
+      ],
+      BOSSFIGHT: [
+        'monumental boss theme orchestral',
+        'epic dramatic battle climax',
+      ],
+      VICTORY: [
+        'triumphant ending theme soundtrack',
+      ],
+    },
   },
-  indie: {
-    EXPLORE: ['Tame Impala Let It Happen', 'Mac DeMarco Chamber of Reflection', 'The Neighbourhood Sweater Weather', 'Gorillaz Melancholy Hill'],
-    MAJESTIC: ['Tame Impala Let It Happen', 'The Neighbourhood Sweater Weather', 'Beach House Space Song', 'MGMT Kids', 'Cigarettes After Sex Apocalypse'],
-    DRAMA: ['Radiohead Exit Music', 'Radiohead Karma Police', 'Lana Del Rey Video Games', 'Lord Huron The Night We Met', 'Joji Glimpse of Us'],
-    STEALTH: ['Radiohead Everything In Its Right Place', 'Massive Attack Teardrop', 'Beach House Space Song'],
-    COMBAT: ['Franz Ferdinand Take Me Out', 'Arctic Monkeys Brianstorm', 'The Strokes Reptilia', 'Kasabian Club Foot'],
-    BOSSFIGHT: ['Muse Knights of Cydonia', 'The White Stripes Seven Nation Army'],
-    VICTORY: ['M83 Midnight City', 'Tame Impala The Less I Know The Better'],
-  },
+};
+
+const GENRE_DYNAMIC_ARTISTS: Record<string, string[]> = {
+  rock: ['Deftones', 'Arctic Monkeys', 'Radiohead', 'Nirvana', 'Queens of the Stone Age', 'The Strokes'],
+  metal: ['System Of A Down', 'Slipknot', 'Rammstein', 'Metallica', 'Bring Me The Horizon', 'Korn'],
+  phonk: ['DVRST', 'Kordhell', 'LXST CXNTURY', 'Skeler', 'Interworld', 'MoonDeity'],
+  electronic: ['Daft Punk', 'Kavinsky', 'M83', 'The Prodigy', 'Pendulum', 'Aphex Twin', 'Carpenter Brut'],
+  indie: ['Tame Impala', 'Beach House', 'Mac DeMarco', 'The Neighbourhood', 'Lord Huron'],
+  ambient: ['Brian Eno', 'Max Richter', 'Hammock', 'Ludovico Einaudi', 'C418', 'Carbon Based Lifeforms'],
 };
 
 function pickRandomItems<T>(arr: T[], count: number): T[] {
@@ -122,47 +287,18 @@ function pickRandomItems<T>(arr: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-function mapItunesItemToTrack(
-  item: Record<string, unknown>,
-  defaultVibe: VibeStateId,
-  idx: number,
-  autoClassify: boolean
-): TrackItem {
-  const art100 = typeof item.artworkUrl100 === 'string' ? item.artworkUrl100 : '';
-  const hiResArt = art100
-    ? art100.replace('100x100bb', '600x600bb')
-    : 'https://i.ytimg.com/vi/sTPn4Jlrjb0/hqdefault.jpg';
-
-  const title = String(item.trackName || 'Unknown Track');
-  const artist = String(item.artistName || 'Unknown Artist');
-  const genre = String(item.primaryGenreName || 'Music');
-  const fallbackPreview = typeof item.previewUrl === 'string' ? item.previewUrl : '';
-  const durMs = typeof item.trackTimeMillis === 'number' ? item.trackTimeMillis : 215000;
-  const durSec = Math.floor(durMs / 1000);
-
-  const resolvedVibe = autoClassify
-    ? classifyTrackSceneAutomatically(title, artist, genre, defaultVibe)
-    : defaultVibe;
-
-  // Supply exact artist, title and studio album duration to resolve only real original tracks
-  const fullStreamUrl = `/api/full-stream?q=${encodeURIComponent(
-    `${artist} ${title}`
-  )}&artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(
-    title
-  )}&dur=${durSec}&fallback=${encodeURIComponent(fallbackPreview)}`;
-
-  return {
-    id: String(item.trackId || `live-${resolvedVibe}-${idx}-${Date.now()}`),
-    videoId: String(item.trackId || ''),
-    title,
-    artist,
-    album: String(item.collectionName || 'Single'),
-    duration: formatDurationMs(durMs),
-    thumbnail: hiResArt,
-    previewUrl: fullStreamUrl,
-    vibe: resolvedVibe,
-    genreTag: genre,
-  };
+function cleanGameName(raw: string): string {
+  return raw
+    .replace(/\.exe$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/dota2/i, 'Dota 2')
+    .replace(/cs2/i, 'Counter Strike 2')
+    .replace(/witcher3/i, 'The Witcher 3')
+    .replace(/cyberpunk2077/i, 'Cyberpunk 2077')
+    .replace(/eldenring/i, 'Elden Ring')
+    .replace(/hollowknight/i, 'Hollow Knight')
+    .replace(/hades2/i, 'Hades 2')
+    .trim();
 }
 
 export async function GET(request: NextRequest) {
@@ -173,169 +309,231 @@ export async function GET(request: NextRequest) {
   const userHint = searchParams.get('hint') || '';
   const genresParam = searchParams.get('genres') || '';
   const artistsParam = searchParams.get('artists') || '';
-  const langPref = searchParams.get('lang') || 'all';
-  const vocalPref = searchParams.get('vocal') || 'mixed';
+  const audioMode = searchParams.get('audioMode') || 'game-vibe';
+  const rawGameParam = searchParams.get('game') || '';
+  const gameClean = cleanGameName(rawGameParam);
 
   try {
-    // 1. Direct User Search
+    // 1. Direct Search (User typed in search bar) -> Directly query YouTube!
     if (mode === 'search' && query.trim().length > 0) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
-      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-        query.trim()
-      )}&media=music&entity=song&limit=25`;
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
-
-      if (res.ok) {
-        const data = await res.json();
-        const results = Array.isArray(data?.results) ? data.results : [];
-        const cleanOriginals = results
-          .filter((r: Record<string, unknown>) => {
-            const art = String(r.artistName || '');
-            const tit = String(r.trackName || '');
-            return (
-              typeof r.previewUrl === 'string' &&
-              !BAD_ITUNES_ARTISTS.test(art) &&
-              !BAD_ITUNES_TITLES.test(tit)
-            );
-          })
-          .map((item: Record<string, unknown>, idx: number) =>
-            mapItunesItemToTrack(item, vibe, idx, true)
-          );
-
+      const ytTracks = await searchYouTubeDirect(query.trim(), vibe, 20);
+      if (ytTracks.length > 0) {
         return NextResponse.json({
-          source: 'live-search',
+          source: 'youtube-search',
           query: query.trim(),
           vibe,
-          tracks: cleanOriginals,
+          tracks: ytTracks,
         });
       }
     }
 
     // 2. Manual Hint Override
     if (userHint.trim().length > 0) {
-      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-        userHint.trim()
-      )}&media=music&entity=song&limit=15`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const results = Array.isArray(data?.results) ? data.results : [];
-        const clean = results
-          .filter((r: Record<string, unknown>) => {
-            const art = String(r.artistName || '');
-            const tit = String(r.trackName || '');
-            return (
-              typeof r.previewUrl === 'string' &&
-              !BAD_ITUNES_ARTISTS.test(art) &&
-              !BAD_ITUNES_TITLES.test(tit)
-            );
+      const ytTracks = await searchYouTubeDirect(userHint.trim(), vibe, 15);
+      if (ytTracks.length > 0) {
+        return NextResponse.json({
+          source: 'autopilot-hint',
+          vibe,
+          resolvedMoodQuery: `Поиск: ${userHint.trim()}`,
+          tracks: ytTracks,
+        });
+      }
+    }
+
+    // 3. Vision Director picks
+    const picksParam = searchParams.get('picks');
+    if (mode === 'director' && picksParam) {
+      let picks: { artist: string; title: string }[] = [];
+      try {
+        const parsedPicks = JSON.parse(picksParam);
+        if (Array.isArray(parsedPicks)) {
+          picks = parsedPicks
+            .filter((p) => p && typeof p.artist === 'string' && typeof p.title === 'string')
+            .slice(0, 5);
+        }
+      } catch {
+        picks = [];
+      }
+
+      if (picks.length > 0) {
+        const verifiedYt = await Promise.all(
+          picks.map(async (pick) => {
+            const q = `${pick.artist} ${pick.title} official audio`;
+            const results = await searchYouTubeDirect(q, vibe, 1);
+            return results.length > 0 ? results[0] : null;
           })
-          .map((item: Record<string, unknown>, idx: number) =>
-            mapItunesItemToTrack(item, vibe, idx, false)
-          );
+        );
 
-        if (clean.length > 0) {
+        const validTracks = verifiedYt.filter((t): t is TrackItem => t !== null);
+        if (validTracks.length > 0) {
           return NextResponse.json({
-            source: 'autopilot-hint',
+            source: 'vision-director',
             vibe,
-            resolvedMoodQuery: `По запросу: ${userHint.trim()}`,
-            tracks: clean,
+            resolvedMoodQuery: `🎬 Режиссёр: ${validTracks[0].artist} — ${validTracks[0].title}`,
+            tracks: validTracks,
           });
         }
       }
     }
 
-    // 3. Autonomous Discovery Tailored to User Account Taste Profile
-    const selectedGenres = genresParam
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const selectedArtists = artistsParam
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // 4. Dynamic Procedural Discovery Engine (100% Free YouTube Streams, Zero Fixed Songs!)
+    const ytQueries: string[] = [];
+    let archetypeLabel = 'Атмосферный саундтрек';
 
-    const candidateSeeds: string[] = [];
+    const gameLower = (gameClean || rawGameParam).toLowerCase();
+    const isGameActive = gameClean && !gameClean.includes('Ожидание игры') && gameClean.length > 1;
 
-    const activeGenreKeys =
-      selectedGenres.length > 0 ? selectedGenres : Object.keys(GENRE_SCENE_ARTISTS);
+    if (audioMode === 'game-vibe' || isGameActive) {
+      let archetypeKey = 'universal';
 
-    for (const gKey of activeGenreKeys) {
-      const gPool = GENRE_SCENE_ARTISTS[gKey]?.[vibe];
-      if (gPool) {
-        candidateSeeds.push(...gPool);
+      if (
+        gameLower.includes('castlevania') ||
+        gameLower.includes('belmont') ||
+        gameLower.includes('vampire') ||
+        gameLower.includes('curse') ||
+        gameLower.includes('hollow') ||
+        gameLower.includes('blasphemous')
+      ) {
+        archetypeKey = 'gothic';
+      } else if (
+        gameLower.includes('nier') ||
+        gameLower.includes('cyberpunk') ||
+        gameLower.includes('deus') ||
+        gameLower.includes('system')
+      ) {
+        archetypeKey = 'scifi';
+      } else if (
+        gameLower.includes('dota') ||
+        gameLower.includes('league') ||
+        gameLower.includes('counter') ||
+        gameLower.includes('apex')
+      ) {
+        archetypeKey = 'moba';
+      } else if (
+        gameLower.includes('souls') ||
+        gameLower.includes('elden') ||
+        gameLower.includes('bloodborne') ||
+        gameLower.includes('witcher') ||
+        gameLower.includes('skyrim')
+      ) {
+        archetypeKey = 'fantasy';
       }
-    }
 
-    if (selectedArtists.length > 0) {
-      const sampledUserArtists = pickRandomItems(selectedArtists, 3);
-      for (const art of sampledUserArtists) {
-        candidateSeeds.push(art);
-      }
-    }
+      const arch = ATMOSPHERE_ARCHETYPES[archetypeKey] || ATMOSPHERE_ARCHETYPES.universal;
+      archetypeLabel = arch.name;
 
-    if (langPref === 'ru') {
-      candidateSeeds.push('Кино', 'Скриптонит', 'Miyagi', 'PHARAOH', 'Король и Шут');
-    }
-
-    // Pick 5 top seeds
-    const chosenQueries = pickRandomItems(Array.from(new Set(candidateSeeds)), 5);
-
-    const artistResponses = await Promise.all(
-      chosenQueries.map(async (qTerm) => {
-        try {
-          const finalTerm =
-            vocalPref === 'instrumental' ? `${qTerm} instrumental` : qTerm;
-          // Offset=0 ensures we fetch the #1 official original studio track, not a karaoke tribute!
-          const url = `https://itunes.apple.com/search?term=${encodeURIComponent(
-            finalTerm
-          )}&media=music&entity=song&limit=3`;
-          const r = await fetch(url);
-          if (!r.ok) return [];
-          const d = await r.json();
-          const list = Array.isArray(d?.results) ? d.results : [];
-          return list.filter((item: Record<string, unknown>) => {
-            const art = String(item.artistName || '');
-            const tit = String(item.trackName || '');
-            return !BAD_ITUNES_ARTISTS.test(art) && !BAD_ITUNES_TITLES.test(tit);
-          });
-        } catch {
-          return [];
+      // If active game is known, anchor searches around this real game world!
+      if (isGameActive) {
+        if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+          ytQueries.push(`${gameClean} combat battle action soundtrack ost`);
+          ytQueries.push(`${gameClean} epic boss fight theme ost`);
+        } else if (vibe === 'MAJESTIC') {
+          ytQueries.push(`${gameClean} majestic vista orchestral choir soundtrack`);
+          ytQueries.push(`${gameClean} beautiful emotional ost`);
+        } else if (vibe === 'DRAMA') {
+          ytQueries.push(`${gameClean} sad sorrowful dramatic soundtrack ost`);
+        } else if (vibe === 'STEALTH') {
+          ytQueries.push(`${gameClean} stealth suspense dark ambient soundtrack`);
+        } else {
+          // EXPLORE (Atmospheric Ambient)
+          ytQueries.push(`${gameClean} ambient exploration soundtrack`);
+          ytQueries.push(`${gameClean} relaxing atmospheric ost`);
+          ytQueries.push(`${gameClean} background music ambient`);
         }
+      }
+
+      // Mix in archetype composers & atmospheric descriptors
+      const chosenArtists = pickRandomItems(arch.artists, 2);
+      for (const artist of chosenArtists) {
+        ytQueries.push(`${artist} ${vibe.toLowerCase()} ambient soundtrack`);
+      }
+
+      const vibeDescs = arch.descriptors[vibe] || arch.descriptors.EXPLORE;
+      const chosenDescs = pickRandomItems(vibeDescs, 2);
+      for (const desc of chosenDescs) {
+        ytQueries.push(`${desc} soundtrack`);
+      }
+    } else {
+      // Custom User Preferences
+      const selectedArtists = artistsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const selectedGenres = genresParam
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      archetypeLabel = 'Персональный вкус';
+
+      if (selectedArtists.length > 0) {
+        const picked = pickRandomItems(selectedArtists, Math.min(2, selectedArtists.length));
+        for (const a of picked) {
+          ytQueries.push(`${a} official audio`);
+        }
+      }
+
+      const activeGenres = selectedGenres.length > 0 ? selectedGenres : ['ambient', 'electronic'];
+      for (const g of activeGenres) {
+        const pool = GENRE_DYNAMIC_ARTISTS[g];
+        if (pool) {
+          const sample = pickRandomItems(pool, 2);
+          for (const a of sample) {
+            ytQueries.push(`${a} official audio`);
+          }
+        }
+      }
+    }
+
+    if (ytQueries.length === 0) {
+      ytQueries.push('Castlevania ambient exploration soundtrack');
+      ytQueries.push('Dark fantasy atmospheric ambient music');
+    }
+
+    // Select 2 diverse search queries to query in parallel
+    const selectedSeeds = pickRandomItems(Array.from(new Set(ytQueries)), 2);
+
+    const searchResponses = await Promise.all(
+      selectedSeeds.map(async (seed) => {
+        return await searchYouTubeDirect(seed, vibe, 10);
       })
     );
 
-    const flatResults = artistResponses
-      .flat()
-      .filter((r: Record<string, unknown>) => typeof r.previewUrl === 'string');
+    const flatTracks = searchResponses.flat();
 
-    if (flatResults.length > 0) {
-      const tracks = flatResults.map((item: Record<string, unknown>, idx: number) =>
-        mapItunesItemToTrack(item, vibe, idx, false)
-      );
+    // Deduplicate by videoId
+    const seenIds = new Set<string>();
+    const uniqueTracks: TrackItem[] = [];
+    for (const t of flatTracks) {
+      if (t.videoId && !seenIds.has(t.videoId)) {
+        seenIds.add(t.videoId);
+        uniqueTracks.push(t);
+      }
+    }
 
-      const labelSummary =
-        selectedGenres.length > 0 || selectedArtists.length > 0
-          ? `Твои вкусы (${chosenQueries.slice(0, 3).join(', ')})`
-          : `Автономный поток (${chosenQueries.slice(0, 3).join(', ')})`;
+    // Shuffle for variety
+    const randomized = [...uniqueTracks].sort(() => Math.random() - 0.5);
+
+    if (randomized.length > 0) {
+      const displayLabel = isGameActive
+        ? `✨ Саундтрек: ${gameClean} [${vibe}]`
+        : `✨ ${archetypeLabel}: Живой поток [${vibe}]`;
 
       return NextResponse.json({
-        source: 'autopilot-dynamic',
+        source: 'youtube-direct',
         vibe,
-        resolvedMoodQuery: labelSummary,
-        tracks,
+        resolvedMoodQuery: displayLabel,
+        tracks: randomized.slice(0, 20),
       });
     }
-  } catch {
-    // Fallback if offline
+  } catch (err) {
+    console.error('[ytmusic API Error]', err);
   }
 
   return NextResponse.json({
-    source: 'offline',
+    source: 'fallback',
     vibe,
-    resolvedMoodQuery: 'Автономный режим',
+    resolvedMoodQuery: 'Атмосферный саундтрек',
     tracks: [],
   });
 }

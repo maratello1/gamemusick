@@ -1,17 +1,23 @@
 const http = require('http');
 
+const PORT = process.env.PORT || 3001;
+
 const ROUTES = [
   '/',
   '/api/telemetry',
   '/api/ytmusic?vibe=COMBAT&q=dark+synthwave',
+  '/api/yt-resolve?artist=Eminem&title=Lose+Yourself',
+  '/api/app-state',
   '/api/presets',
   '/api/userscript',
+  '/api/accounts',
+  '/api/integrations',
 ];
 
 function fetchUrl(path) {
   return new Promise((resolve, reject) => {
     http
-      .get(`http://localhost:3000${path}`, (res) => {
+      .get(`http://localhost:${PORT}${path}`, (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
         res.on('end', () => resolve({ status: res.statusCode, body: data }));

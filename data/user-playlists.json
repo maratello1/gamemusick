@@ -16,5 +16,63 @@
     "createdAt": 1793711604119
   },
   "userPlaylists": [],
+  "aiLearningModel": {
+    "artistWeights": {
+      "eminem": 34,
+      "dr. dre": 18,
+      "skee-lo": 4,
+      "50 cent": 2,
+      "outkast": 4,
+      "kanye west": 2,
+      "dr. dre & snoop dogg": 2,
+      "michiru yamane": 2,
+      "atrium carceri": 6,
+      "christopher larkin, david peacock & augustine mayuga gonzales": 2,
+      "bohren & der club of gore": 2
+    },
+    "genreWeights": {
+      "hip-hop/rap": 64,
+      "soundtrack": 2,
+      "anime": 2,
+      "electronic": 6,
+      "classical": 2,
+      "alternative": 2
+    },
+    "gameProfiles": {
+      "castlevania belmont's curse": {
+        "preferredGenres": [],
+        "favoriteArtists": [
+          "Eminem",
+          "Dr. Dre",
+          "Kanye West",
+          "Dr. Dre & Snoop Dogg",
+          "Skee-Lo",
+          "Michiru Yamane",
+          "Atrium Carceri",
+          "Christopher Larkin, David Peacock & Augustine Mayuga Gonzales",
+          "Bohren & Der Club of Gore"
+        ]
+      },
+      "hydra": {
+        "preferredGenres": [],
+        "favoriteArtists": [
+          "Dr. Dre",
+          "Eminem"
+        ]
+      },
+      "dota2": {
+        "preferredGenres": [],
+        "favoriteArtists": [
+          "Skee-Lo",
+          "50 Cent",
+          "Eminem",
+          "Dr. Dre",
+          "Outkast"
+        ]
+      }
+    },
+    "totalListens": 39,
+    "totalSkips": 0
+  },
   "activeBridgeTrack": null
 }

@@ -89,6 +89,8 @@ class AdaptiveStemEngine {
     let step = 0;
     const notesByVibe: Record<VibeStateId, number[]> = {
       EXPLORE: [220, 261.63, 329.63, 392.0],
+      MAJESTIC: [220, 277.18, 329.63, 440.0, 554.37],
+      DRAMA: [110, 130.81, 146.83, 164.81],
       STEALTH: [110, 116.54, 110, 146.83],
       COMBAT: [110, 220, 130.81, 164.81, 110, 246.94, 130.81, 196.0],
       BOSSFIGHT: [55, 110, 116.54, 55, 130.81, 123.47, 55, 164.81],
@@ -134,6 +136,8 @@ class AdaptiveStemEngine {
 
     const mix: Record<VibeStateId, { pad: number; bass: number; pulse: number }> = {
       EXPLORE: { pad: 0.55, bass: 0.08, pulse: 0.15 },
+      MAJESTIC: { pad: 0.75, bass: 0.25, pulse: 0.3 },
+      DRAMA: { pad: 0.45, bass: 0.55, pulse: 0.2 },
       STEALTH: { pad: 0.2, bass: 0.45, pulse: 0.25 },
       COMBAT: { pad: 0.15, bass: 0.65, pulse: 0.65 },
       BOSSFIGHT: { pad: 0.1, bass: 0.85, pulse: 0.9 },

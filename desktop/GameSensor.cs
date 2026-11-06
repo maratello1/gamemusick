@@ -22,9 +22,6 @@ public class GameSensor
     static extern short GetAsyncKeyState(int vKey);
 
     [DllImport("user32.dll")]
-    static extern bool GetCursorPos(out POINT lpPoint);
-
-    [DllImport("user32.dll")]
     static extern int GetSystemMetrics(int nIndex);
 
     [DllImport("user32.dll")]
@@ -53,13 +50,6 @@ public class GameSensor
 
     [DllImport("gdi32.dll")]
     static extern bool DeleteDC(IntPtr hdc);
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X;
-        public int Y;
-    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct XINPUT_GAMEPAD
@@ -175,6 +165,15 @@ public class GameSensor
         int SetDuckingPreference(bool optOut);
     }
 
+    [Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    internal interface ISimpleAudioVolume
+    {
+        int SetMasterVolume(float fLevel, ref Guid EventContext);
+        int GetMasterVolume(out float pfLevel);
+        int SetMute(bool bMute, ref Guid EventContext);
+        int GetMute(out bool pbMute);
+    }
+
     [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     internal interface IAudioMeterInformation
     {
@@ -187,6 +186,7 @@ public class GameSensor
         public string ProcessName;
         public string WindowTitle;
         public IAudioMeterInformation Meter;
+        public ISimpleAudioVolume Volume;
     }
 
     const int SRCCOPY = 0x00CC0020;
@@ -200,7 +200,8 @@ public class GameSensor
         "audiodg", "System", "Idle", "TextInputHost", "LockApp", "dwm", "csrss",
         "Antigravity", "Code", "Cursor", "Windsurf", "Discord", "Telegram",
         "Spotify", "Steam", "steamwebhelper", "EpicGamesLauncher", "nvcontainer",
-        "NVIDIA Share", "NVIDIA Overlay", "GameBar", "XboxPcAppFt"
+        "NVIDIA Share", "NVIDIA Overlay", "GameBar", "XboxPcAppFt",
+        "happ", "hydra", "v2ray", "clash", "nekoray", "sing-box", "xray", "anydesk", "teamviewer"
     };
 
     static readonly HashSet<int> AttackKeys = new HashSet<int>
@@ -213,13 +214,10 @@ public class GameSensor
         0x31, 0x32, 0x33, 0x34  // 1, 2, 3, 4
     };
 
-    static readonly HashSet<int> AnyControlKeys = new HashSet<int>
+    static readonly HashSet<int> DirectionKeys = new HashSet<int>
     {
-        0x01, 0x02, 0x04,
         0x57, 0x41, 0x53, 0x44, // WASD
-        0x25, 0x26, 0x27, 0x28, // Arrows
-        0x5A, 0x58, 0x43, 0x56,
-        0x20, 0x10, 0x11, 0x0D
+        0x25, 0x26, 0x27, 0x28  // Arrows
     };
 
     static string CleanJson(string s)
@@ -256,6 +254,7 @@ public class GameSensor
                 sessionEnum.GetSession(i, out ctrl);
                 var ctrl2 = ctrl as IAudioSessionControl2;
                 var meter = ctrl as IAudioMeterInformation;
+                var vol = ctrl as ISimpleAudioVolume;
                 if (ctrl2 != null && meter != null)
                 {
                     uint pid = 0;
@@ -275,7 +274,8 @@ public class GameSensor
                                     Pid = pid,
                                     ProcessName = pName,
                                     WindowTitle = !string.IsNullOrEmpty(wTitle) ? wTitle : pName,
-                                    Meter = meter
+                                    Meter = meter,
+                                    Volume = vol
                                 });
                             }
                         }
@@ -288,8 +288,7 @@ public class GameSensor
         return list;
     }
 
-    // High-performance cinematic vision analyzer:
-    // Detects 21:9 letterbox cutscenes, open majestic vistas (warm awe), and tragic/tense drama (cold contrast)
+    // High-performance cinematic vision & palette analyzer:
     static void SampleCinematicVision(
         out int avgLuma,
         out bool isLetterboxCutscene,
@@ -311,7 +310,7 @@ public class GameSensor
             IntPtr hbm = CreateCompatibleBitmap(hdcScreen, 1, 1);
             IntPtr oldObj = SelectObject(hdcMem, hbm);
 
-            // 1. Cinematic Letterbox Bars: top 2.5% and bottom 97.5%
+            // 1. Cinematic letterbox bars check
             int[] borderYs = new int[] { (int)(h * 0.025), (int)(h * 0.975) };
             int[] borderXs = new int[] { (int)(w * 0.25), (int)(w * 0.50), (int)(w * 0.75) };
             int blackBorderCount = 0;
@@ -327,23 +326,23 @@ public class GameSensor
                         int r = (int)(color & 0xFF);
                         int g = (int)((color >> 8) & 0xFF);
                         int b = (int)((color >> 16) & 0xFF);
-                        if (r <= 20 && g <= 20 && b <= 20) blackBorderCount++;
+                        if (r <= 8 && g <= 8 && b <= 8) blackBorderCount++;
                     }
                 }
             }
 
-            // 2. Active Screen Area: 3x3 grid across the middle 70% of viewport
-            int[] cXs = new int[] { (int)(w * 0.25), (int)(w * 0.50), (int)(w * 0.75) };
-            int[] cYs = new int[] { (int)(h * 0.25), (int)(h * 0.50), (int)(h * 0.75) };
-
+            // 2. Grid sampling across active game area (5x5 grid = 25 points for reliable coverage)
             int lumaSum = 0;
             int warmSum = 0;
             int dramaSum = 0;
+            int sampledPoints = 0;
 
-            foreach (int cy in cYs)
+            for (int gy = 1; gy <= 5; gy++)
             {
-                foreach (int cx in cXs)
+                int cy = (int)(h * (0.15 + gy * 0.14));
+                for (int gx = 1; gx <= 5; gx++)
                 {
+                    int cx = (int)(w * (0.15 + gx * 0.14));
                     BitBlt(hdcMem, 0, 0, 1, 1, hdcScreen, cx, cy, SRCCOPY);
                     uint color = GetPixel(hdcMem, 0, 0);
                     if (color != 0xFFFFFFFF)
@@ -353,27 +352,29 @@ public class GameSensor
                         int b = (int)((color >> 16) & 0xFF);
                         int l = (299 * r + 587 * g + 114 * b) / 2550;
                         lumaSum += l;
+                        sampledPoints++;
 
                         int maxC = Math.Max(r, Math.Max(g, b));
                         int minC = Math.Min(r, Math.Min(g, b));
                         int sat = maxC - minC;
 
-                        // Warm Majestic: bright golden hour, sunny vista, azure skies, rich landscape colors
-                        if (l > 36 && (r > b + 10 || (g > 95 && b > 95)) && sat > 20)
+                        // Warm Majestic: bright golden sunlight, rich vistas, sky hues
+                        if (l > 42 && (r > b + 15 || (g > 100 && b > 100)) && sat > 25)
                         {
-                            warmSum += 12;
+                            warmSum += 8;
                         }
-                        // Cold Drama: desaturated slate, bleak shadows, tragic dark palette, cold blue tints
-                        if ((sat < 30 && l < 52) || (b > r + 15 && l < 70))
+                        // Tragic Drama: heavy cold blue tint or blood crimson
+                        if ((b > r + 25 && l > 10 && l < 60) || (r > g + 40 && r > b + 40 && l > 15))
                         {
-                            dramaSum += 12;
+                            dramaSum += 8;
                         }
                     }
                 }
             }
 
-            avgLuma = Math.Max(5, Math.Min(100, lumaSum / 9));
-            isLetterboxCutscene = (blackBorderCount >= 5 && avgLuma > 18);
+            avgLuma = sampledPoints > 0 ? (lumaSum / sampledPoints) : 30;
+            // Letterbox bars require all 6 border points to be pitch black AND illuminated center
+            isLetterboxCutscene = (blackBorderCount == 6 && avgLuma >= 15);
             warmAweScore = Math.Min(100, warmSum);
             coldDramaScore = Math.Min(100, dramaSum);
 
@@ -388,10 +389,16 @@ public class GameSensor
     public static void Main(string[] args)
     {
         bool singleShot = args != null && args.Length > 0 && args[0] == "--once";
-        string dataDir = @"D:\Desktop\gamevibe\data";
+        string exeDir = AppDomain.CurrentDomain.BaseDirectory;
+        string dataDir = Path.GetFullPath(Path.Combine(exeDir, "..", "data"));
+        if (!Directory.Exists(dataDir))
+        {
+            dataDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "data"));
+        }
         try { Directory.CreateDirectory(dataDir); } catch { }
         string outFile = Path.Combine(dataDir, "live-sensor.json");
         string tmpFile = Path.Combine(dataDir, "live-sensor.tmp.json");
+        string appStateFile = Path.Combine(dataDir, "app-state.json");
 
         bool[] prevKeyStates = new bool[256];
         ushort[] prevPadButtons = new ushort[4];
@@ -405,16 +412,25 @@ public class GameSensor
         float rollingAudioBaseline = -1.0f;
         long lastCombatDetectedMs = 0;
         long lastPlayerInputMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        long lastDirectionInputMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // Room Transition / Fade to Black state
+        int blackFrameStreak = 0;
+        long lastRoomTransitionMs = 0;
+        int letterboxStreak = 0;
+        long lastCutsceneActiveMs = 0;
 
         string activeState = "EXPLORE";
         string emotionTag = "EXPLORE";
-        string sceneLabel = "Спокойное исследование";
+        string sceneKey = "EXPLORE_PEACE";
 
         int cycleCounter = 0;
         List<TrackedAudioSession> cachedSessions = DiscoverGameAudioSessions();
 
-        string lastKnownGame = "Castlevania Belmont's Curse";
-        string lastKnownTitle = "Castlevania Belmont's Curse";
+        string lastKnownGame = "";
+        string lastKnownTitle = "Ожидание игры";
+
+        Guid emptyGuid = Guid.Empty;
 
         while (true)
         {
@@ -424,7 +440,40 @@ public class GameSensor
             }
             cycleCounter++;
 
-            // 1. Foreground Window Check
+            // 1. In-Game Audio Ducking Controller
+            bool shouldDuck = false;
+            try
+            {
+                if (File.Exists(appStateFile))
+                {
+                    string appJson = File.ReadAllText(appStateFile);
+                    if (appJson.Contains("\"isPlaying\": true") || appJson.Contains("\"isPlaying\":true"))
+                    {
+                        shouldDuck = true;
+                    }
+                }
+            }
+            catch { }
+
+            float targetGameVol = shouldDuck ? 0.18f : 1.0f;
+            foreach (var gs in cachedSessions)
+            {
+                if (gs.Volume != null)
+                {
+                    try
+                    {
+                        float cur = 1f;
+                        gs.Volume.GetMasterVolume(out cur);
+                        if (Math.Abs(cur - targetGameVol) > 0.05f)
+                        {
+                            gs.Volume.SetMasterVolume(targetGameVol, ref emptyGuid);
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            // 2. Foreground Window Check
             bool isGameInForeground = false;
             string fgName = "";
             string fgTitle = "";
@@ -457,22 +506,28 @@ public class GameSensor
             float sumAudioPeak = 0f;
 
             int tickAttackPresses = 0;
-            bool anyControlDown = false;
+            bool directionPressed = false;
+            bool anyKeyPressed = false;
 
-            // 10 ticks x 25ms = 250ms
+            // 10 ticks x 25ms = 250ms window
             int ticks = 10;
             for (int t = 0; t < ticks; t++)
             {
-                if (isGameInForeground)
+                if (isGameInForeground || (!string.IsNullOrEmpty(lastKnownGame)))
                 {
-                    foreach (int vk in AnyControlKeys)
+                    foreach (int vk in DirectionKeys)
                     {
-                        if ((GetAsyncKeyState(vk) & 0x8000) != 0) anyControlDown = true;
+                        if ((GetAsyncKeyState(vk) & 0x8000) != 0)
+                        {
+                            directionPressed = true;
+                            anyKeyPressed = true;
+                        }
                     }
 
                     foreach (int vk in AttackKeys)
                     {
                         bool isDown = (GetAsyncKeyState(vk) & 0x8000) != 0;
+                        if (isDown) anyKeyPressed = true;
                         if (isDown && !prevKeyStates[vk])
                         {
                             tickAttackPresses++;
@@ -491,9 +546,10 @@ public class GameSensor
                         ushort newly = (ushort)(btns & ~prevPadButtons[padIdx]);
                         prevPadButtons[padIdx] = btns;
 
-                        if (btns != 0 || xs.Gamepad.bLeftTrigger > 40 || xs.Gamepad.bRightTrigger > 40)
+                        if (Math.Abs(xs.Gamepad.sThumbLX) > 8000 || Math.Abs(xs.Gamepad.sThumbLY) > 8000)
                         {
-                            anyControlDown = true;
+                            directionPressed = true;
+                            anyKeyPressed = true;
                         }
 
                         if ((newly & 0xF300) != 0) tickAttackPresses++;
@@ -517,7 +573,6 @@ public class GameSensor
                                 uint btns = ji.dwButtons;
                                 uint newly = btns & ~prevJoyButtons[padIdx];
                                 prevJoyButtons[padIdx] = btns;
-                                if (btns != 0) anyControlDown = true;
                                 if (newly != 0) tickAttackPresses++;
                             }
                         }
@@ -548,20 +603,23 @@ public class GameSensor
             }
 
             long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            if (anyControlDown)
-            {
-                lastPlayerInputMs = nowMs;
-            }
+            if (anyKeyPressed) lastPlayerInputMs = nowMs;
+            if (directionPressed) lastDirectionInputMs = nowMs;
 
             if (!string.IsNullOrEmpty(fgName))
             {
                 lastKnownGame = fgName;
                 lastKnownTitle = !string.IsNullOrEmpty(fgTitle) ? fgTitle : fgName;
             }
-            else if (!string.IsNullOrEmpty(audioGameName))
+            else if (!string.IsNullOrEmpty(audioGameName) && maxAudioPeak > 0.02f)
             {
                 lastKnownGame = audioGameName;
                 lastKnownTitle = !string.IsNullOrEmpty(audioGameTitle) ? audioGameTitle : audioGameName;
+            }
+            else if (string.IsNullOrEmpty(lastKnownGame))
+            {
+                lastKnownGame = "Ожидание игры";
+                lastKnownTitle = "Ожидание игры";
             }
 
             combatActionsHistory[historyIdx] = tickAttackPresses;
@@ -579,93 +637,133 @@ public class GameSensor
                 if (rollingAudioBaseline < 0f) rollingAudioBaseline = avgPeak;
                 else rollingAudioBaseline = rollingAudioBaseline * 0.95f + avgPeak * 0.05f;
             }
-            bool isAudioSurging = (rollingAudioBaseline > 0.002f && maxAudioPeak > rollingAudioBaseline * 1.6f && maxAudioPeak > 0.04f);
+            bool isAudioSurging = (rollingAudioBaseline > 0.002f && maxAudioPeak > rollingAudioBaseline * 1.8f && maxAudioPeak > 0.05f);
 
-            // 2. Cinematic Vision Analysis
+            // 3. Vision & Palette Sampling
             int avgLuma = 30;
             bool isLetterboxCutscene = false;
             int warmAweScore = 0;
             int coldDramaScore = 0;
             SampleCinematicVision(out avgLuma, out isLetterboxCutscene, out warmAweScore, out coldDramaScore);
 
-            // Hands-off cutscene test: player hasn't touched controls for 2.2+ seconds
-            bool isHandsOffCutscene = (nowMs - lastPlayerInputMs > 2200 && isLetterboxCutscene);
+            // Letterbox bars require sustained detection (at least 4 ticks = ~800ms)
+            if (isLetterboxCutscene) letterboxStreak++;
+            else letterboxStreak = 0;
+            bool sustainedLetterbox = (letterboxStreak >= 4);
 
+            // Room Transition / Screen Wipe detection (transient screen wipe of 1 to 8 cycles = 0.2s - 1.6s)
+            if (avgLuma <= 3)
+            {
+                blackFrameStreak++;
+            }
+            else
+            {
+                if (blackFrameStreak >= 1 && blackFrameStreak <= 8)
+                {
+                    lastRoomTransitionMs = nowMs;
+                }
+                blackFrameStreak = 0;
+            }
+
+            // Neural OCR Dialogue Context Reading (WinRT hardware OCR)
+            string dialogueFile = Path.Combine(dataDir, "live-dialogue.json");
+            bool isOcrDialogueActive = false;
+            string dialogueEmotion = "";
+            try
+            {
+                if (File.Exists(dialogueFile))
+                {
+                    string dJson = File.ReadAllText(dialogueFile);
+                    if (dJson.Contains("\"isDialogueActive\": true") || dJson.Contains("\"isDialogueActive\":true"))
+                    {
+                        isOcrDialogueActive = true;
+                        if (dJson.Contains("\"emotion\": \"DRAMA\"") || dJson.Contains("\"emotion\":\"DRAMA\"")) dialogueEmotion = "DRAMA";
+                        else if (dJson.Contains("\"emotion\": \"MAJESTIC\"") || dJson.Contains("\"emotion\":\"MAJESTIC\"")) dialogueEmotion = "MAJESTIC";
+                        else if (dJson.Contains("\"emotion\": \"COMBAT\"") || dJson.Contains("\"emotion\":\"COMBAT\"")) dialogueEmotion = "COMBAT";
+                        else if (dJson.Contains("\"emotion\": \"EXPLORE\"") || dJson.Contains("\"emotion\":\"EXPLORE\"")) dialogueEmotion = "EXPLORE";
+                    }
+                }
+            }
+            catch { }
+
+            if (isOcrDialogueActive || sustainedLetterbox)
+            {
+                lastCutsceneActiveMs = nowMs;
+            }
+
+            bool inCutsceneSession = (nowMs - lastCutsceneActiveMs < 12000);
+            bool isRecentRoomTransition = (nowMs - lastRoomTransitionMs < 12000);
+
+            // Combat requires real attack inputs
             bool isActivelyFighting = (totalAttackPressesIn2s >= 2) || (totalAttackPressesIn2s >= 1 && isAudioSurging);
 
-            // State Machine with Intelligent Emotional Classification:
+            // High-stability State Machine:
             if (isActivelyFighting)
             {
                 lastCombatDetectedMs = nowMs;
                 activeState = "COMBAT";
                 emotionTag = "COMBAT";
-                sceneLabel = "Бой / Экшен";
+                sceneKey = "COMBAT_ACTION";
             }
-            else if (nowMs - lastCombatDetectedMs < 14000)
+            else if (nowMs - lastCombatDetectedMs < 20000)
             {
-                // Hold battle mode during pauses between enemies
+                // Hold battle state during fight encounter for 20s
                 activeState = "COMBAT";
                 emotionTag = "COMBAT";
-                sceneLabel = "Бой / Экшен";
+                sceneKey = "COMBAT_ACTION";
             }
-            else if (isHandsOffCutscene || isLetterboxCutscene)
+            else if (isRecentRoomTransition)
             {
-                // In-Game Cinematic Cutscene
-                if (coldDramaScore >= 42)
-                {
-                    activeState = "DRAMA";
-                    emotionTag = "DRAMA";
-                    sceneLabel = "Трагическая катсцена / Драма";
-                }
-                else if (warmAweScore >= 42)
+                // New Location entered!
+                if (warmAweScore > coldDramaScore && warmAweScore >= 25)
                 {
                     activeState = "MAJESTIC";
                     emotionTag = "MAJESTIC";
-                    sceneLabel = "Воодушевляющая катсцена / Панорама";
+                    sceneKey = "NEW_LOCATION_MAJESTIC";
                 }
                 else
                 {
                     activeState = "DRAMA";
                     emotionTag = "DRAMA";
-                    sceneLabel = "Кинематографический сюжет";
+                    sceneKey = "NEW_LOCATION_DRAMA";
+                }
+            }
+            else if (inCutsceneSession)
+            {
+                if (!string.IsNullOrEmpty(dialogueEmotion))
+                {
+                    activeState = dialogueEmotion;
+                    emotionTag = dialogueEmotion;
+                    sceneKey = dialogueEmotion + "_CUTSCENE";
+                }
+                else if (warmAweScore > coldDramaScore && warmAweScore >= 30)
+                {
+                    activeState = "MAJESTIC";
+                    emotionTag = "MAJESTIC";
+                    sceneKey = "MAJESTIC_CUTSCENE";
+                }
+                else
+                {
+                    activeState = "DRAMA";
+                    emotionTag = "DRAMA";
+                    sceneKey = "DRAMA_CUTSCENE";
                 }
             }
             else
             {
-                // Peaceful Exploration & Discovery
-                if (warmAweScore >= 55)
-                {
-                    activeState = "MAJESTIC";
-                    emotionTag = "MAJESTIC";
-                    sceneLabel = "Красивая локация / Панорама";
-                }
-                else if (coldDramaScore >= 60)
-                {
-                    activeState = "DRAMA";
-                    emotionTag = "DRAMA";
-                    sceneLabel = "Мрачная локация / Напряжение";
-                }
-                else if (avgLuma <= 18)
-                {
-                    activeState = "STEALTH";
-                    emotionTag = "STEALTH";
-                    sceneLabel = "Таинственная атмосфера / Ночь";
-                }
-                else
-                {
-                    activeState = "EXPLORE";
-                    emotionTag = "EXPLORE";
-                    sceneLabel = "Спокойное исследование";
-                }
+                // SOLID ROAMING BASELINE (EXPLORATION)
+                activeState = "EXPLORE";
+                emotionTag = "EXPLORE";
+                sceneKey = "EXPLORE_PEACE";
             }
 
             int displayMotion = (activeState == "COMBAT")
-                ? Math.Min(95, 52 + totalAttackPressesIn2s * 8)
-                : (activeState == "MAJESTIC" ? 28 : (activeState == "DRAMA" ? 22 : 14));
+                ? Math.Min(95, 55 + totalAttackPressesIn2s * 8)
+                : 16;
 
             string json = string.Format(
                 CultureInfo.InvariantCulture,
-                "{{\"timestamp\":{0},\"detectedProcess\":\"{1}\",\"windowTitle\":\"{2}\",\"motionDelta\":{3},\"redAlertRatio\":0,\"brightness\":{4},\"inferredVibe\":\"{5}\",\"sceneEmotion\":\"{6}\",\"sceneLabel\":\"{7}\",\"isCutscene\":{8},\"sensorMode\":\"cinematic-vision-50hz\"}}",
+                "{{\"timestamp\":{0},\"detectedProcess\":\"{1}\",\"windowTitle\":\"{2}\",\"motionDelta\":{3},\"redAlertRatio\":0,\"brightness\":{4},\"inferredVibe\":\"{5}\",\"sceneEmotion\":\"{6}\",\"sceneKey\":\"{7}\",\"isCutscene\":{8},\"isNewLocation\":{9},\"gameAudioDucked\":{10},\"sensorMode\":\"cinematic-vision-50hz\"}}",
                 nowMs,
                 CleanJson(lastKnownGame),
                 CleanJson(lastKnownTitle),
@@ -673,13 +771,15 @@ public class GameSensor
                 avgLuma,
                 activeState,
                 emotionTag,
-                CleanJson(sceneLabel),
-                isHandsOffCutscene || isLetterboxCutscene ? "true" : "false"
+                sceneKey,
+                (activeState != "COMBAT" && inCutsceneSession) ? "true" : "false",
+                isRecentRoomTransition ? "true" : "false",
+                shouldDuck ? "true" : "false"
             );
 
             try
             {
-                File.WriteAllText(tmpFile, json, Encoding.UTF8);
+                File.WriteAllText(tmpFile, json, new UTF8Encoding(false));
                 if (File.Exists(outFile)) File.Delete(outFile);
                 File.Move(tmpFile, outFile);
             }
@@ -687,7 +787,6 @@ public class GameSensor
 
             if (singleShot)
             {
-                Console.WriteLine(json);
                 break;
             }
         }

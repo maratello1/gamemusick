@@ -58,13 +58,39 @@ export interface TelemetrySnapshot {
   timestamp: number;
   activeWindowTitle: string;
   detectedProcess: string;
-  runningWindows: RunningWindowProcess[];
+  runningWindows?: RunningWindowProcess[];
   motionDelta: number;
   crimsonIndex: number;
   luminance: number;
   compositeIntensity: number;
   inferredVibe: VibeStateId;
   isCutscene?: boolean;
+  isNewLocation?: boolean;
+  gameAudioDucked?: boolean;
+  sceneKey?: string;
   sceneEmotion?: string;
   sceneLabel?: string;
+  brightness?: number;
+  windowTitle?: string;
+  sensorMode?: string;
+  dialogueText?: string;
+  dialogueEmotion?: string;
+  dialogueLabel?: string;
+  director?: DirectorScene;
+}
+
+/** Scene understanding produced by desktop/vision_director.py (Gemini vision). */
+export interface DirectorScene {
+  timestamp: number;
+  game: string;
+  sceneType: string;
+  vibe: VibeStateId;
+  mood: string;
+  tension: number;
+  location: string;
+  summary: string;
+  onScreenText: string;
+  musicStyle: string;
+  changeMusic: boolean;
+  picks: { artist: string; title: string }[];
 }

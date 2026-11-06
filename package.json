@@ -1,7 +1,7 @@
 {
   "name": "gamevibe",
-  "version": "1.0.0",
-  "description": "GameVibe v1.0 — AI-DJ & Adaptive Gaming Soundtrack Platform (YouTube Music InnerTube + Win32 Optical Telemetry)",
+  "version": "2.0.0",
+  "description": "GameVibe v2.0 — AI Sound Director & Adaptive Gaming Soundtrack Platform with Scene-Based Playlists",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {

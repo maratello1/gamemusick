@@ -1,0 +1,96 @@
+{
+  "activeAccountId": "usr-1793996831737-db0u",
+  "accounts": [
+    {
+      "id": "usr-1793996831737-db0u",
+      "username": "maratello",
+      "avatarColor": "#6E1D2F",
+      "createdAt": 1793996831737,
+      "favoriteGenres": [
+        "rock",
+        "rap",
+        "electronic",
+        "ambient"
+      ],
+      "favoriteArtists": [
+        "Deftones",
+        "Kavinsky",
+        "Brian Eno"
+      ],
+      "customArtistsText": "",
+      "gameGenres": [
+        "RPG и Открытый мир",
+        "Шутеры / Соревновательные"
+      ],
+      "driveMode": "balanced",
+      "languagePref": "all",
+      "vocalPref": "mixed",
+      "playlists": [
+        {
+          "id": "pl-1793996831737-sl8l",
+          "name": "Мой первый игровой сет",
+          "gameTag": "Для любых игр",
+          "description": "ИИ-режиссер автоматически переключает треки из этих сцен под геймплей",
+          "createdAt": 1793996831737,
+          "updatedAt": 1793998244362,
+          "scenes": {
+            "EXPLORE": [
+              {
+                "id": "yt-7G7yCE2nZ1Y",
+                "videoId": "7G7yCE2nZ1Y",
+                "title": "Symphony of Sorrow ~ Relaxing Castlevania Music",
+                "artist": "Cry Café",
+                "album": "Ambient Collection",
+                "duration": "51:52",
+                "thumbnail": "https://i.ytimg.com/vi/7G7yCE2nZ1Y/hq720.jpg",
+                "vibe": "EXPLORE",
+                "genreTag": "Ambient & Relax"
+              },
+              {
+                "id": "yt-doom-bfg",
+                "videoId": "QHRuTYtSbJQ",
+                "title": "BFG Division",
+                "artist": "Mick Gordon",
+                "album": "DOOM OST",
+                "duration": "08:26",
+                "thumbnail": "https://i.ytimg.com/vi/QHRuTYtSbJQ/hqdefault.jpg",
+                "vibe": "EXPLORE",
+                "genreTag": "Metal"
+              },
+              {
+                "id": "yt-witcher-kaer",
+                "videoId": "NknjE2SBSAQ",
+                "title": "Kaer Morhen (Marcin Przybyłowicz)",
+                "artist": "Marcin Przybyłowicz",
+                "album": "The Witcher 3 OST",
+                "duration": "02:35",
+                "thumbnail": "https://i.ytimg.com/vi/NknjE2SBSAQ/hqdefault.jpg",
+                "vibe": "EXPLORE",
+                "genreTag": "Ambient OST"
+              }
+            ],
+            "COMBAT": [
+              {
+                "id": "yt-qUwTedLyvGc",
+                "videoId": "qUwTedLyvGc",
+                "title": "Isaac vs. Carmilla Theme | Ultra Epic Remake",
+                "artist": "Castlevania Soundtrack",
+                "album": "Battle OST",
+                "duration": "03:01",
+                "thumbnail": "https://i.ytimg.com/vi/qUwTedLyvGc/hq720.jpg",
+                "vibe": "COMBAT",
+                "genreTag": "Battle Action"
+              }
+            ],
+            "BOSSFIGHT": [],
+            "DRAMA": [],
+            "MAJESTIC": [],
+            "STEALTH": []
+          }
+        }
+      ],
+      "selectedPlaylistId": "pl-1793996831737-sl8l",
+      "useCustomPlaylistInAutopilot": false
+    }
+  ]
+}
