@@ -698,4 +698,9 @@ async def run_director():
 
 
 if __name__ == '__main__':
+    kernel32.CreateMutexA.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.LPCSTR]
+    kernel32.CreateMutexA.restype = wintypes.HANDLE
+    _h_mutex = kernel32.CreateMutexA(None, False, b"Local\\GameMusick_Director_Instance_Mutex")
+    if kernel32.GetLastError() == 183:
+        sys.exit(0)
     asyncio.run(run_director())

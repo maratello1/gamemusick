@@ -439,6 +439,7 @@ export default function GameVibeSpotifyApp() {
   const activeVibeRef = useRef<VibeStateId>('EXPLORE');
   const activeMacroModeRef = useRef<'EXPLORE' | 'COMBAT'>('EXPLORE');
   const currentTrackStartTimeRef = useRef<number>(Date.now());
+  const lastAutoSkipTimeRef = useRef<number>(0);
   const autopilotRef = useRef<boolean>(true);
   const sensitivityRef = useRef<number>(34);
   const currentTrackRef = useRef<TrackItem>(FALLBACK_REAL_TRACKS[0]);
@@ -1226,10 +1227,15 @@ export default function GameVibeSpotifyApp() {
           if (inCombatSession) {
             // Player is in battle or Boss Fight!
             if (targetVibe === 'BOSSFIGHT' && currentVibe !== 'BOSSFIGHT') {
-              switchToSceneSmoothly('BOSSFIGHT');
+              // Only switch from regular combat to boss theme if combat theme played at least 35s or was peaceful
+              if (trackPlayDurationSec >= 35 || currentVibe === 'EXPLORE') {
+                switchToSceneSmoothly('BOSSFIGHT');
+              }
             } else if (currentVibe !== 'COMBAT' && currentVibe !== 'BOSSFIGHT') {
-              // Entering battle: immediately switch to battle theme!
-              switchToSceneSmoothly('COMBAT');
+              // Entering battle from peaceful exploration
+              if (trackPlayDurationSec >= 25 || !isPlayingRef.current) {
+                switchToSceneSmoothly('COMBAT');
+              }
             }
             // CRITICAL: While in battle, keep the current battle song playing without skipping!
           } else {
@@ -1311,13 +1317,27 @@ export default function GameVibeSpotifyApp() {
             onStateChange: (event: { data: number }) => {
               // 0 = ENDED, 1 = PLAYING, 2 = PAUSED
               if (event.data === 0) {
-                skipTrackRef.current(1);
+                const now = Date.now();
+                if (now - lastAutoSkipTimeRef.current > 3000) {
+                  lastAutoSkipTimeRef.current = now;
+                  skipTrackRef.current(1);
+                }
               } else if (event.data === 1) {
                 setIsPlaying(true);
                 isPlayingRef.current = true;
               } else if (event.data === 2) {
                 setIsPlaying(false);
                 isPlayingRef.current = false;
+              }
+            },
+            onError: (err: { data: number }) => {
+              console.warn('[GameMusick YouTube Player] Playback error code:', err?.data);
+              const now = Date.now();
+              if (now - lastAutoSkipTimeRef.current > 3000) {
+                lastAutoSkipTimeRef.current = now;
+                setTimeout(() => {
+                  skipTrackRef.current(1);
+                }, 1200);
               }
             },
           },

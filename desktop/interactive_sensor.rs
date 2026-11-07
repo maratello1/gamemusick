@@ -70,6 +70,8 @@ extern "system" {
     ) -> i32;
     fn LoadLibraryA(lpLibFileName: *const u8) -> isize;
     fn GetProcAddress(hModule: isize, lpProcName: *const u8) -> isize;
+    fn CreateMutexA(lpMutexAttributes: isize, bInitialOwner: i32, lpName: *const u8) -> isize;
+    fn GetLastError() -> u32;
 }
 
 #[link(name = "gdi32")]
@@ -414,6 +416,19 @@ fn load_learned_thresholds(file_path: &std::path::Path) -> (i32, i32, i32) {
 }
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    let is_once = args.iter().any(|a| a == "--once");
+
+    // Single-instance enforcement: if not running --once, ensure only ONE sensor process runs globally
+    const ERROR_ALREADY_EXISTS: u32 = 183;
+    let _mutex = unsafe {
+        CreateMutexA(0, 0, b"Local\\GameMusick_Sensor_Instance_Mutex\0".as_ptr())
+    };
+    if !is_once && unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        // Another sensor daemon is already actively monitoring at 50Hz!
+        return;
+    }
+
     let out_dir = resolve_data_dir();
     let _ = fs::create_dir_all(&out_dir);
     let out_file = out_dir.join("live-sensor.json");
@@ -725,6 +740,11 @@ fn main() {
 
             if fs::write(&tmp_file, &json).is_ok() {
                 let _ = fs::rename(&tmp_file, &out_file);
+            }
+
+            if is_once {
+                println!("{}", json);
+                return;
             }
         }
     }
