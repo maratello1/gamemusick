@@ -138,12 +138,12 @@ function createSystemTray() {
     const iconPath = fs.existsSync(ICON_ICO) ? ICON_ICO : ICON_PNG;
     const image = nativeImage.createFromPath(iconPath);
     tray = new Tray(image);
-    tray.setToolTip('GameVibe v2.0 — AI Game Soundtrack Director');
+    tray.setToolTip('GameMusick v2.0 — AI Game Soundtrack Director');
 
     const updateTrayMenu = () => {
       const contextMenu = Menu.buildFromTemplate([
         {
-          label: 'Открыть GameVibe v2.0',
+          label: 'Открыть GameMusick v2.0',
           click: () => {
             if (mainWindow) {
               mainWindow.show();
@@ -193,7 +193,7 @@ function createSystemTray() {
         },
         { type: 'separator' },
         {
-          label: 'Выйти из GameVibe',
+          label: 'Выйти из GameMusick',
           click: () => {
             isQuitting = true;
             app.quit();
@@ -226,7 +226,7 @@ async function createDesktopWindow() {
     height: 920,
     minWidth: 390,
     minHeight: 560,
-    title: 'GameVibe v2.0 — Autonomous AI Soundtrack Director',
+    title: 'GameMusick v2.0 — Autonomous AI Soundtrack Director',
     icon: iconPath,
     backgroundColor: '#080809',
     frame: false,

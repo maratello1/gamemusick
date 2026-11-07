@@ -1,41 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <!-- Noble Burgundy & Obsidian Background -->
-    <radialGradient id="bgGrad" cx="50%" cy="28%" r="78%">
-      <stop offset="0%" stop-color="#1E1016" />
-      <stop offset="65%" stop-color="#0E0B0D" />
-      <stop offset="100%" stop-color="#080608" />
-    </radialGradient>
-
-    <!-- Warm Crimson-Rose Gradient (from original Claude palette) -->
-    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF4D6D" />
-      <stop offset="55%" stop-color="#E5384F" />
-      <stop offset="100%" stop-color="#8C2038" />
-    </linearGradient>
-
-    <!-- Emerald Sensor Core Gradient -->
-    <linearGradient id="emeraldGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#059669" />
-      <stop offset="100%" stop-color="#10B981" />
-    </linearGradient>
-  </defs>
-
-  <!-- App Squircle Tile -->
-  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bgGrad)" stroke="#2D1720" stroke-width="6" />
-
-  <!-- Left & Right Equalizer Wings (Music) -->
-  <g stroke-linecap="round">
-    <line x1="88" y1="224" x2="88" y2="288" stroke="#6E1D2F" stroke-width="20" />
-    <line x1="126" y1="186" x2="126" y2="326" stroke="#C9184A" stroke-width="20" />
-    <line x1="386" y1="186" x2="386" y2="326" stroke="#C9184A" stroke-width="20" />
-    <line x1="424" y1="224" x2="424" y2="288" stroke="#6E1D2F" stroke-width="20" />
-  </g>
-
-  <!-- Central Minimalist V / Controller Grips (Gaming) -->
-  <path d="M174 172 L256 348 L338 172" fill="none" stroke="url(#crimsonGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Top Play / AI Sensor Core (Warm Ivory + Emerald Pulse) -->
-  <circle cx="256" cy="132" r="22" fill="url(#emeraldGrad)" />
-  <circle cx="256" cy="132" r="8" fill="#EDE9E8" />
+  <rect width="512" height="512" rx="112" fill="#161417"/>
+  <path fill-rule="evenodd" fill="#EDE9E8" d="M 252.66 320.54 L 252.66 98.50 A 6.50 6.50 0 0 1 259.16 92.00 C 283.66 92.00, 385.66 134.00, 375.66 248.00 C 361.66 202.00, 297.66 166.00, 265.66 160.00 L 265.66 344.00 A 27.66 27.66 0 1 1 252.66 320.54 Z M 252.66 344.00 A 14.66 14.66 0 1 0 223.34 344.00 A 14.66 14.66 0 1 0 252.66 344.00 Z" />
+  <polygon points="184.00,266.89 207.00,306.73 161.00,306.73" fill="none" stroke="#EDE9E8" stroke-width="13" stroke-linejoin="round"/>
+  <rect x="110.68" y="324.68" width="38.64" height="38.64" rx="4" fill="none" stroke="#EDE9E8" stroke-width="13"/>
+  <line x1="164.68" y1="378.68" x2="203.32" y2="417.32" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/><line x1="164.68" y1="417.32" x2="203.32" y2="378.68" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/>
 </svg>

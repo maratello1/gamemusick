@@ -2003,11 +2003,11 @@ export default function GameVibeSpotifyApp() {
         <div className="flex items-center gap-2.5 min-w-0">
           <img
             src="/logo-icon.svg"
-            alt="GameVibe"
+            alt="GameMusick"
             className="w-4 h-4 rounded-sm shrink-0"
           />
           <span className="text-[11px] font-bold tracking-wider uppercase text-[#EDE9E8] whitespace-nowrap">
-            GameVibe Desktop <span className="text-[#B84A62] font-mono">v2.0</span>
+            GameMusick Desktop <span className="text-[#E5384F] font-mono">v2.0</span>
           </span>
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#121014] border border-[#241F25] text-[10px] text-[#A8A0A4] truncate max-w-[260px]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
@@ -2104,9 +2104,9 @@ export default function GameVibeSpotifyApp() {
           <div className="bg-[#111012] border border-[#1E1B1D] rounded-lg p-3 flex flex-col gap-1.5 shrink-0">
             <div className="flex items-center justify-between px-2 pb-2 border-b border-[#1E1B1D]">
               <div className="flex items-center gap-2.5">
-                <img src="/logo-icon.svg" alt="GameVibe" className="w-6 h-6 rounded-md" />
+                <img src="/logo-icon.svg" alt="GameMusick" className="w-6 h-6 rounded-md" />
                 <span className="text-sm font-semibold tracking-wide text-[#EDE9E8]">
-                  GameVibe
+                  Game<span className="text-[#E5384F]">Musick</span>
                 </span>
               </div>
               <span
@@ -3753,7 +3753,7 @@ export default function GameVibeSpotifyApp() {
                         </span>
                       </div>
                       <p className="text-xs text-[#8C8482] leading-relaxed">
-                        По умолчанию GameVibe работает <strong>100% бесплатно и офлайн</strong>, считывая сюжет и субтитры через встроенный в Windows нейро-OCR (WinRT) и OpenCV на процессоре (&lt;1% нагрузки).
+                        По умолчанию GameMusick работает <strong>100% бесплатно и офлайн</strong>, считывая сюжет и субтитры через встроенный в Windows нейро-OCR (WinRT) и OpenCV на процессоре (&lt;1% нагрузки).
                         Если вы хотите подключить визуальную нейросеть Google для кинематографического анализа каждого кадра игры — активируйте эту опцию.
                       </p>
                     </div>
@@ -4386,6 +4386,7 @@ export default function GameVibeSpotifyApp() {
               style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             >
               <div className="flex items-center gap-2 min-w-0">
+                <img src="/logo-icon.svg" alt="GameVibe" className="w-4 h-4 rounded-sm shrink-0" />
                 <span className="px-2 py-0.5 rounded bg-[#6E1D2F] text-[10px] font-bold uppercase tracking-wider text-white">
                   {SCENE_BUCKET_CONFIGS[activeVibe as SceneBucketId]?.shortLabel || currentSceneMeta.shortLabel}
                 </span>

@@ -1,42 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140" width="640" height="140">
-  <defs>
-    <linearGradient id="waveGradH" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF4D6D" />
-      <stop offset="55%" stop-color="#E5384F" />
-      <stop offset="100%" stop-color="#8C2038" />
-    </linearGradient>
-    <linearGradient id="emeraldGradH" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#059669" />
-      <stop offset="100%" stop-color="#10B981" />
-    </linearGradient>
-  </defs>
-
-  <!-- Left Icon Tile (110x110) -->
-  <g transform="translate(15, 15)">
-    <rect x="0" y="0" width="110" height="110" rx="26" fill="#120D10" stroke="#2D1720" stroke-width="2.5" />
-    <!-- Equalizer Wings -->
-    <line x1="20" y1="48" x2="20" y2="62" stroke="#6E1D2F" stroke-width="5" stroke-linecap="round" />
-    <line x1="29" y1="39" x2="29" y2="71" stroke="#C9184A" stroke-width="5" stroke-linecap="round" />
-    <line x1="81" y1="39" x2="81" y2="71" stroke="#C9184A" stroke-width="5" stroke-linecap="round" />
-    <line x1="90" y1="48" x2="90" y2="62" stroke="#6E1D2F" stroke-width="5" stroke-linecap="round" />
-    <!-- Central V Crest -->
-    <path d="M39 38 L55 75 L71 38" fill="none" stroke="url(#waveGradH)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
-    <!-- Emerald AI Core -->
-    <circle cx="55" cy="28" r="5.5" fill="url(#emeraldGradH)" />
-    <circle cx="55" cy="28" r="2" fill="#EDE9E8" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 140" width="680" height="140">
+  <g transform="translate(15, 15) scale(0.21484375)">
+    <rect width="512" height="512" rx="112" fill="#161417" stroke="#262129" stroke-width="10"/>
+    <path fill-rule="evenodd" fill="#EDE9E8" d="M 252.66 320.54 L 252.66 98.50 A 6.50 6.50 0 0 1 259.16 92.00 C 283.66 92.00, 385.66 134.00, 375.66 248.00 C 361.66 202.00, 297.66 166.00, 265.66 160.00 L 265.66 344.00 A 27.66 27.66 0 1 1 252.66 320.54 Z M 252.66 344.00 A 14.66 14.66 0 1 0 223.34 344.00 A 14.66 14.66 0 1 0 252.66 344.00 Z" />
+  <polygon points="184.00,266.89 207.00,306.73 161.00,306.73" fill="none" stroke="#EDE9E8" stroke-width="13" stroke-linejoin="round"/>
+  <rect x="110.68" y="324.68" width="38.64" height="38.64" rx="4" fill="none" stroke="#EDE9E8" stroke-width="13"/>
+  <line x1="164.68" y1="378.68" x2="203.32" y2="417.32" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/><line x1="164.68" y1="417.32" x2="203.32" y2="378.68" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/>
   </g>
-
-  <!-- Brand Typography -->
   <g transform="translate(145, 30)">
-    <text x="0" y="46" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="44" letter-spacing="1.5" fill="#EDE9E8">
-      GAME<tspan fill="url(#waveGradH)">VIBE</tspan>
+    <text x="0" y="46" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="42" letter-spacing="0.8" fill="#EDE9E8">
+      GAME<tspan fill="#E5384F">MUSICK</tspan>
     </text>
-    <text x="2" y="74" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="600" font-size="13" letter-spacing="3" fill="#8C8482">
+    <text x="2" y="74" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="600" font-size="13" letter-spacing="2.8" fill="#8C8482">
       AI SOUND DIRECTOR &amp; ADAPTIVE OST
     </text>
-    <rect x="365" y="24" width="76" height="22" rx="11" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-opacity="0.3" stroke-width="1" />
-    <circle cx="376" cy="35" r="3" fill="#10B981" />
-    <text x="384" y="39" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="10" fill="#6EE7B7" letter-spacing="0.5">
+    <rect x="405" y="24" width="76" height="22" rx="11" fill="#E5384F" fill-opacity="0.14" stroke="#E5384F" stroke-opacity="0.35" stroke-width="1" />
+    <circle cx="416" cy="35" r="3" fill="#E5384F" />
+    <text x="424" y="39" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="10" fill="#EDE9E8" letter-spacing="0.5">
       FREE v2.0
     </text>
   </g>

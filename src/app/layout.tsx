@@ -15,9 +15,14 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'GAMEVIBE STUDIO — Adaptive Gaming Audio Client',
+  title: 'GAMEVIBE v2.0 — AI Sound Director & Adaptive Gaming OST',
   description:
-    'Десктопный AI-DJ клиент для автоматической адаптации музыки YouTube Music под события в игре.',
+    'Нативное десктоп-приложение с 50 Гц Rust-сенсором для автоматической адаптации музыки под события и сцены в любой ПК-игре.',
+  icons: {
+    icon: '/logo-icon.svg',
+    shortcut: '/icon.ico',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

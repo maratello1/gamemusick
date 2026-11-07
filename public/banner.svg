@@ -1,57 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
   <defs>
     <radialGradient id="bgBanner" cx="25%" cy="35%" r="85%">
-      <stop offset="0%" stop-color="#1E1016" />
-      <stop offset="55%" stop-color="#0E0B0D" />
-      <stop offset="100%" stop-color="#080608" />
+      <stop offset="0%" stop-color="#1A151C" />
+      <stop offset="55%" stop-color="#0E0C10" />
+      <stop offset="100%" stop-color="#080709" />
     </radialGradient>
-    <linearGradient id="crimsonBanner" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF4D6D" />
-      <stop offset="55%" stop-color="#E5384F" />
-      <stop offset="100%" stop-color="#8C2038" />
-    </linearGradient>
-    <linearGradient id="emeraldBanner" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#059669" />
-      <stop offset="100%" stop-color="#10B981" />
-    </linearGradient>
   </defs>
 
   <rect width="1280" height="640" rx="36" fill="url(#bgBanner)" />
 
-  <!-- Left App Icon Tile -->
-  <g transform="translate(96, 160)">
-    <rect width="320" height="320" rx="76" fill="#120D10" stroke="#2D1720" stroke-width="5" />
-    <g stroke-linecap="round">
-      <line x1="56" y1="140" x2="56" y2="180" stroke="#6E1D2F" stroke-width="14" />
-      <line x1="82" y1="114" x2="82" y2="206" stroke="#C9184A" stroke-width="14" />
-      <line x1="238" y1="114" x2="238" y2="206" stroke="#C9184A" stroke-width="14" />
-      <line x1="264" y1="140" x2="264" y2="180" stroke="#6E1D2F" stroke-width="14" />
-    </g>
-    <path d="M112 108 L160 218 L208 108" fill="none" stroke="url(#crimsonBanner)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
-    <circle cx="160" cy="82" r="14" fill="url(#emeraldBanner)" />
-    <circle cx="160" cy="82" r="5" fill="#EDE9E8" />
+  <!-- Left App Icon Tile (330x330) -->
+  <g transform="translate(86, 155) scale(0.64453125)">
+    <rect width="512" height="512" rx="112" fill="#161417" stroke="#2A242D" stroke-width="8"/>
+    <path fill-rule="evenodd" fill="#EDE9E8" d="M 252.66 320.54 L 252.66 98.50 A 6.50 6.50 0 0 1 259.16 92.00 C 283.66 92.00, 385.66 134.00, 375.66 248.00 C 361.66 202.00, 297.66 166.00, 265.66 160.00 L 265.66 344.00 A 27.66 27.66 0 1 1 252.66 320.54 Z M 252.66 344.00 A 14.66 14.66 0 1 0 223.34 344.00 A 14.66 14.66 0 1 0 252.66 344.00 Z" />
+  <polygon points="184.00,266.89 207.00,306.73 161.00,306.73" fill="none" stroke="#EDE9E8" stroke-width="13" stroke-linejoin="round"/>
+  <rect x="110.68" y="324.68" width="38.64" height="38.64" rx="4" fill="none" stroke="#EDE9E8" stroke-width="13"/>
+  <line x1="164.68" y1="378.68" x2="203.32" y2="417.32" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/><line x1="164.68" y1="417.32" x2="203.32" y2="378.68" stroke="#E5384F" stroke-width="14" stroke-linecap="round"/>
   </g>
 
-  <!-- Right Brand Block -->
-  <g transform="translate(476, 235)">
-    <text x="0" y="60" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="900" font-size="86" letter-spacing="-1" fill="#EDE9E8">
-      GAME<tspan fill="url(#crimsonBanner)">VIBE</tspan>
+  <!-- Right Brand Typography -->
+  <g transform="translate(460, 228)">
+    <text x="0" y="62" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="900" font-size="82" letter-spacing="-1.5" fill="#EDE9E8">
+      GAME<tspan fill="#E5384F">MUSICK</tspan>
     </text>
-    <text x="4" y="114" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="600" font-size="24" fill="#8C8482" letter-spacing="0.5">
+    <text x="4" y="114" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="600" font-size="24" fill="#9E9694" letter-spacing="0.2">
       ИИ-режиссёр адаптивного саундтрека для любых ПК-игр
     </text>
-    <g transform="translate(4, 148)" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="700" font-size="15" fill="#EDE9E8">
-      <rect x="0" y="0" width="160" height="36" rx="18" fill="#1B1216" stroke="#2D1720" />
-      <circle cx="20" cy="18" r="4" fill="#10B981" />
-      <text x="34" y="23">50Hz Rust Sensor</text>
+    <g transform="translate(4, 150)" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="700" font-size="15" fill="#EDE9E8">
+      <rect x="0" y="0" width="172" height="38" rx="19" fill="#161417" stroke="#2A242D" />
+      <circle cx="22" cy="19" r="4.5" fill="#E5384F" />
+      <text x="36" y="24">50Hz Rust Sensor</text>
 
-      <rect x="174" y="0" width="184" height="36" rx="18" fill="#1B1216" stroke="#2D1720" />
-      <circle cx="194" cy="18" r="4" fill="#FF4D6D" />
-      <text x="208" y="23">6 Игровых Сцен</text>
+      <rect x="186" y="0" width="186" height="38" rx="19" fill="#161417" stroke="#2A242D" />
+      <circle cx="208" cy="19" r="4.5" fill="#EDE9E8" />
+      <text x="222" y="24">6 Игровых Сцен</text>
 
-      <rect x="372" y="0" width="176" height="36" rx="18" fill="#1B1216" stroke="#2D1720" />
-      <circle cx="392" cy="18" r="4" fill="#EDE9E8" />
-      <text x="406" y="23">100% Бесплатно</text>
+      <rect x="386" y="0" width="182" height="38" rx="19" fill="#161417" stroke="#2A242D" />
+      <circle cx="408" cy="19" r="4.5" fill="#E5384F" />
+      <text x="422" y="24">100% Бесплатно</text>
     </g>
   </g>
 </svg>

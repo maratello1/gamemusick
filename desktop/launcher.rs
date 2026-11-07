@@ -25,7 +25,7 @@ fn to_wide(s: &str) -> Vec<u16> {
 
 fn focus_existing_window() -> bool {
     unsafe {
-        let title = to_wide("GameVibe v2.0 — Autonomous AI Soundtrack Director");
+        let title = to_wide("GameMusick v2.0 — Autonomous AI Soundtrack Director");
         let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
         if hwnd != 0 {
             ShowWindow(hwnd, SW_RESTORE);
