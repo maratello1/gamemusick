@@ -9,7 +9,7 @@ let isAlwaysOnTop = false;
 let isCompactMode = false;
 let isMiniHudMode = false;
 
-const APP_URL = 'http://localhost:3000';
+const APP_URL = 'http://localhost:3001';
 
 function checkServerReady(url) {
   return new Promise((resolve) => {
@@ -67,7 +67,7 @@ async function createDesktopWindow() {
 
   // Open external links (e.g. music.youtube.com) in default browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http') && !url.includes('localhost:3000')) {
+    if (url.startsWith('http') && !url.includes('localhost:3001')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }

@@ -1,16 +1,36 @@
 #![windows_subsystem = "windows"]
 
 use std::env;
-use std::net::TcpStream;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, TcpStream};
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+const GAMEVIBE_PORT: u16 = 3001;
 
-fn is_port_open(port: u16) -> bool {
-    TcpStream::connect(("127.0.0.1", port)).is_ok()
+fn is_gamevibe_running(port: u16) -> bool {
+    let addr: SocketAddr = match format!("127.0.0.1:{}", port).parse() {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+
+    if let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(600)) {
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(900)));
+        let _ = stream.set_write_timeout(Some(Duration::from_millis(600)));
+        let req = format!(
+            "GET /api/app-state HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\n\r\n",
+            port
+        );
+        if stream.write_all(req.as_bytes()).is_ok() {
+            let mut buf = String::new();
+            let _ = stream.read_to_string(&mut buf);
+            return buf.contains("\"activeVibe\"") || buf.contains("\"duckingEnabled\"");
+        }
+    }
+    false
 }
 
 fn open_app_window(url: &str) {
@@ -21,7 +41,7 @@ fn open_app_window(url: &str) {
             "",
             "msedge",
             &format!("--app={}", url),
-            "--window-size=1200,820",
+            "--window-size=1440,900",
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn();
@@ -33,39 +53,68 @@ fn main() {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."));
 
-    // 1. Ensure 50Hz high-precision interactive sensor is active in the user session
-    let sensor_exe = project_dir.join("desktop").join("interactive_sensor.exe");
-    if sensor_exe.exists() {
-        let _ = Command::new(&sensor_exe)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
-    }
-
-    // 2. If Next.js dev server on port 3000 is already running, open it directly
-    if is_port_open(3000) {
-        open_app_window("http://localhost:3000");
-        return;
-    }
-
-    // 3. Otherwise start Next.js dev server and wait for port 3000
     let pkg_json = project_dir.join("package.json");
     let fallback_dir = std::path::Path::new(r"D:\Desktop\gamevibe");
     let working_dir = if pkg_json.exists() { project_dir } else { fallback_dir };
 
-    let _ = Command::new("cmd")
-        .args(["/C", "npm run dev"])
-        .current_dir(working_dir)
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn();
+    // 1. Start Local AI Scene & Boss/Dialogue Director (local_director.py)
+    let director_py = working_dir.join("desktop").join("local_director.py");
+    if director_py.exists() {
+        let _ = Command::new("python")
+            .arg(&director_py)
+            .current_dir(working_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
 
-    for _ in 0..40 {
-        if is_port_open(3000) {
-            open_app_window("http://localhost:3000");
+    // 2. Ensure 50Hz high-precision interactive sensor is active in the user session
+    let sensor_exe = working_dir.join("desktop").join("interactive_sensor.exe");
+    if sensor_exe.exists() {
+        let _ = Command::new(&sensor_exe)
+            .current_dir(working_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+
+    let app_url = format!("http://localhost:{}", GAMEVIBE_PORT);
+
+    // 3. Verify that GameVibe specifically (not another site on port 3000) is running on GAMEVIBE_PORT
+    if is_gamevibe_running(GAMEVIBE_PORT) {
+        open_app_window(&app_url);
+        return;
+    }
+
+    // 4. Start GameVibe Next.js server directly via node on port 3001
+    let next_bin = working_dir
+        .join("node_modules")
+        .join("next")
+        .join("dist")
+        .join("bin")
+        .join("next");
+
+    if next_bin.exists() {
+        let _ = Command::new("node")
+            .arg(&next_bin)
+            .args(["dev", "-p", &GAMEVIBE_PORT.to_string()])
+            .current_dir(working_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    } else {
+        let _ = Command::new("cmd")
+            .args(["/C", &format!("npm run dev -- -p {}", GAMEVIBE_PORT)])
+            .current_dir(working_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+
+    for _ in 0..45 {
+        if is_gamevibe_running(GAMEVIBE_PORT) {
+            open_app_window(&app_url);
             return;
         }
         thread::sleep(Duration::from_millis(500));
     }
 
-    // Fallback if port 3000 did not open
-    open_app_window("http://localhost:3000");
+    // Fallback open
+    open_app_window(&app_url);
 }

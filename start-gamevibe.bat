@@ -23,8 +23,8 @@ if exist "GameVibe.exe" (
         echo Установка зависимостей (первый запуск)...
         call npm install
     )
-    echo [2/2] Запуск сервера GameVibe на http://localhost:3000 ...
-    start "" http://localhost:3000
-    call npm run dev
+    echo [2/2] Запуск сервера GameVibe на http://localhost:3001 ...
+    start "" http://localhost:3001
+    node node_modules\next\dist\bin\next dev -p 3001
 )
 

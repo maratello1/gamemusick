@@ -5,9 +5,9 @@
   "main": "desktop/main.js",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start -p 3000",
+    "dev": "node node_modules/next/dist/bin/next dev -p 3001",
+    "build": "node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start -p 3001",
     "desktop": "electron desktop/main.js"
   },
   "dependencies": {
