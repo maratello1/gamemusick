@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('gamevibeDesktop', {
   setCompactOverlay: (compact) => ipcRenderer.invoke('window:set-compact', compact),
   toggleMiniHud: (forceState) => ipcRenderer.invoke('window:toggle-mini-hud', forceState),
   minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  hideToTray: () => ipcRenderer.invoke('window:hide-to-tray'),
   maximizeWindow: () => ipcRenderer.invoke('window:maximize'),
   closeWindow: () => ipcRenderer.invoke('window:close'),
   onGlobalHotkeyVibe: (callback) => {

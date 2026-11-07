@@ -33,7 +33,7 @@ fn is_gamevibe_running(port: u16) -> bool {
     false
 }
 
-fn open_app_window(url: &str) {
+fn open_fallback_window(url: &str) {
     let _ = Command::new("cmd")
         .args([
             "/C",
@@ -57,7 +57,7 @@ fn main() {
     let fallback_dir = std::path::Path::new(r"D:\Desktop\gamevibe");
     let working_dir = if pkg_json.exists() { project_dir } else { fallback_dir };
 
-    // 1. Start Local AI Scene & Boss/Dialogue Director (local_director.py)
+    // 1. Start Local AI Scene, Boss & Subtitle Director (local_director.py)
     let director_py = working_dir.join("desktop").join("local_director.py");
     if director_py.exists() {
         let _ = Command::new("python")
@@ -76,45 +76,49 @@ fn main() {
             .spawn();
     }
 
-    let app_url = format!("http://localhost:{}", GAMEVIBE_PORT);
+    // 3. Ensure GameVibe Next.js backend on port 3001 is running
+    if !is_gamevibe_running(GAMEVIBE_PORT) {
+        let next_bin = working_dir
+            .join("node_modules")
+            .join("next")
+            .join("dist")
+            .join("bin")
+            .join("next");
 
-    // 3. Verify that GameVibe specifically (not another site on port 3000) is running on GAMEVIBE_PORT
-    if is_gamevibe_running(GAMEVIBE_PORT) {
-        open_app_window(&app_url);
+        if next_bin.exists() {
+            let _ = Command::new("node")
+                .arg(&next_bin)
+                .args(["dev", "-p", &GAMEVIBE_PORT.to_string()])
+                .current_dir(working_dir)
+                .creation_flags(CREATE_NO_WINDOW)
+                .spawn();
+        }
+
+        for _ in 0..45 {
+            if is_gamevibe_running(GAMEVIBE_PORT) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+    }
+
+    // 4. Launch Native Frameless Electron Desktop Client (with System Tray, Global Hotkeys & Mini-HUD)
+    let electron_exe = working_dir
+        .join("node_modules")
+        .join("electron")
+        .join("dist")
+        .join("electron.exe");
+    let main_js = working_dir.join("desktop").join("main.js");
+
+    if electron_exe.exists() && main_js.exists() {
+        let _ = Command::new(&electron_exe)
+            .arg(&main_js)
+            .current_dir(working_dir)
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
         return;
     }
 
-    // 4. Start GameVibe Next.js server directly via node on port 3001
-    let next_bin = working_dir
-        .join("node_modules")
-        .join("next")
-        .join("dist")
-        .join("bin")
-        .join("next");
-
-    if next_bin.exists() {
-        let _ = Command::new("node")
-            .arg(&next_bin)
-            .args(["dev", "-p", &GAMEVIBE_PORT.to_string()])
-            .current_dir(working_dir)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
-    } else {
-        let _ = Command::new("cmd")
-            .args(["/C", &format!("npm run dev -- -p {}", GAMEVIBE_PORT)])
-            .current_dir(working_dir)
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn();
-    }
-
-    for _ in 0..45 {
-        if is_gamevibe_running(GAMEVIBE_PORT) {
-            open_app_window(&app_url);
-            return;
-        }
-        thread::sleep(Duration::from_millis(500));
-    }
-
-    // Fallback open
-    open_app_window(&app_url);
+    // Fallback if Electron binary is missing
+    open_fallback_window(&format!("http://localhost:{}", GAMEVIBE_PORT));
 }

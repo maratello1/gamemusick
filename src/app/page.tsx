@@ -1994,7 +1994,94 @@ export default function GameVibeSpotifyApp() {
   };
 
   return (
-    <div className="h-dvh w-full bg-[#080809] text-[#EDE9E8] flex flex-col overflow-hidden select-none">
+    <div className="h-dvh w-full bg-[#080809] text-[#EDE9E8] flex flex-col overflow-hidden select-none border border-[#241E23]">
+      {/* NATIVE DESKTOP APPLICATION TITLEBAR (Frameless Drag Region + Window Controls) */}
+      <div
+        className="h-[34px] shrink-0 bg-[#050507] border-b border-[#1A161A] px-3 flex items-center justify-between gap-2 select-none"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img
+            src="/logo-icon.svg"
+            alt="GameVibe"
+            className="w-4 h-4 rounded-sm shrink-0"
+          />
+          <span className="text-[11px] font-bold tracking-wider uppercase text-[#EDE9E8] whitespace-nowrap">
+            GameVibe Desktop <span className="text-[#B84A62] font-mono">v2.0</span>
+          </span>
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#121014] border border-[#241F25] text-[10px] text-[#A8A0A4] truncate max-w-[260px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
+            <span className="truncate">Сенсор: {telemetry.detectedProcess}</span>
+          </span>
+          <span className="hidden md:inline text-[10px] font-mono text-[#6E666A] whitespace-nowrap">
+            Хоткеи: Alt+1..5 (Сцены) · Alt+M (Мини-HUD) · Alt+P (Поверх игры)
+          </span>
+        </div>
+
+        <div
+          className="flex items-center gap-1 shrink-0"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const w = window as unknown as {
+                gamevibeDesktop?: { hideToTray?: () => void; minimizeWindow?: () => void };
+              };
+              if (w.gamevibeDesktop?.hideToTray) w.gamevibeDesktop.hideToTray();
+              else if (w.gamevibeDesktop?.minimizeWindow) w.gamevibeDesktop.minimizeWindow();
+            }}
+            className="px-2 py-1 rounded text-[10px] font-medium text-[#8C8482] hover:text-[#EDE9E8] hover:bg-[#19161B] transition"
+            title="Свернуть в системный трей (музыка продолжит играть в фоне)"
+          >
+            В трей
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const w = window as unknown as {
+                gamevibeDesktop?: { minimizeWindow?: () => void };
+              };
+              w.gamevibeDesktop?.minimizeWindow?.();
+            }}
+            className="w-7 h-6 rounded flex items-center justify-center text-xs text-[#8C8482] hover:text-white hover:bg-[#19161B] transition"
+            title="Свернуть окно"
+          >
+            —
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const w = window as unknown as {
+                gamevibeDesktop?: { maximizeWindow?: () => void };
+              };
+              w.gamevibeDesktop?.maximizeWindow?.();
+            }}
+            className="w-7 h-6 rounded flex items-center justify-center text-[11px] text-[#8C8482] hover:text-white hover:bg-[#19161B] transition"
+            title="Развернуть на весь экран"
+          >
+            □
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const w = window as unknown as {
+                gamevibeDesktop?: { closeWindow?: () => void };
+              };
+              if (w.gamevibeDesktop?.closeWindow) w.gamevibeDesktop.closeWindow();
+              else window.close();
+            }}
+            className="w-7 h-6 rounded flex items-center justify-center text-xs text-[#8C8482] hover:text-white hover:bg-[#8E253D] transition"
+            title="Закрыть приложение"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
       {/* Full-Length HTML5 Audio Stream Engine */}
       <audio
         ref={audioRef}
@@ -4293,10 +4380,13 @@ export default function GameVibeSpotifyApp() {
 
       {/* ULTRA-MINI IN-GAME HUD OVERLAY BAR (Alt + M) */}
       {isMiniHudMode && (
-        <div className="fixed inset-0 z-40 bg-[#080809]/95 backdrop-blur-md flex flex-col justify-between p-3 sm:p-4 select-none">
-          <div className="max-w-xl w-full mx-auto my-auto rounded-2xl bg-[#121014] border border-[#381C26] shadow-2xl p-3.5 space-y-3">
-            {/* Top row: Active Game + Scene Badge + Expand Button */}
-            <div className="flex items-center justify-between gap-2">
+        <div className="fixed inset-0 z-40 bg-[#080809] flex flex-col justify-between p-2 select-none">
+          <div className="w-full h-full rounded-xl bg-[#121014] border border-[#441E2B] shadow-2xl p-3 flex flex-col justify-between">
+            {/* Top row: Active Game + Scene Badge + Expand Button (Draggable region) */}
+            <div
+              className="flex items-center justify-between gap-2"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            >
               <div className="flex items-center gap-2 min-w-0">
                 <span className="px-2 py-0.5 rounded bg-[#6E1D2F] text-[10px] font-bold uppercase tracking-wider text-white">
                   {SCENE_BUCKET_CONFIGS[activeVibe as SceneBucketId]?.shortLabel || currentSceneMeta.shortLabel}
@@ -4313,6 +4403,7 @@ export default function GameVibeSpotifyApp() {
 
               <button
                 onClick={toggleMiniHud}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1D191D] hover:bg-[#2A232A] border border-[#362E36] text-[11px] font-medium text-[#EDE9E8] transition shrink-0"
                 title="Развернуть полное окно (Alt + M)"
               >
