@@ -2104,9 +2104,7 @@ export default function GameVibeSpotifyApp() {
           <div className="bg-[#111012] border border-[#1E1B1D] rounded-lg p-3 flex flex-col gap-1.5 shrink-0">
             <div className="flex items-center justify-between px-2 pb-2 border-b border-[#1E1B1D]">
               <div className="flex items-center gap-2.5">
-                <div className="w-6 h-6 rounded bg-[#6E1D2F] flex items-center justify-center text-xs font-bold tracking-wider text-white">
-                  GV
-                </div>
+                <img src="/logo-icon.svg" alt="GameVibe" className="w-6 h-6 rounded-md" />
                 <span className="text-sm font-semibold tracking-wide text-[#EDE9E8]">
                   GameVibe
                 </span>
