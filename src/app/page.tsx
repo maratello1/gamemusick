@@ -2102,15 +2102,15 @@ export default function GameVibeSpotifyApp() {
         <aside className="w-full lg:w-[285px] shrink-0 flex flex-col gap-2 min-h-0">
           {/* App Brand & Main Nav */}
           <div className="bg-[#111012] border border-[#1E1B1D] rounded-lg p-3 flex flex-col gap-1.5 shrink-0">
-            <div className="flex items-center justify-between px-2 pb-2 border-b border-[#1E1B1D]">
-              <div className="flex items-center gap-2.5">
-                <img src="/logo-icon.svg" alt="GameMusick" className="w-6 h-6 rounded-md" />
-                <span className="text-sm font-semibold tracking-wide text-[#EDE9E8]">
+            <div className="flex items-center justify-between gap-2 px-1.5 pb-2 border-b border-[#1E1B1D]">
+              <div className="flex items-center gap-2 shrink-0">
+                <img src="/logo-icon.svg" alt="GameMusick" className="w-6 h-6 rounded-md shrink-0" />
+                <span className="text-sm font-bold tracking-wide text-[#EDE9E8] whitespace-nowrap">
                   Game<span className="text-[#E5384F]">Musick</span>
                 </span>
               </div>
               <span
-                className="text-[11px] font-mono text-[#8C8482] truncate max-w-[110px] sm:max-w-[140px] text-right ml-2 px-2 py-0.5 rounded bg-[#171518] border border-[#232023]"
+                className="text-[10px] font-mono text-[#8C8482] truncate max-w-[105px] text-right px-2 py-0.5 rounded bg-[#171518] border border-[#232023]"
                 title={telemetry.detectedProcess}
               >
                 {telemetry.detectedProcess}
