@@ -414,7 +414,6 @@ export function tickNeuralEvolution(params: {
     proc !== 'STANDBY' &&
     proc !== 'explorer' &&
     proc !== 'GameMusick' &&
-    proc !== "Castlevania Belmont's Curse" &&
     !proc.toLowerCase().includes('electron') &&
     !proc.toLowerCase().includes('antigravity') &&
     !proc.toLowerCase().includes('cursor') &&

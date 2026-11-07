@@ -149,7 +149,6 @@ export async function GET() {
         !rawProc ||
         rawProc === 'IDLE_STANDBY' ||
         rawProc === 'STANDBY' ||
-        rawProc === "Castlevania Belmont's Curse" ||
         rawProc.toLowerCase().includes('electron') ||
         rawProc.toLowerCase().includes('gamemusick') ||
         rawProc.toLowerCase().includes('gamevibe') ||
@@ -228,7 +227,7 @@ export async function GET() {
       if (!isStandby && isNeuralDialogueActive && dialogueText) {
         resolvedLabel = `🎬 ${dialogueLabel}: "${dialogueText.slice(0, 45)}..."`;
       }
-      if (!isStandby && director && director.summary) {
+      if (!isStandby && director && director.summary && director.process && !director.process.includes('Ожидание игры')) {
         resolvedLabel = director.summary;
       }
 

@@ -135,46 +135,92 @@ except Exception:
     HAS_WINOCR = False
 
 
-def get_foreground_game():
-    hwnd = user32.GetForegroundWindow()
-    if not hwnd:
-        return None
-    pid = wintypes.DWORD()
-    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    if pid.value == 0:
-        return None
+def find_running_game():
+    try:
+        hdesk = user32.OpenInputDesktop(0, False, 0x01FF)
+        if hdesk:
+            user32.SetThreadDesktop(hdesk)
+    except Exception:
+        pass
 
-    hproc = kernel32.OpenProcess(0x1000, False, pid.value)
-    name = ''
-    if hproc:
+    found = None
+    def cb(hwnd, lparam):
+        nonlocal found
+        if not user32.IsWindowVisible(hwnd):
+            return 1
+        rect = wintypes.RECT()
+        user32.GetWindowRect(hwnd, ctypes.byref(rect))
+        w = rect.right - rect.left
+        h = rect.bottom - rect.top
+        if w < 300 or h < 200:
+            return 1
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value == 0:
+            return 1
+        hproc = kernel32.OpenProcess(0x1000, False, pid.value)
+        if not hproc:
+            return 1
         buf = ctypes.create_unicode_buffer(520)
         size = wintypes.DWORD(520)
+        name = ''
         if kernel32.QueryFullProcessImageNameW(hproc, 0, buf, ctypes.byref(size)):
             name = os.path.splitext(os.path.basename(buf.value))[0].lower()
         kernel32.CloseHandle(hproc)
+        if name and name not in DENYLIST_PROCESSES and not any(d in name for d in DENYLIST_PROCESSES):
+            tbuf = ctypes.create_unicode_buffer(256)
+            user32.GetWindowTextW(hwnd, tbuf, 256)
+            title = tbuf.value.strip() or name
+            if not any(d in title.lower() for d in ['nvidia', 'geforce', 'overlay', 'settings']):
+                found = {
+                    'hwnd': hwnd,
+                    'pid': pid.value,
+                    'process': name,
+                    'title': title,
+                    'rect': (rect.left, rect.top, w, h)
+                }
+                return 0
+        return 1
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+    user32.EnumWindows(WNDENUMPROC(cb), 0)
+    return found
 
-    if not name or name in DENYLIST_PROCESSES:
-        return None
 
-    rect = wintypes.RECT()
-    user32.GetWindowRect(hwnd, ctypes.byref(rect))
-    w = rect.right - rect.left
-    h = rect.bottom - rect.top
-    if w < 240 or h < 180:
-        return None
+def get_foreground_game():
+    hwnd = user32.GetForegroundWindow()
+    if hwnd:
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value != 0:
+            hproc = kernel32.OpenProcess(0x1000, False, pid.value)
+            name = ''
+            if hproc:
+                buf = ctypes.create_unicode_buffer(520)
+                size = wintypes.DWORD(520)
+                if kernel32.QueryFullProcessImageNameW(hproc, 0, buf, ctypes.byref(size)):
+                    name = os.path.splitext(os.path.basename(buf.value))[0].lower()
+                kernel32.CloseHandle(hproc)
 
-    title_buf = ctypes.create_unicode_buffer(256)
-    user32.GetWindowTextW(hwnd, title_buf, 256)
-    raw_title = title_buf.value.strip()
-    clean_title = raw_title if raw_title else name
+            if name and name not in DENYLIST_PROCESSES and not any(d in name for d in DENYLIST_PROCESSES):
+                rect = wintypes.RECT()
+                user32.GetWindowRect(hwnd, ctypes.byref(rect))
+                w = rect.right - rect.left
+                h = rect.bottom - rect.top
+                if w >= 240 and h >= 180:
+                    title_buf = ctypes.create_unicode_buffer(256)
+                    user32.GetWindowTextW(hwnd, title_buf, 256)
+                    raw_title = title_buf.value.strip()
+                    clean_title = raw_title if raw_title else name
+                    return {
+                        'hwnd': hwnd,
+                        'pid': pid.value,
+                        'process': name,
+                        'title': clean_title,
+                        'rect': (rect.left, rect.top, w, h)
+                    }
 
-    return {
-        'hwnd': hwnd,
-        'pid': pid.value,
-        'process': name,
-        'title': clean_title,
-        'rect': (rect.left, rect.top, w, h)
-    }
+    # Fallback: check if an active game window is running on the system
+    return find_running_game()
 
 
 def grab_window_crop(rect, x_rel, y_rel, w_rel, h_rel):

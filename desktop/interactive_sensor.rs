@@ -52,6 +52,10 @@ extern "system" {
     fn GetSystemMetrics(nIndex: i32) -> i32;
     fn GetAsyncKeyState(vKey: i32) -> i16;
     fn GetCursorPos(lpPoint: *mut POINT) -> i32;
+    fn EnumWindows(lpEnumFunc: unsafe extern "system" fn(isize, isize) -> i32, lParam: isize) -> i32;
+    fn IsWindowVisible(hWnd: isize) -> i32;
+    fn OpenInputDesktop(dwFlags: u32, fInherit: i32, dwDesiredAccess: u32) -> isize;
+    fn SetThreadDesktop(hDesktop: isize) -> i32;
 }
 
 #[link(name = "kernel32")]
@@ -183,6 +187,66 @@ fn get_window_title(hwnd: isize) -> String {
             String::new()
         }
     }
+}
+
+struct FoundGame {
+    hwnd: isize,
+    proc: String,
+    title: String,
+    rect: RECT,
+}
+
+unsafe extern "system" fn enum_game_window_cb(hwnd: isize, lparam: isize) -> i32 {
+    let out = &mut *(lparam as *mut Option<FoundGame>);
+    if IsWindowVisible(hwnd) == 0 {
+        return 1;
+    }
+    let mut rect = RECT::default();
+    if GetWindowRect(hwnd, &mut rect) == 0 {
+        return 1;
+    }
+    let w = rect.right - rect.left;
+    let h = rect.bottom - rect.top;
+    if w < 300 || h < 200 {
+        return 1;
+    }
+
+    let proc = get_process_name(hwnd);
+    if proc.is_empty() || is_denylisted(&proc) {
+        return 1;
+    }
+
+    let title = get_window_title(hwnd);
+    let title_lower = title.to_lowercase();
+    if title_lower.contains("overlay")
+        || title_lower.contains("nvidia")
+        || title_lower.contains("geforce")
+        || title_lower.contains("settings")
+    {
+        return 1;
+    }
+
+    *out = Some(FoundGame {
+        hwnd,
+        proc,
+        title,
+        rect,
+    });
+    0 // stop enumeration
+}
+
+fn find_running_game() -> Option<FoundGame> {
+    unsafe {
+        let h_desk = OpenInputDesktop(0, 0, 0x01FF);
+        if h_desk != 0 {
+            let _ = SetThreadDesktop(h_desk);
+        }
+    }
+    let mut found: Option<FoundGame> = None;
+    unsafe {
+        EnumWindows(enum_game_window_cb, &mut found as *mut _ as isize);
+    }
+    found
 }
 
 struct VisualSample {
@@ -484,21 +548,28 @@ fn main() {
                 thread::sleep(Duration::from_millis(20));
             }
 
-            // Foreground window & process detection
-            let hwnd = GetForegroundWindow();
-            let proc_now = get_process_name(hwnd);
-            let title_now = get_window_title(hwnd);
+            // Window & active game detection (checks foreground, falls back to running game window)
+            let hwnd_fg = GetForegroundWindow();
+            let proc_fg = get_process_name(hwnd_fg);
+            let title_fg = get_window_title(hwnd_fg);
 
-            let mut game_rect = RECT {
-                left: 0,
-                top: 0,
-                right: GetSystemMetrics(0).max(800),
-                bottom: GetSystemMetrics(1).max(600),
+            let (_hwnd, proc_now, title_now, game_rect) = if !proc_fg.is_empty() && !is_denylisted(&proc_fg) {
+                let mut rect = RECT::default();
+                let _ = GetWindowRect(hwnd_fg, &mut rect);
+                (hwnd_fg, proc_fg, title_fg, rect)
+            } else if let Some(bg_game) = find_running_game() {
+                (bg_game.hwnd, bg_game.proc, bg_game.title, bg_game.rect)
+            } else {
+                (0, String::new(), String::new(), RECT {
+                    left: 0,
+                    top: 0,
+                    right: GetSystemMetrics(0).max(800),
+                    bottom: GetSystemMetrics(1).max(600),
+                })
             };
-            let _ = GetWindowRect(hwnd, &mut game_rect);
 
             let cur_ms = now_ms();
-            let is_real_game = !proc_now.is_empty() && !is_denylisted(&proc_now);
+            let is_real_game = !proc_now.is_empty();
 
             if is_real_game {
                 last_game_proc = proc_now;
@@ -506,7 +577,7 @@ fn main() {
                     last_game_title = title_now;
                 }
                 last_game_seen_ms = cur_ms;
-            } else if cur_ms.saturating_sub(last_game_seen_ms) > 8000 {
+            } else if cur_ms.saturating_sub(last_game_seen_ms) > 4000 {
                 last_game_proc = String::from("IDLE_STANDBY");
                 last_game_title = String::from("IDLE_STANDBY");
             }
