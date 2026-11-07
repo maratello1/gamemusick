@@ -2777,10 +2777,14 @@ export default function GameVibeSpotifyApp() {
                               Профиль игры
                             </div>
                             <div className="text-xs font-semibold text-[#EDE9E8] truncate mt-0.5">
-                              {telemetry.neuralEvolution.activeGame || telemetry.detectedProcess}
+                              {telemetry.detectedProcess && telemetry.detectedProcess !== 'Ожидание игры'
+                                ? (telemetry.neuralEvolution.activeGame || telemetry.detectedProcess)
+                                : 'Ожидание запуска игры'}
                             </div>
                             <div className="text-[10px] text-[#4ADE80] mt-0.5">
-                              ✓ Адаптаций: {telemetry.neuralEvolution.gameAdaptationsCount}
+                              {telemetry.detectedProcess && telemetry.detectedProcess !== 'Ожидание игры'
+                                ? `✓ Адаптаций: ${telemetry.neuralEvolution.gameAdaptationsCount}`
+                                : '✓ Готов к адаптации'}
                             </div>
                           </div>
 

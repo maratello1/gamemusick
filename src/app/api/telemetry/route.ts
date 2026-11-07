@@ -35,6 +35,7 @@ let lastSnapshot: TelemetrySnapshot = {
   isCutscene: false,
   isNewLocation: false,
   gameAudioDucked: false,
+  sensorMode: 'rust-win32-50hz-neural-synced',
 };
 
 let manualOverrideUntil = 0;
@@ -263,8 +264,10 @@ export async function GET() {
             (director ? ['cutscene', 'dialogue', 'tragedy'].includes(director.sceneType) : false)),
         isNewLocation: !isStandby && Boolean(parsed.isNewLocation),
         gameAudioDucked: !isStandby && Boolean(parsed.gameAudioDucked),
-        sceneKey: isNeuralDialogueActive ? `${dialogueEmotion}_DIALOGUE` : resolvedSceneKey,
-        sceneEmotion: isNeuralDialogueActive
+        sceneKey: isStandby ? '' : isNeuralDialogueActive ? `${dialogueEmotion}_DIALOGUE` : resolvedSceneKey,
+        sceneEmotion: isStandby
+          ? 'EXPLORE'
+          : isNeuralDialogueActive
           ? dialogueEmotion
           : typeof parsed.sceneEmotion === 'string'
           ? parsed.sceneEmotion
@@ -273,6 +276,7 @@ export async function GET() {
         dialogueText: isNeuralDialogueActive ? dialogueText : director?.onScreenText || undefined,
         dialogueEmotion: isNeuralDialogueActive ? dialogueEmotion : undefined,
         dialogueLabel: isNeuralDialogueActive ? dialogueLabel : undefined,
+        sensorMode: typeof parsed.sensorMode === 'string' ? parsed.sensorMode : 'rust-win32-50hz-neural-synced',
         director,
         neuralEvolution,
       };

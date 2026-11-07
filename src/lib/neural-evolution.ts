@@ -410,8 +410,17 @@ export function tickNeuralEvolution(params: {
   const isRealGame =
     proc &&
     proc !== 'Ожидание игры' &&
+    proc !== 'IDLE_STANDBY' &&
+    proc !== 'STANDBY' &&
     proc !== 'explorer' &&
     proc !== 'GameMusick' &&
+    proc !== "Castlevania Belmont's Curse" &&
+    !proc.toLowerCase().includes('electron') &&
+    !proc.toLowerCase().includes('antigravity') &&
+    !proc.toLowerCase().includes('cursor') &&
+    !proc.toLowerCase().includes('code') &&
+    !proc.toLowerCase().includes('powershell') &&
+    !proc.toLowerCase().includes('cmd') &&
     !proc.toLowerCase().includes('edge') &&
     !proc.toLowerCase().includes('chrome');
 
@@ -470,6 +479,8 @@ export function tickNeuralEvolution(params: {
       storage.state.learnedThresholds.stealthLumaThreshold = profile.stealthLumaThreshold;
       storage.state.gameAdaptationsCount = profile.adaptationsCount;
     }
+  } else {
+    storage.state.activeGame = 'Ожидание игры';
   }
 
   // Periodic persist every 10 seconds
