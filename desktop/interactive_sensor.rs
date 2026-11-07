@@ -50,8 +50,6 @@ extern "system" {
     fn GetDC(hWnd: isize) -> isize;
     fn ReleaseDC(hWnd: isize, hDC: isize) -> i32;
     fn GetSystemMetrics(nIndex: i32) -> i32;
-    fn GetAsyncKeyState(vKey: i32) -> i16;
-    fn GetCursorPos(lpPoint: *mut POINT) -> i32;
     fn EnumWindows(lpEnumFunc: unsafe extern "system" fn(isize, isize) -> i32, lParam: isize) -> i32;
     fn IsWindowVisible(hWnd: isize) -> i32;
     fn OpenInputDesktop(dwFlags: u32, fInherit: i32, dwDesiredAccess: u32) -> isize;
@@ -98,6 +96,8 @@ extern "system" {
 }
 
 type XInputGetStateFn = unsafe extern "system" fn(u32, *mut XINPUT_STATE) -> u32;
+type GetAsyncKeyStateFn = unsafe extern "system" fn(i32) -> i16;
+type GetCursorPosFn = unsafe extern "system" fn(*mut POINT) -> i32;
 
 const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 const SRCCOPY: u32 = 0x00CC0020;
@@ -526,6 +526,19 @@ fn main() {
         }
     };
 
+    unsafe extern "system" fn dummy_key(_: i32) -> i16 { 0 }
+    unsafe extern "system" fn dummy_pos(_: *mut POINT) -> i32 { 0 }
+
+    let (get_key_fn, get_pos_fn): (GetAsyncKeyStateFn, GetCursorPosFn) = unsafe {
+        let h_user = LoadLibraryA(b"user32.dll\0".as_ptr());
+        let p_key = if h_user != 0 { GetProcAddress(h_user, b"GetAsyncKeyState\0".as_ptr()) } else { 0 };
+        let p_pos = if h_user != 0 { GetProcAddress(h_user, b"GetCursorPos\0".as_ptr()) } else { 0 };
+        (
+            if p_key != 0 { std::mem::transmute(p_key) } else { dummy_key },
+            if p_pos != 0 { std::mem::transmute(p_pos) } else { dummy_pos },
+        )
+    };
+
     loop {
         unsafe {
             let cur_ms = now_ms();
@@ -566,7 +579,7 @@ fn main() {
             let is_online = is_online_competitive_game(&last_game_proc);
 
             let mut pt_prev = POINT::default();
-            GetCursorPos(&mut pt_prev);
+            get_pos_fn(&mut pt_prev);
 
             let mut attack_edge_presses = 0i32;
             let mut attack_held_ticks = 0i32;
@@ -579,7 +592,7 @@ fn main() {
             // Sample 12 times x 20ms = 240ms per cycle at 50Hz
             for _ in 0..12 {
                 for &vk in combat_attack_vkeys.iter() {
-                    let st = GetAsyncKeyState(vk as i32);
+                    let st = get_key_fn(vk as i32);
                     let is_down = (st as u16 & 0x8000) != 0;
                     if is_down {
                         if !prev_key_states[vk] {
@@ -608,14 +621,14 @@ fn main() {
                 }
 
                 // Check crouch/stealth keys (Ctrl 0x11 or 'C' 0x43)
-                if ((GetAsyncKeyState(0x11) as u16 & 0x8000) != 0)
-                    || ((GetAsyncKeyState(0x43) as u16 & 0x8000) != 0)
+                if ((get_key_fn(0x11) as u16 & 0x8000) != 0)
+                    || ((get_key_fn(0x43) as u16 & 0x8000) != 0)
                 {
                     crouch_held = true;
                 }
 
                 for &vk in movement_vkeys.iter() {
-                    let st = GetAsyncKeyState(vk as i32);
+                    let st = get_key_fn(vk as i32);
                     let is_down = (st as u16 & 0x8000) != 0;
                     if is_down {
                         if !prev_key_states[vk] {
@@ -648,7 +661,7 @@ fn main() {
                 }
 
                 let mut pt_now = POINT::default();
-                if GetCursorPos(&mut pt_now) != 0 {
+                if get_pos_fn(&mut pt_now) != 0 {
                     cursor_travel += (pt_now.x - pt_prev.x).abs() + (pt_now.y - pt_prev.y).abs();
                     pt_prev = pt_now;
                 }
