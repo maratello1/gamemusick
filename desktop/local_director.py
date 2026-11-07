@@ -95,6 +95,45 @@ ATTACK_VKEYS = [
     0x31, 0x32, 0x33, 0x34  # 1, 2, 3, 4
 ]
 
+ONLINE_COMPETITIVE_GAMES = {
+    'dota2', 'cs2', 'csgo', 'counter-strike', 'counterstrike', 'valorant',
+    'league of legends', 'leagueclient', 'deadlock', 'r5apex', 'apex',
+    'overwatch', 'pubg', 'tslgame', 'fortnite', 'rainbowsix', 'r6', 'marvelrivals'
+}
+
+def is_online_competitive_game(proc: str) -> bool:
+    if not proc:
+        return False
+    p = proc.lower()
+    return any(g in p for g in ONLINE_COMPETITIVE_GAMES)
+
+UI_GARBAGE_PATTERNS = [
+    'gamemusick', 'gamevibe', 'youtube', 'soundtrack', 'ost', 'audio',
+    'stream', 'playlist', 'spotify', 'deftones', 'kavinsky', 'brian eno',
+    'celldweller', 'combat battle action', 'game audio', 'dota 2 combat',
+    'magnus', 'power of the horde', 'frostivus', 'invincible'
+]
+
+def contains_ui_garbage(text: str) -> bool:
+    if not text:
+        return False
+    t = text.lower()
+    return any(p in t for p in UI_GARBAGE_PATTERNS)
+
+def get_user_favorite_artists():
+    try:
+        acc_file = os.path.join(DATA_DIR, 'accounts.json')
+        if os.path.exists(acc_file):
+            with open(acc_file, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+                active_id = d.get('activeAccountId')
+                for acc in d.get('accounts', []):
+                    if acc.get('id') == active_id:
+                        return acc.get('favoriteArtists', []), acc.get('favoriteGenres', [])
+    except Exception:
+        pass
+    return [], []
+
 user32 = ctypes.windll.user32
 gdi32 = ctypes.windll.gdi32
 kernel32 = ctypes.windll.kernel32
@@ -353,12 +392,33 @@ def sample_cinematic_bars_and_luma(rect):
 
 def get_user_gemini_config():
     try:
+        cfg = {}
         if os.path.exists(USER_INTEGRATIONS_FILE):
             with open(USER_INTEGRATIONS_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                g = data.get('gemini', {})
-                if g.get('enabled') and g.get('apiKey') and len(g.get('apiKey')) > 10:
-                    return g
+                cfg = data.get('gemini', {})
+                if cfg.get('enabled') and cfg.get('apiKey') and len(cfg.get('apiKey')) > 10:
+                    return cfg
+        
+        # Check environment or .env.local
+        env_key = os.environ.get('GEMINI_API_KEY', '')
+        if not env_key:
+            env_file = os.path.join(ROOT, '.env.local')
+            if os.path.exists(env_file):
+                with open(env_file, 'r', encoding='utf-8') as ef:
+                    for line in ef:
+                        line = line.strip()
+                        if line.startswith('GEMINI_API_KEY='):
+                            env_key = line.split('=', 1)[1].strip().strip('"').strip("'")
+                            break
+        if env_key and len(env_key) > 10:
+            return {
+                'enabled': True,
+                'apiKey': env_key,
+                'model': cfg.get('model', 'gemini-3.5-flash'),
+                'intervalSec': int(cfg.get('intervalSec', 10)),
+                'isValidated': True
+            }
     except Exception:
         pass
     return None
@@ -501,32 +561,45 @@ async def run_director():
             dialogue_emotion = ''
             is_dialogue_active = False
 
-            if HAS_WINOCR and not sustained_letterbox and center_luma > 8:
+            fg_hwnd = user32.GetForegroundWindow()
+            is_game_foreground = bool(game and fg_hwnd == game.get('hwnd'))
+            is_online = is_online_competitive_game(game_proc)
+
+            # Story dialogue OCR ONLY runs on foreground single-player story games!
+            # Online competitive games (Dota 2, CS2) have no story cutscene dialogue.
+            # Background windows must never be OCR-ed to avoid capturing music player UI!
+            if HAS_WINOCR and is_game_foreground and not is_online and not sustained_letterbox and center_luma > 8:
                 # Check subtitles area
                 sub_crop = grab_window_crop(game_rect, 0.12, 0.72, 0.76, 0.22)
                 t_en = await ocr_crop(sub_crop, 'en-US')
-                if len(t_en) >= 5:
+                if len(t_en) >= 5 and not contains_ui_garbage(t_en):
                     dialogue_text = t_en
                 else:
                     t_ru = await ocr_crop(sub_crop, 'ru')
-                    if len(t_ru) >= 5:
+                    if len(t_ru) >= 5 and not contains_ui_garbage(t_ru):
                         dialogue_text = t_ru
 
-            if len(dialogue_text) >= 5:
+            if len(dialogue_text) >= 5 and not contains_ui_garbage(dialogue_text):
                 dialogue_emotion, d_label = analyze_text_sentiment(dialogue_text)
                 dialogue_hold_until = time.time() + 9.0
                 is_dialogue_active = True
                 last_dialogue_text = dialogue_text
                 scene_label = f"🎬 {d_label}: \"{dialogue_text[:45]}...\""
-            elif time.time() < dialogue_hold_until and last_dialogue_text:
+            elif time.time() < dialogue_hold_until and last_dialogue_text and not is_online and not contains_ui_garbage(last_dialogue_text):
                 is_dialogue_active = True
                 dialogue_text = last_dialogue_text
+            else:
+                last_dialogue_text = ''
+                dialogue_text = ''
+                is_dialogue_active = False
 
             if is_dialogue_active or sustained_letterbox:
                 last_cutscene_ms = now_ms
 
             # 5. Scene State Machine (Supports all 6 buckets: EXPLORE, COMBAT, BOSSFIGHT, DRAMA, MAJESTIC, STEALTH)
-            is_fighting = (total_presses_2s >= 3)
+            # In online games, combat requires sustained teamfight APM (>= 10 presses/2s), not 3 menu clicks!
+            combat_threshold = 10 if is_online else 3
+            is_fighting = (total_presses_2s >= combat_threshold)
             if is_fighting:
                 if combat_streak_start_ms == 0:
                     combat_streak_start_ms = now_ms
@@ -536,8 +609,10 @@ async def run_director():
 
             combat_duration_ms = (now_ms - combat_streak_start_ms) if combat_streak_start_ms > 0 else 0
             is_boss_escalated = (
-                (is_fighting and sustained_boss_bar)
-                or (combat_duration_ms > 32000 and total_presses_2s >= 5)
+                not is_online and (
+                    (is_fighting and sustained_boss_bar)
+                    or (combat_duration_ms > 32000 and total_presses_2s >= 5)
+                )
             )
             if is_boss_escalated:
                 last_boss_ms = now_ms
@@ -545,11 +620,11 @@ async def run_director():
             if crouch_held and not is_fighting and center_luma < 45:
                 last_stealth_ms = now_ms
 
-            in_boss_hold = (now_ms - last_boss_ms < 22000)
-            in_combat_hold = (now_ms - last_combat_ms < 18000)
-            in_stealth_hold = (now_ms - last_stealth_ms < 14000)
-            in_cutscene_hold = (now_ms - last_cutscene_ms < 12000)
-            is_recent_room_change = (now_ms - last_room_wipe_ms < 10000)
+            in_boss_hold = not is_online and (now_ms - last_boss_ms < 22000)
+            in_combat_hold = (now_ms - last_combat_ms < (6000 if is_online else 18000))
+            in_stealth_hold = not is_online and (now_ms - last_stealth_ms < 14000)
+            in_cutscene_hold = not is_online and (now_ms - last_cutscene_ms < 12000)
+            is_recent_room_change = not is_online and (now_ms - last_room_wipe_ms < 10000)
 
             if is_boss_escalated or in_boss_hold:
                 active_vibe = 'BOSSFIGHT'
@@ -579,7 +654,7 @@ async def run_director():
             else:
                 active_vibe = 'EXPLORE'
                 active_scene_type = 'exploration'
-                scene_label = 'Атмосферное исследование'
+                scene_label = 'Атмосферное исследование' if not is_online else 'Лобби / Исследование карты'
 
             # 6. Dynamic Music Style & Recommendations
             music_style_map = {
@@ -606,7 +681,8 @@ async def run_director():
                         print(f'[LocalDirector] Gemini init: {ex}', flush=True)
 
                 interval_ms = int(gemini_cfg.get('intervalSec', 12)) * 1000
-                if gemini_client and (now_ms - last_gemini_call_ms > interval_ms) and center_luma > 6:
+                # Only analyze screen with Gemini if the game is actually focused!
+                if gemini_client and is_game_foreground and (now_ms - last_gemini_call_ms > interval_ms) and center_luma > 6:
                     last_gemini_call_ms = now_ms
                     try:
                         from google.genai import types
@@ -616,9 +692,19 @@ async def run_director():
                         full_frame.save(b, format='JPEG', quality=65)
                         jpeg_bytes = b.getvalue()
 
-                        prompt = f'Scoring scene for "{game_title}". Subtitles: "{dialogue_text}". Return JSON with: summary (Russian 1 sentence), mood (2-3 words), picks (5 real tracks with artist, title).'
+                        fav_artists, fav_genres = get_user_favorite_artists()
+                        artists_hint = f" Player favorite artists: {', '.join(fav_artists[:3])}." if fav_artists else ""
+
+                        prompt = (
+                            f'Scoring scene for "{game_title}". Subtitles: "{dialogue_text}".{artists_hint} '
+                            'Return JSON with: summary (Russian 1 sentence describing gameplay scene), '
+                            'mood (2-3 words), picks (5 real tracks with artist, title fitting the scene and player tastes).'
+                        )
+                        model_name = gemini_cfg.get('model', 'gemini-3.5-flash')
+                        if '2.5' in model_name or '2.0' in model_name:
+                            model_name = 'gemini-3.5-flash'
                         resp = gemini_client.models.generate_content(
-                            model=gemini_cfg.get('model', 'gemini-2.5-flash'),
+                            model=model_name,
                             contents=[
                                 types.Part.from_bytes(data=jpeg_bytes, mime_type='image/jpeg'),
                                 prompt

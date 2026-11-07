@@ -1,4 +1,5 @@
-#![windows_subsystem = "windows"]
+// Console subsystem so stdout pipes work with Node.js and Next.js /api/telemetry
+// Windows hides the console window automatically via windowsHide: true / -WindowStyle Hidden
 
 use std::env;
 use std::fs;
@@ -458,7 +459,7 @@ fn main() {
     const ERROR_ALREADY_EXISTS: u32 = 183;
     let (_mutex_handle, is_duplicate) = unsafe {
         SetLastError(0);
-        let h = CreateMutexA(0, 0, b"GameMusick_Sensor_Instance_Mutex_v2\0".as_ptr());
+        let h = CreateMutexA(0, 0, b"Local\\GameMusick_Sensor_Instance_Mutex_v3\0".as_ptr());
         let err = GetLastError();
         (h, h != 0 && err == ERROR_ALREADY_EXISTS)
     };
@@ -470,7 +471,6 @@ fn main() {
     let out_dir = resolve_data_dir();
     let _ = fs::create_dir_all(&out_dir);
     let out_file = out_dir.join("live-sensor.json");
-    let tmp_file = out_dir.join("live-sensor.tmp.json");
     let brain_file = out_dir.join("neural-evolution.json");
 
     let mut learned_combat = 42;
@@ -577,6 +577,8 @@ fn main() {
             }
 
             let is_online = is_online_competitive_game(&last_game_proc);
+            let p_lower = last_game_proc.to_lowercase();
+            let is_moba = is_online && (p_lower.contains("dota") || p_lower.contains("league") || p_lower.contains("deadlock"));
 
             let mut pt_prev = POINT::default();
             get_pos_fn(&mut pt_prev);
@@ -597,15 +599,28 @@ fn main() {
                     if is_down {
                         if !prev_key_states[vk] {
                             if is_online {
-                                if vk == 0x02 {
-                                    // Right click: navigation / steering in MOBAs & tactical aim
-                                    attack_edge_presses += 2;
-                                } else if vk == 0x01 {
-                                    // Left click: attack / shooting
-                                    attack_edge_presses += 14;
+                                if is_moba {
+                                    if vk == 0x01 {
+                                        // Left click in MOBA: selection / menu click
+                                        attack_edge_presses += 2;
+                                    } else if vk == 0x02 {
+                                        // Right click in MOBA: movement / attack move
+                                        attack_edge_presses += 4;
+                                    } else {
+                                        // Abilities (Q, W, E, R, D, F, numbers)
+                                        attack_edge_presses += 15;
+                                    }
                                 } else {
-                                    // Abilities (Q, E, R, F, numbers)
-                                    attack_edge_presses += 12;
+                                    if vk == 0x02 {
+                                        // Right click: navigation / steering in MOBAs & tactical aim
+                                        attack_edge_presses += 2;
+                                    } else if vk == 0x01 {
+                                        // Left click: attack / shooting
+                                        attack_edge_presses += 14;
+                                    } else {
+                                        // Abilities (Q, E, R, F, numbers)
+                                        attack_edge_presses += 12;
+                                    }
                                 }
                             } else {
                                 attack_edge_presses += if vk == 0x01 || vk == 0x02 { 16 } else { 12 };
@@ -717,13 +732,15 @@ fn main() {
             // Combat & Energy State Machine
             let walk_base = if move_held_ticks > 0 { if is_online { 10 } else { 16 } } else { 8 };
             let input_combat = if is_online {
-                (walk_base
-                    + (attack_edge_presses * 70 / 100)
+                let key_score = (attack_edge_presses * 70 / 100)
                     + (attack_held_ticks * 60 / 100)
                     + move_edge_presses
-                    + pad_attack_score
-                    + (cursor_travel / 55).min(20))
-                .clamp(8, 100)
+                    + pad_attack_score;
+                if key_score == 0 {
+                    8 // zero combat actions in online game
+                } else {
+                    (walk_base + key_score + (cursor_travel / 250).min(5)).clamp(8, 100)
+                }
             } else {
                 (walk_base
                     + attack_edge_presses
@@ -735,8 +752,14 @@ fn main() {
             };
 
             let instant_energy = if is_online {
-                // In online games: balance APM with verified optical screen action:
-                ((input_combat * 55) / 100) + ((optical_delta_score * 50) / 100) + (vis.red_score / 3).min(15)
+                let raw_energy = ((input_combat * 55) / 100) + ((optical_delta_score * 50) / 100) + (vis.red_score / 3).min(15);
+                // In online games (Dota 2, CS2, etc.), 3D hero showcases and animated lobbies
+                // must never trigger combat if the player has zero combat attacks or low APM (< 22 input_combat)!
+                if input_combat < 22 || attack_edge_presses == 0 {
+                    raw_energy.min(20)
+                } else {
+                    raw_energy
+                }
             } else {
                 input_combat.max((optical_delta_score * 85) / 100) + (vis.red_score / 3).min(20)
             };
@@ -753,14 +776,18 @@ fn main() {
 
             if instant_clamped > rolling_energy {
                 rolling_energy = rolling_energy * 0.35 + instant_clamped * 0.65;
-            } else if cur_ms.saturating_sub(last_combat_spike_ms) < 14000 && rolling_energy >= 44.0 {
+            } else if cur_ms.saturating_sub(last_combat_spike_ms) < (if is_online { 6000 } else { 14000 }) && rolling_energy >= 44.0 {
                 rolling_energy = (rolling_energy * 0.96).max(46.0);
             } else {
                 rolling_energy = (rolling_energy * 0.82 + instant_clamped * 0.18).max(8.0);
             }
 
             let final_motion = (rolling_energy.round() as i32).clamp(8, 100);
-            let is_fighting = final_motion >= learned_combat;
+            let is_fighting = if is_online {
+                final_motion >= learned_combat && input_combat >= 22 && attack_edge_presses > 0
+            } else {
+                final_motion >= learned_combat
+            };
             let combat_duration_ms = if combat_streak_start_ms > 0 {
                 cur_ms.saturating_sub(combat_streak_start_ms)
             } else {
@@ -771,14 +798,15 @@ fn main() {
             let mut is_respawn_spectating = false;
             if is_online {
                 let recent_combat = cur_ms.saturating_sub(last_combat_spike_ms) < 28000;
-                let zero_inputs = attack_edge_presses <= 1 && move_edge_presses == 0 && move_held_ticks == 0 && cursor_travel < 250;
-                if recent_combat && zero_inputs {
+                let sustained_fight = combat_duration_ms > 4000;
+                let zero_inputs = attack_edge_presses <= 1 && move_edge_presses == 0 && move_held_ticks == 0 && cursor_travel < 200;
+                if recent_combat && sustained_fight && zero_inputs {
                     online_respawn_streak += 1;
                 } else if !zero_inputs {
                     online_respawn_streak = 0;
                 }
 
-                if online_respawn_streak >= 6 {
+                if online_respawn_streak >= 8 {
                     is_respawn_spectating = true;
                     rolling_energy = (rolling_energy * 0.72).max(10.0);
                 }
@@ -786,9 +814,9 @@ fn main() {
                 online_respawn_streak = 0;
             }
 
-            if (is_fighting && boss_bar_streak >= 2)
+            if !is_online && ((is_fighting && boss_bar_streak >= 2)
                 || (combat_duration_ms > 32000 && final_motion >= (learned_boss - 17))
-                || final_motion >= learned_boss
+                || final_motion >= learned_boss)
             {
                 last_boss_ms = cur_ms;
             }
@@ -797,10 +825,10 @@ fn main() {
                 last_stealth_ms = cur_ms;
             }
 
-            let in_boss_hold = cur_ms.saturating_sub(last_boss_ms) < 22000;
-            let in_combat_hold = cur_ms.saturating_sub(last_combat_spike_ms) < 16000;
-            let in_cutscene_hold = cur_ms.saturating_sub(last_cutscene_ms) < 12000;
-            let is_recent_room_change = cur_ms.saturating_sub(last_room_wipe_ms) < 10000;
+            let in_boss_hold = !is_online && (cur_ms.saturating_sub(last_boss_ms) < 22000);
+            let in_combat_hold = cur_ms.saturating_sub(last_combat_spike_ms) < if is_online { 5000 } else { 16000 };
+            let in_cutscene_hold = !is_online && (cur_ms.saturating_sub(last_cutscene_ms) < 12000);
+            let is_recent_room_change = !is_online && (cur_ms.saturating_sub(last_room_wipe_ms) < 10000);
             let in_stealth_hold = cur_ms.saturating_sub(last_stealth_ms) < 14000;
 
             let is_standby = last_game_proc == "IDLE_STANDBY" || last_game_proc.is_empty();
@@ -820,7 +848,7 @@ fn main() {
             } else if in_stealth_hold {
                 ("STEALTH", "STEALTH")
             } else {
-                ("EXPLORE", "EXPLORE")
+                ("EXPLORE", if is_online { "LOBBY" } else { "EXPLORE" })
             };
 
             let out_motion = if is_standby { 10 } else { final_motion };
@@ -847,9 +875,7 @@ fn main() {
                 if is_respawn_spectating { "true" } else { "false" }
             );
 
-            if fs::write(&tmp_file, &json).is_ok() {
-                let _ = fs::rename(&tmp_file, &out_file);
-            }
+            let _ = fs::write(&out_file, &json);
 
             if is_once {
                 println!("{}", json);

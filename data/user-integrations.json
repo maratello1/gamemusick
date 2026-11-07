@@ -1,11 +1,11 @@
 {
   "playbackEngine": "youtube",
   "gemini": {
-    "enabled": false,
+    "enabled": true,
     "apiKey": "",
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3.5-flash",
     "intervalSec": 10,
-    "isValidated": false
+    "isValidated": true
   },
   "spotify": {
     "enabled": false,

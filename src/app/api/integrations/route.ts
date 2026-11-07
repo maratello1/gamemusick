@@ -34,7 +34,7 @@ const DEFAULT_CONFIG: UserIntegrationsConfig = {
   gemini: {
     enabled: false,
     apiKey: '',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash',
     intervalSec: 10,
     isValidated: false,
   },
@@ -53,10 +53,11 @@ const DEFAULT_CONFIG: UserIntegrationsConfig = {
 
 function readConfig(): UserIntegrationsConfig {
   try {
+    let cfg: UserIntegrationsConfig = DEFAULT_CONFIG;
     if (fs.existsSync(CONFIG_FILE)) {
       const raw = fs.readFileSync(CONFIG_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
-      return {
+      cfg = {
         ...DEFAULT_CONFIG,
         ...parsed,
         gemini: { ...DEFAULT_CONFIG.gemini, ...(parsed.gemini || {}) },
@@ -64,6 +65,12 @@ function readConfig(): UserIntegrationsConfig {
         appleMusic: { ...DEFAULT_CONFIG.appleMusic, ...(parsed.appleMusic || {}) },
       };
     }
+    if (!cfg.gemini.apiKey && process.env.GEMINI_API_KEY) {
+      cfg.gemini.apiKey = process.env.GEMINI_API_KEY;
+      cfg.gemini.enabled = true;
+      cfg.gemini.isValidated = true;
+    }
+    return cfg;
   } catch {
     // ignore
   }

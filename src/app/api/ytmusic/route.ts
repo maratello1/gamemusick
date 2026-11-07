@@ -440,7 +440,66 @@ export async function GET(request: NextRequest) {
     const gameLower = (gameClean || rawGameParam).toLowerCase();
     const isGameActive = gameClean && !gameClean.includes('Ожидание игры') && gameClean.length > 1;
 
-    if (audioMode === 'game-vibe' || isGameActive) {
+    // Strict priority: If user chose "Мои артисты" (custom), ALWAYS honor user taste!
+    if (audioMode === 'custom') {
+      const selectedArtists = artistsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const selectedGenres = genresParam
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+
+      archetypeLabel = 'Персональный вкус';
+
+      if (selectedArtists.length > 0) {
+        for (const a of selectedArtists) {
+          if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+            ytQueries.push(`${a} high energy live`);
+            ytQueries.push(`${a} battle heavy`);
+          } else if (vibe === 'DRAMA') {
+            ytQueries.push(`${a} slow acoustic`);
+            ytQueries.push(`${a} melancholic`);
+          } else if (vibe === 'STEALTH') {
+            ytQueries.push(`${a} dark instrumental`);
+          } else if (vibe === 'MAJESTIC' || vibe === 'VICTORY') {
+            ytQueries.push(`${a} greatest hits live`);
+          } else {
+            ytQueries.push(`${a} official audio`);
+            ytQueries.push(`${a} chill`);
+          }
+        }
+      }
+
+      const activeGenres =
+        selectedGenres.length > 0
+          ? selectedGenres
+          : selectedArtists.length === 0
+          ? ['electronic', 'rock', 'ambient']
+          : [];
+
+      for (const g of activeGenres) {
+        const pool = GENRE_DYNAMIC_ARTISTS[g];
+        if (pool && pool.length > 0) {
+          const sample = pickRandomItems(pool, 2);
+          for (const a of sample) {
+            if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+              ytQueries.push(`${a} high energy`);
+            } else {
+              ytQueries.push(`${a} official audio`);
+            }
+          }
+        } else {
+          if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+            ytQueries.push(`${g} high energy battle`);
+          } else {
+            ytQueries.push(`${g} chill atmospheric`);
+          }
+        }
+      }
+    } else {
+      // audioMode === 'game-vibe': Procedural Game Soundtrack Discovery
       let archetypeKey = 'universal';
 
       if (
@@ -562,36 +621,6 @@ export async function GET(request: NextRequest) {
       for (const desc of chosenDescs) {
         ytQueries.push(`${desc} soundtrack`);
       }
-    } else {
-      // Custom User Preferences
-      const selectedArtists = artistsParam
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean);
-      const selectedGenres = genresParam
-        .split(',')
-        .map((s) => s.trim().toLowerCase())
-        .filter(Boolean);
-
-      archetypeLabel = 'Персональный вкус';
-
-      if (selectedArtists.length > 0) {
-        const picked = pickRandomItems(selectedArtists, Math.min(2, selectedArtists.length));
-        for (const a of picked) {
-          ytQueries.push(`${a} official audio`);
-        }
-      }
-
-      const activeGenres = selectedGenres.length > 0 ? selectedGenres : ['ambient', 'electronic'];
-      for (const g of activeGenres) {
-        const pool = GENRE_DYNAMIC_ARTISTS[g];
-        if (pool) {
-          const sample = pickRandomItems(pool, 2);
-          for (const a of sample) {
-            ytQueries.push(`${a} official audio`);
-          }
-        }
-      }
     }
 
     if (ytQueries.length === 0) {
@@ -624,9 +653,12 @@ export async function GET(request: NextRequest) {
     const randomized = [...uniqueTracks].sort(() => Math.random() - 0.5);
 
     if (randomized.length > 0) {
-      const displayLabel = isGameActive
-        ? `✨ Саундтрек: ${gameClean} [${vibe}]`
-        : `✨ ${archetypeLabel}: Живой поток [${vibe}]`;
+      const displayLabel =
+        audioMode === 'custom'
+          ? `🎧 Мои артисты & Вкусы [${vibe}]`
+          : isGameActive
+          ? `✨ Саундтрек: ${gameClean} [${vibe}]`
+          : `✨ ${archetypeLabel}: Живой поток [${vibe}]`;
 
       return NextResponse.json({
         source: 'youtube-direct',

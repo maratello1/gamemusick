@@ -320,7 +320,7 @@ export default function GameVibeSpotifyApp() {
     playbackEngine: 'youtube',
     geminiEnabled: false,
     geminiApiKey: '',
-    geminiModel: 'gemini-2.5-flash',
+    geminiModel: 'gemini-3.5-flash',
     geminiMaskedKey: '',
     geminiHasKey: false,
     geminiIsValidated: false,
@@ -341,7 +341,7 @@ export default function GameVibeSpotifyApp() {
           ...prev,
           playbackEngine: data.playbackEngine || 'youtube',
           geminiEnabled: Boolean(data.gemini?.enabled),
-          geminiModel: data.gemini?.model || 'gemini-2.5-flash',
+          geminiModel: data.gemini?.model || 'gemini-3.5-flash',
           geminiMaskedKey: data.gemini?.maskedKey || '',
           geminiHasKey: Boolean(data.gemini?.hasKey),
           geminiIsValidated: Boolean(data.gemini?.isValidated),
@@ -968,6 +968,11 @@ export default function GameVibeSpotifyApp() {
         }
 
         setLiveStreamTracks(deck);
+        setResolvedMoodQuery(
+          audioModeRef.current === 'game-vibe'
+            ? `Вайб игры: ${chosen.artist} — ${chosen.title}`
+            : `Мои вкусы: ${chosen.artist} — ${chosen.title}`
+        );
         executePlayTrack(chosen);
       }
     },
@@ -4231,9 +4236,9 @@ export default function GameVibeSpotifyApp() {
                             }}
                             className="w-full px-3 py-1.5 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] outline-none"
                           >
-                            <option value="gemini-2.5-flash">gemini-2.5-flash (Рекомендуется, быстрый)</option>
-                            <option value="gemini-2.5-pro">gemini-2.5-pro (Глубокий анализ кадра)</option>
-                            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                            <option value="gemini-3.5-flash">gemini-3.5-flash (Рекомендуется, быстрый)</option>
+                            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ультрабыстрый)</option>
+                            <option value="gemini-3.8-flash">gemini-3.8-flash (Новейший)</option>
                           </select>
                         </div>
 
