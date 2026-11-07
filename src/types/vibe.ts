@@ -77,6 +77,37 @@ export interface TelemetrySnapshot {
   dialogueEmotion?: string;
   dialogueLabel?: string;
   director?: DirectorScene;
+  neuralEvolution?: NeuralEvolutionState;
+}
+
+export interface NeuralEvolutionState {
+  enabled: boolean;
+  isGeminiActive: boolean;
+  mode: 'ONLINE_LEARNING' | 'GEMINI_CLOUD';
+  statusMessage: string;
+  level: number;
+  xp: number;
+  xpToNextLevel: number;
+  totalEpochs: number;
+  accuracy: number;
+  totalCorrections: number;
+  activeGame: string;
+  gameAdaptationsCount: number;
+  learnedThresholds: {
+    combatMotionThreshold: number;
+    bossSensitivity: number;
+    stealthLumaThreshold: number;
+    reactionSpeedMs: number;
+  };
+  recentLearnings: string[];
+  weights: {
+    motion: number;
+    apm: number;
+    redAlert: number;
+    ocrKeywords: number;
+    hysteresis: number;
+  };
+  lastUpdate: number;
 }
 
 /** Scene understanding produced by desktop/vision_director.py (Gemini vision). */

@@ -37,6 +37,9 @@ import {
   Users,
   Link,
   ChevronDown,
+  ChevronUp,
+  Zap,
+  Brain,
   X,
   Download,
   Upload,
@@ -463,6 +466,7 @@ export default function GameVibeSpotifyApp() {
   const isDialogueDuckedRef = useRef<boolean>(false);
 
   const [isMiniHudMode, setIsMiniHudMode] = useState<boolean>(false);
+  const [showNeuralLogs, setShowNeuralLogs] = useState<boolean>(false);
   const [showImportPlaylistModal, setShowImportPlaylistModal] = useState<boolean>(false);
   const [importPlaylistCode, setImportPlaylistCode] = useState<string>('');
   const [playlistShareFeedback, setPlaylistShareFeedback] = useState<string | null>(null);
@@ -951,6 +955,50 @@ export default function GameVibeSpotifyApp() {
   );
 
   /**
+   * Manual Scene Override with Continuous Local Neural Reinforcement Learning.
+   * Every time the player manually chooses a vibe or uses hotkeys, this trains the local neural network!
+   */
+  const handleManualSceneOverride = useCallback(
+    async (targetVibe: VibeStateId) => {
+      switchToSceneSmoothly(targetVibe);
+      try {
+        const res = await fetch('/api/telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            forceVibe: targetVibe,
+            holdMs: 15000,
+            detectedProcess: telemetry.detectedProcess,
+            activeWindowTitle: telemetry.activeWindowTitle,
+            motionDelta: telemetry.motionDelta,
+            crimsonIndex: telemetry.crimsonIndex,
+            luminance: telemetry.luminance,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.neuralEvolution) {
+            setTelemetry((prev) => ({
+              ...prev,
+              neuralEvolution: data.neuralEvolution,
+            }));
+          }
+        }
+      } catch {
+        // silent fail
+      }
+    },
+    [
+      switchToSceneSmoothly,
+      telemetry.detectedProcess,
+      telemetry.activeWindowTitle,
+      telemetry.motionDelta,
+      telemetry.crimsonIndex,
+      telemetry.luminance,
+    ]
+  );
+
+  /**
    * Vision Director: the Gemini scene model decides when the music no longer fits and
    * which exact tracks to play. Tracks are verified server-side against the catalogue.
    */
@@ -1304,12 +1352,12 @@ export default function GameVibeSpotifyApp() {
     }
     if (w.gamevibeDesktop?.onGlobalHotkeyVibe) {
       w.gamevibeDesktop.onGlobalHotkeyVibe((vibeId) => {
-        switchToSceneSmoothly(vibeId);
+        handleManualSceneOverride(vibeId);
       });
     }
 
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [switchToSceneSmoothly]);
+  }, [switchToSceneSmoothly, handleManualSceneOverride]);
 
   const handleSaveAccountProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2586,6 +2634,142 @@ export default function GameVibeSpotifyApp() {
                             🎬 Нейросеть распознала реплику в игре ({telemetry.dialogueLabel || 'Сюжет'}):
                           </span>
                           <span className="italic text-[#EDE9E8] break-words">"{telemetry.dialogueText}"</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Continuous Neural Evolution & Adaptive Learning Panel */}
+                    {telemetry.neuralEvolution && (
+                      <div className="p-3.5 rounded-lg bg-[#141115] border border-[#2B2329] text-xs text-[#EDE9E8] space-y-3 shadow-lg">
+                        {/* Header bar */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {telemetry.neuralEvolution.isGeminiActive ? (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#3A1E4A] text-[#E0A8FF] font-semibold text-[10px] uppercase tracking-wider border border-[#5E2B7A]">
+                                <Sparkles className="w-3.5 h-3.5 text-[#E0A8FF]" />
+                                <span>Gemini Vision API активен</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#10241B] text-[#4ADE80] font-semibold text-[10px] uppercase tracking-wider border border-[#184E32]">
+                                <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80] animate-ping" />
+                                <Cpu className="w-3.5 h-3.5 text-[#4ADE80]" />
+                                <span>Локальная нейросеть · Онлайн-обучение</span>
+                              </div>
+                            )}
+                            <span className="px-2 py-0.5 rounded bg-[#201822] text-[#D47A8D] font-mono text-[10px] font-bold border border-[#3A283C]">
+                              LVL {telemetry.neuralEvolution.level}
+                            </span>
+                            <span className="text-[10px] text-[#8C8482] font-mono">
+                              Эпоха #{telemetry.neuralEvolution.totalEpochs}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-[#8C8482]">Точность:</span>
+                            <span className="text-[11px] font-bold text-[#4ADE80] font-mono">
+                              {telemetry.neuralEvolution.accuracy}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* XP Progress Bar (Free local offline mode) */}
+                        {!telemetry.neuralEvolution.isGeminiActive && (
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between text-[10px] text-[#8C8482]">
+                              <span className="flex items-center gap-1 text-[#EDE9E8] font-medium">
+                                <Zap className="w-3 h-3 text-[#FBBF24]" />
+                                <span>Прогресс адаптации нейросети (XP)</span>
+                              </span>
+                              <span className="font-mono text-[#D47A8D]">
+                                {telemetry.neuralEvolution.xp} / {telemetry.neuralEvolution.xpToNextLevel} XP
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-[#201B22] rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-gradient-to-r from-[#D47A8D] via-[#FF6A00] to-[#4ADE80] transition-all duration-500 rounded-full"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.round(
+                                      (telemetry.neuralEvolution.xp / telemetry.neuralEvolution.xpToNextLevel) * 100
+                                    )
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 3-Card Metrics Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
+                              Профиль игры
+                            </div>
+                            <div className="text-xs font-semibold text-[#EDE9E8] truncate mt-0.5">
+                              {telemetry.neuralEvolution.activeGame || telemetry.detectedProcess}
+                            </div>
+                            <div className="text-[10px] text-[#4ADE80] mt-0.5">
+                              ✓ Адаптаций: {telemetry.neuralEvolution.gameAdaptationsCount}
+                            </div>
+                          </div>
+
+                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
+                              Порог боя (Combat)
+                            </div>
+                            <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
+                              {telemetry.neuralEvolution.learnedThresholds.combatMotionThreshold}% динамики
+                            </div>
+                            <div className="text-[10px] text-[#8C8482] mt-0.5">
+                              Автокалибровка темпа
+                            </div>
+                          </div>
+
+                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
+                              Порог скрытности
+                            </div>
+                            <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
+                              {telemetry.neuralEvolution.learnedThresholds.stealthLumaThreshold}% яркости
+                            </div>
+                            <div className="text-[10px] text-[#8C8482] mt-0.5">
+                              Подстройка под стелс
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expandable Learning Logs & Reinforcement feedback */}
+                        <div className="pt-1 border-t border-[#221C24] space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-[#8C8482]">
+                              {telemetry.neuralEvolution.isGeminiActive
+                                ? 'Облачный ИИ анализирует кадры каждые 4 сек.'
+                                : '💡 Нажимай сцены внизу — нейросеть обучается и запоминает твои вкусы (+30 XP)'}
+                            </span>
+                            <button
+                              onClick={() => setShowNeuralLogs((prev) => !prev)}
+                              className="text-[10px] font-medium text-[#D47A8D] hover:text-[#EDE9E8] inline-flex items-center gap-1 transition"
+                            >
+                              <span>{showNeuralLogs ? 'Скрыть лог' : 'Журнал обучения'}</span>
+                              {showNeuralLogs ? (
+                                <ChevronUp className="w-3 h-3" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+
+                          {showNeuralLogs && (
+                            <div className="p-2.5 rounded bg-[#0D0B0E] border border-[#251F27] font-mono text-[11px] text-[#A69EA4] space-y-1.5 max-h-36 overflow-y-auto">
+                              {telemetry.neuralEvolution.recentLearnings?.map((log, idx) => (
+                                <div key={idx} className="flex items-start gap-1.5 leading-snug">
+                                  <span className="text-[#4ADE80] shrink-0">›</span>
+                                  <span className="text-[#EDE9E8]">{log}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -4462,7 +4646,7 @@ export default function GameVibeSpotifyApp() {
                 return (
                   <button
                     key={bId}
-                    onClick={() => switchToSceneSmoothly(bId)}
+                    onClick={() => handleManualSceneOverride(bId)}
                     className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
                       isAct
                         ? 'bg-[#6E1D2F] text-white'

@@ -4,6 +4,11 @@ import path from 'path';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DirectorScene, TelemetrySnapshot, VibeStateId } from '@/types/vibe';
+import {
+  tickNeuralEvolution,
+  recordPlayerFeedback,
+  getNeuralBrainState,
+} from '@/lib/neural-evolution';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,12 +50,13 @@ const SCENE_LABELS: Record<string, string> = {
 
 function inferVibeFromMetrics(
   energy: number,
-  crimson: number
+  crimson: number,
+  combatThresh: number = 42
 ): { vibe: VibeStateId; intensity: number } {
   if (energy >= 74 || crimson >= 50) {
     return { vibe: 'BOSSFIGHT', intensity: Math.min(100, Math.max(energy, 82)) };
   }
-  if (energy >= 42) {
+  if (energy >= combatThresh) {
     return { vibe: 'COMBAT', intensity: Math.min(100, Math.max(energy, 56)) };
   }
   if (energy >= 28) {
@@ -192,6 +198,15 @@ export async function GET() {
         resolvedLabel = director.summary;
       }
 
+      const neuralEvolution = tickNeuralEvolution({
+        detectedProcess: proc,
+        windowTitle: title,
+        motionDelta: motion,
+        crimsonIndex: crimson,
+        luminance: luma,
+        currentVibe: finalVibe,
+      });
+
       lastSnapshot = {
         timestamp: now,
         activeWindowTitle: title,
@@ -225,10 +240,17 @@ export async function GET() {
         dialogueEmotion: isNeuralDialogueActive ? dialogueEmotion : undefined,
         dialogueLabel: isNeuralDialogueActive ? dialogueLabel : undefined,
         director,
+        neuralEvolution,
       };
+    } else {
+      lastSnapshot.neuralEvolution = getNeuralBrainState();
     }
   } catch {
     // Keep lastSnapshot if mid-write
+  }
+
+  if (!lastSnapshot.neuralEvolution) {
+    lastSnapshot.neuralEvolution = getNeuralBrainState();
   }
 
   return NextResponse.json(lastSnapshot);
@@ -247,8 +269,28 @@ export async function POST(request: NextRequest) {
       holdMs = 10000,
     } = body;
 
-    const { vibe, intensity } = inferVibeFromMetrics(motionDelta, crimsonIndex);
+    const brainState = getNeuralBrainState();
+    const { vibe, intensity } = inferVibeFromMetrics(
+      motionDelta,
+      crimsonIndex,
+      brainState.learnedThresholds.combatMotionThreshold
+    );
     manualOverrideUntil = Date.now() + Number(holdMs || 10000);
+
+    const userChosen = (forceVibe || vibe) as VibeStateId;
+    let neuralEvolution = brainState;
+
+    if (forceVibe && forceVibe !== lastSnapshot.inferredVibe) {
+      neuralEvolution = recordPlayerFeedback({
+        detectedProcess,
+        windowTitle: activeWindowTitle,
+        aiPredictedVibe: lastSnapshot.inferredVibe,
+        userChosenVibe: userChosen,
+        motionDelta,
+        crimsonIndex,
+        luminance,
+      });
+    }
 
     lastSnapshot = {
       ...lastSnapshot,
@@ -259,7 +301,8 @@ export async function POST(request: NextRequest) {
       crimsonIndex,
       luminance,
       compositeIntensity: intensity,
-      inferredVibe: forceVibe || vibe,
+      inferredVibe: userChosen,
+      neuralEvolution,
     };
 
     return NextResponse.json(lastSnapshot);

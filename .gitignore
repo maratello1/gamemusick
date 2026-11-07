@@ -25,6 +25,7 @@ data/live-dialogue.json
 data/scene-director.json
 data/session-flight-log.jsonl
 data/session-summary.json
+data/neural-evolution.json*
 data/app-state.json
 data/yt-cache.json
 

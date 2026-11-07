@@ -306,6 +306,40 @@ fn resolve_data_dir() -> PathBuf {
     PathBuf::from("data")
 }
 
+fn load_learned_thresholds(file_path: &std::path::Path) -> (i32, i32, i32) {
+    let mut combat = 42;
+    let mut stealth = 42;
+    let mut boss = 85;
+
+    if let Ok(content) = fs::read_to_string(file_path) {
+        if let Some(pos) = content.find("\"combatMotionThreshold\":") {
+            let rest = &content[pos + 24..];
+            if let Some(num_str) = rest.split(|c: char| !c.is_ascii_digit()).next() {
+                if let Ok(val) = num_str.trim().parse::<i32>() {
+                    combat = val.clamp(20, 80);
+                }
+            }
+        }
+        if let Some(pos) = content.find("\"stealthLumaThreshold\":") {
+            let rest = &content[pos + 23..];
+            if let Some(num_str) = rest.split(|c: char| !c.is_ascii_digit()).next() {
+                if let Ok(val) = num_str.trim().parse::<i32>() {
+                    stealth = val.clamp(10, 70);
+                }
+            }
+        }
+        if let Some(pos) = content.find("\"bossSensitivity\":") {
+            let rest = &content[pos + 18..];
+            if let Some(num_str) = rest.split(|c: char| !c.is_ascii_digit()).next() {
+                if let Ok(val) = num_str.trim().parse::<i32>() {
+                    boss = val.clamp(50, 100);
+                }
+            }
+        }
+    }
+    (combat, stealth, boss)
+}
+
 fn main() {
     let out_dir = resolve_data_dir();
     let _ = fs::create_dir_all(&out_dir);
@@ -313,6 +347,12 @@ fn main() {
     let tmp_file = out_dir.join("live-sensor.tmp.json");
     let dir_file = out_dir.join("scene-director.json");
     let dir_tmp = out_dir.join("scene-director.tmp.json");
+    let brain_file = out_dir.join("neural-evolution.json");
+
+    let mut learned_combat = 42;
+    let mut learned_stealth = 42;
+    let mut learned_boss = 85;
+    let mut last_brain_sync_ms: u128 = 0;
 
     let mut prev_lumas = [40i32; 16];
     let mut rolling_energy: f32 = 14.0;
@@ -469,6 +509,15 @@ fn main() {
 
             let cur_ms = now_ms();
 
+            // Dynamic Neural Evolution Brain Sync (Every ~3.5 seconds)
+            if cur_ms.saturating_sub(last_brain_sync_ms) > 3500 {
+                last_brain_sync_ms = cur_ms;
+                let (c, s, b) = load_learned_thresholds(&brain_file);
+                learned_combat = c;
+                learned_stealth = s;
+                learned_boss = b;
+            }
+
             // Letterbox cutscene & room transition streaks
             if vis.is_letterbox {
                 letterbox_streak += 1;
@@ -508,7 +557,7 @@ fn main() {
                 + (vis.red_score / 3).min(20);
             let instant_clamped = instant_energy.clamp(8, 100) as f32;
 
-            if instant_clamped >= 44.0 {
+            if instant_clamped >= (learned_combat as f32 + 2.0) {
                 if combat_streak_start_ms == 0 {
                     combat_streak_start_ms = cur_ms;
                 }
@@ -526,7 +575,7 @@ fn main() {
             }
 
             let final_motion = (rolling_energy.round() as i32).clamp(8, 100);
-            let is_fighting = final_motion >= 42;
+            let is_fighting = final_motion >= learned_combat;
             let combat_duration_ms = if combat_streak_start_ms > 0 {
                 cur_ms.saturating_sub(combat_streak_start_ms)
             } else {
@@ -534,13 +583,13 @@ fn main() {
             };
 
             if (is_fighting && boss_bar_streak >= 2)
-                || (combat_duration_ms > 32000 && final_motion >= 68)
-                || final_motion >= 84
+                || (combat_duration_ms > 32000 && final_motion >= (learned_boss - 17))
+                || final_motion >= learned_boss
             {
                 last_boss_ms = cur_ms;
             }
 
-            if crouch_held && !is_fighting && avg_luma < 42 {
+            if crouch_held && !is_fighting && avg_luma < learned_stealth {
                 last_stealth_ms = cur_ms;
             }
 
@@ -565,7 +614,7 @@ fn main() {
             };
 
             let json = format!(
-                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":true,\"sensorMode\":\"rust-win32-50hz\"}}",
+                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":true,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{}}}",
                 cur_ms,
                 last_game_proc,
                 last_game_title,
@@ -576,7 +625,9 @@ fn main() {
                 vibe,
                 scene_label,
                 if in_cutscene_hold { "true" } else { "false" },
-                if is_recent_room_change { "true" } else { "false" }
+                if is_recent_room_change { "true" } else { "false" },
+                learned_combat,
+                learned_stealth
             );
 
             if fs::write(&tmp_file, &json).is_ok() {
