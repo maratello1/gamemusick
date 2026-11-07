@@ -10,6 +10,31 @@ use std::time::Duration;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 const GAMEVIBE_PORT: u16 = 3001;
+const SW_RESTORE: i32 = 9;
+
+#[link(name = "user32")]
+extern "system" {
+    fn FindWindowW(lpClassName: *const u16, lpWindowName: *const u16) -> isize;
+    fn ShowWindow(hWnd: isize, nCmdShow: i32) -> i32;
+    fn SetForegroundWindow(hWnd: isize) -> i32;
+}
+
+fn to_wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+fn focus_existing_window() -> bool {
+    unsafe {
+        let title = to_wide("GameVibe v2.0 — Autonomous AI Soundtrack Director");
+        let hwnd = FindWindowW(std::ptr::null(), title.as_ptr());
+        if hwnd != 0 {
+            ShowWindow(hwnd, SW_RESTORE);
+            SetForegroundWindow(hwnd);
+            return true;
+        }
+    }
+    false
+}
 
 fn is_gamevibe_running(port: u16) -> bool {
     let addr: SocketAddr = match format!("127.0.0.1:{}", port).parse() {
@@ -48,6 +73,11 @@ fn open_fallback_window(url: &str) {
 }
 
 fn main() {
+    // If the native GameVibe Desktop window is already open, bring it to front immediately
+    if focus_existing_window() {
+        return;
+    }
+
     let exe_path = env::current_exe().unwrap_or_default();
     let project_dir = exe_path
         .parent()
@@ -57,20 +87,20 @@ fn main() {
     let fallback_dir = std::path::Path::new(r"D:\Desktop\gamevibe");
     let working_dir = if pkg_json.exists() { project_dir } else { fallback_dir };
 
-    // 1. Start Local AI Scene, Boss & Subtitle Director (local_director.py)
-    let director_py = working_dir.join("desktop").join("local_director.py");
-    if director_py.exists() {
-        let _ = Command::new("python")
-            .arg(&director_py)
+    // 1. Ensure 50Hz pure-Rust AI Scene, Boss & Cutscene Sensor is running
+    let sensor_exe = working_dir.join("desktop").join("interactive_sensor.exe");
+    if sensor_exe.exists() {
+        let _ = Command::new(&sensor_exe)
             .current_dir(working_dir)
             .creation_flags(CREATE_NO_WINDOW)
             .spawn();
     }
 
-    // 2. Ensure 50Hz high-precision interactive sensor is active in the user session
-    let sensor_exe = working_dir.join("desktop").join("interactive_sensor.exe");
-    if sensor_exe.exists() {
-        let _ = Command::new(&sensor_exe)
+    // 2. Start optional WinRT Subtitle OCR Enhancer if Python is present
+    let director_py = working_dir.join("desktop").join("local_director.py");
+    if director_py.exists() {
+        let _ = Command::new("python")
+            .arg(&director_py)
             .current_dir(working_dir)
             .creation_flags(CREATE_NO_WINDOW)
             .spawn();
@@ -102,7 +132,7 @@ fn main() {
         }
     }
 
-    // 4. Launch Native Frameless Electron Desktop Client (with System Tray, Global Hotkeys & Mini-HUD)
+    // 4. Launch Native Frameless Desktop Client (with System Tray, Global Hotkeys & Mini-HUD)
     let electron_exe = working_dir
         .join("node_modules")
         .join("electron")
