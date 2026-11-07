@@ -1,13 +1,43 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" width="720" height="200">
-  <g transform="translate(20 20) scale(0.3125)">
-    <rect width="512" height="512" rx="112" fill="#0C0B0D"/>
-    <path d="M168 168 H344 C396 168 424 202 432 258 L446 340 C450 372 410 388 388 360 L352 314 H160 L124 360 C102 388 62 372 66 340 L80 258 C88 202 116 168 168 168 Z" fill="none" stroke="#EDE9E8" stroke-width="22" stroke-linejoin="round"/>
-    <g stroke-linecap="round" stroke-width="22">
-      <line x1="206" y1="226" x2="206" y2="256" stroke="#EDE9E8"/>
-      <line x1="256" y1="204" x2="256" y2="278" stroke="#E5384F"/>
-      <line x1="306" y1="218" x2="306" y2="264" stroke="#EDE9E8"/>
-    </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140" width="640" height="140">
+  <defs>
+    <linearGradient id="waveGradH" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4D6D" />
+      <stop offset="55%" stop-color="#E5384F" />
+      <stop offset="100%" stop-color="#8C2038" />
+    </linearGradient>
+    <linearGradient id="emeraldGradH" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Left Icon Tile (110x110) -->
+  <g transform="translate(15, 15)">
+    <rect x="0" y="0" width="110" height="110" rx="26" fill="#120D10" stroke="#2D1720" stroke-width="2.5" />
+    <!-- Equalizer Wings -->
+    <line x1="20" y1="48" x2="20" y2="62" stroke="#6E1D2F" stroke-width="5" stroke-linecap="round" />
+    <line x1="29" y1="39" x2="29" y2="71" stroke="#C9184A" stroke-width="5" stroke-linecap="round" />
+    <line x1="81" y1="39" x2="81" y2="71" stroke="#C9184A" stroke-width="5" stroke-linecap="round" />
+    <line x1="90" y1="48" x2="90" y2="62" stroke="#6E1D2F" stroke-width="5" stroke-linecap="round" />
+    <!-- Central V Crest -->
+    <path d="M39 38 L55 75 L71 38" fill="none" stroke="url(#waveGradH)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- Emerald AI Core -->
+    <circle cx="55" cy="28" r="5.5" fill="url(#emeraldGradH)" />
+    <circle cx="55" cy="28" r="2" fill="#EDE9E8" />
   </g>
-  <text x="208" y="118" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="68" font-weight="600" letter-spacing="-1.5" fill="#EDE9E8">GameVibe</text>
+
+  <!-- Brand Typography -->
+  <g transform="translate(145, 30)">
+    <text x="0" y="46" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="44" letter-spacing="1.5" fill="#EDE9E8">
+      GAME<tspan fill="url(#waveGradH)">VIBE</tspan>
+    </text>
+    <text x="2" y="74" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="600" font-size="13" letter-spacing="3" fill="#8C8482">
+      AI SOUND DIRECTOR &amp; ADAPTIVE OST
+    </text>
+    <rect x="365" y="24" width="76" height="22" rx="11" fill="#10B981" fill-opacity="0.15" stroke="#10B981" stroke-opacity="0.3" stroke-width="1" />
+    <circle cx="376" cy="35" r="3" fill="#10B981" />
+    <text x="384" y="39" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="10" fill="#6EE7B7" letter-spacing="0.5">
+      FREE v2.0
+    </text>
+  </g>
 </svg>
