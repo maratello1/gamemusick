@@ -143,6 +143,50 @@ export const GENRE_ARCHETYPES: Record<string, GenreArchetype> = {
     crimsonAvg: 6,
     reactionSpeedMs: 300,
   },
+  ONLINE_COMPETITIVE_FPS: {
+    id: 'ONLINE_COMPETITIVE_FPS',
+    name: 'Online Competitive Tactical FPS',
+    keywords: ['cs2', 'csgo', 'counter-strike', 'valorant', 'rainbowsix', 'r6', 'siege', 'pointblank', 'crossfire'],
+    combatMotionThreshold: 54,
+    bossSensitivity: 92,
+    stealthLumaThreshold: 22,
+    motionAvg: 40,
+    crimsonAvg: 8,
+    reactionSpeedMs: 140,
+  },
+  ONLINE_MOBA: {
+    id: 'ONLINE_MOBA',
+    name: 'Online MOBA & Action RTS',
+    keywords: ['dota', 'dota2', 'league of legends', 'leagueclient', 'deadlock', 'heroes of the storm', 'smite', 'honor of kings'],
+    combatMotionThreshold: 52,
+    bossSensitivity: 86,
+    stealthLumaThreshold: 28,
+    motionAvg: 44,
+    crimsonAvg: 14,
+    reactionSpeedMs: 180,
+  },
+  ONLINE_BATTLE_ROYALE: {
+    id: 'ONLINE_BATTLE_ROYALE',
+    name: 'Online Battle Royale & Squad Extraction',
+    keywords: ['pubg', 'tslgame', 'apex', 'r5apex', 'warzone', 'fortnite', 'bloodhunt'],
+    combatMotionThreshold: 52,
+    bossSensitivity: 90,
+    stealthLumaThreshold: 26,
+    motionAvg: 46,
+    crimsonAvg: 10,
+    reactionSpeedMs: 160,
+  },
+  ONLINE_HERO_SHOOTER: {
+    id: 'ONLINE_HERO_SHOOTER',
+    name: 'Online Hero Shooter & Arena',
+    keywords: ['overwatch', 'marvelrivals', 'marvel rivals', 'paladins', 'team fortress', 'tf2'],
+    combatMotionThreshold: 52,
+    bossSensitivity: 90,
+    stealthLumaThreshold: 26,
+    motionAvg: 48,
+    crimsonAvg: 12,
+    reactionSpeedMs: 150,
+  },
 };
 
 /**
@@ -161,17 +205,33 @@ export const PRESET_GAME_CATALOG: Record<string, Partial<GameNeuralProfile>> = {
   remnant2: { gameTitle: 'Remnant II', genre: 'SOULSLIKE', combatMotionThreshold: 45, bossSensitivity: 78, stealthLumaThreshold: 32, motionAvg: 30, crimsonAvg: 15 },
   nioh2: { gameTitle: 'Nioh 2', genre: 'SOULSLIKE', combatMotionThreshold: 45, bossSensitivity: 76, stealthLumaThreshold: 32, motionAvg: 32, crimsonAvg: 18 },
 
-  // Fast-Paced Action & FPS
+  // Fast-Paced Action & Boomer Shooters
   doometernal: { gameTitle: 'DOOM Eternal', genre: 'FAST_FPS', combatMotionThreshold: 52, bossSensitivity: 88, stealthLumaThreshold: 25, motionAvg: 48, crimsonAvg: 14 },
   doom: { gameTitle: 'DOOM (2016)', genre: 'FAST_FPS', combatMotionThreshold: 50, bossSensitivity: 86, stealthLumaThreshold: 26, motionAvg: 44, crimsonAvg: 12 },
   ultrakill: { gameTitle: 'ULTRAKILL', genre: 'FAST_FPS', combatMotionThreshold: 58, bossSensitivity: 90, stealthLumaThreshold: 20, motionAvg: 54, crimsonAvg: 20 },
   cyberpunk2077: { gameTitle: 'Cyberpunk 2077', genre: 'FAST_FPS', combatMotionThreshold: 48, bossSensitivity: 84, stealthLumaThreshold: 36, motionAvg: 38, crimsonAvg: 10 },
-  r5apex: { gameTitle: 'Apex Legends', genre: 'FAST_FPS', combatMotionThreshold: 52, bossSensitivity: 88, stealthLumaThreshold: 28, motionAvg: 46, crimsonAvg: 10 },
   titanfall2: { gameTitle: 'Titanfall 2', genre: 'FAST_FPS', combatMotionThreshold: 50, bossSensitivity: 86, stealthLumaThreshold: 26, motionAvg: 44, crimsonAvg: 10 },
   trepang2: { gameTitle: 'Trepang2', genre: 'FAST_FPS', combatMotionThreshold: 54, bossSensitivity: 86, stealthLumaThreshold: 28, motionAvg: 46, crimsonAvg: 14 },
   atomicheart: { gameTitle: 'Atomic Heart', genre: 'FAST_FPS', combatMotionThreshold: 46, bossSensitivity: 84, stealthLumaThreshold: 30, motionAvg: 36, crimsonAvg: 12 },
-  overwatch: { gameTitle: 'Overwatch 2', genre: 'FAST_FPS', combatMotionThreshold: 52, bossSensitivity: 88, stealthLumaThreshold: 26, motionAvg: 45, crimsonAvg: 12 },
-  cs2: { gameTitle: 'Counter-Strike 2', genre: 'FAST_FPS', combatMotionThreshold: 48, bossSensitivity: 90, stealthLumaThreshold: 25, motionAvg: 38, crimsonAvg: 8 },
+
+  // Online Competitive FPS & Tactical Shooters
+  cs2: { gameTitle: 'Counter-Strike 2', genre: 'ONLINE_COMPETITIVE_FPS', combatMotionThreshold: 54, bossSensitivity: 92, stealthLumaThreshold: 22, motionAvg: 40, crimsonAvg: 8 },
+  csgo: { gameTitle: 'Counter-Strike: Global Offensive', genre: 'ONLINE_COMPETITIVE_FPS', combatMotionThreshold: 54, bossSensitivity: 92, stealthLumaThreshold: 22, motionAvg: 40, crimsonAvg: 8 },
+  valorant: { gameTitle: 'VALORANT', genre: 'ONLINE_COMPETITIVE_FPS', combatMotionThreshold: 52, bossSensitivity: 92, stealthLumaThreshold: 20, motionAvg: 38, crimsonAvg: 8 },
+  rainbowsix: { gameTitle: "Tom Clancy's Rainbow Six Siege", genre: 'ONLINE_COMPETITIVE_FPS', combatMotionThreshold: 50, bossSensitivity: 90, stealthLumaThreshold: 32, motionAvg: 34, crimsonAvg: 8 },
+
+  // Online MOBA & Action Strategy
+  dota2: { gameTitle: 'Dota 2', genre: 'ONLINE_MOBA', combatMotionThreshold: 52, bossSensitivity: 86, stealthLumaThreshold: 28, motionAvg: 44, crimsonAvg: 14 },
+  'league of legends': { gameTitle: 'League of Legends', genre: 'ONLINE_MOBA', combatMotionThreshold: 52, bossSensitivity: 86, stealthLumaThreshold: 28, motionAvg: 44, crimsonAvg: 14 },
+  leagueclientux: { gameTitle: 'League of Legends Client', genre: 'ONLINE_MOBA', combatMotionThreshold: 52, bossSensitivity: 86, stealthLumaThreshold: 28, motionAvg: 20, crimsonAvg: 5 },
+  deadlock: { gameTitle: 'Deadlock', genre: 'ONLINE_MOBA', combatMotionThreshold: 54, bossSensitivity: 88, stealthLumaThreshold: 28, motionAvg: 46, crimsonAvg: 12 },
+
+  // Online Battle Royale & Hero Shooters
+  r5apex: { gameTitle: 'Apex Legends', genre: 'ONLINE_BATTLE_ROYALE', combatMotionThreshold: 54, bossSensitivity: 90, stealthLumaThreshold: 26, motionAvg: 48, crimsonAvg: 10 },
+  tslgame: { gameTitle: 'PUBG: BATTLEGROUNDS', genre: 'ONLINE_BATTLE_ROYALE', combatMotionThreshold: 50, bossSensitivity: 88, stealthLumaThreshold: 30, motionAvg: 38, crimsonAvg: 8 },
+  'fortniteclient-win64-shipping': { gameTitle: 'Fortnite', genre: 'ONLINE_BATTLE_ROYALE', combatMotionThreshold: 52, bossSensitivity: 88, stealthLumaThreshold: 26, motionAvg: 48, crimsonAvg: 10 },
+  overwatch: { gameTitle: 'Overwatch 2', genre: 'ONLINE_HERO_SHOOTER', combatMotionThreshold: 52, bossSensitivity: 90, stealthLumaThreshold: 26, motionAvg: 46, crimsonAvg: 12 },
+  marvelrivals: { gameTitle: 'Marvel Rivals', genre: 'ONLINE_HERO_SHOOTER', combatMotionThreshold: 54, bossSensitivity: 90, stealthLumaThreshold: 26, motionAvg: 48, crimsonAvg: 12 },
 
   // Survival Horror
   re4: { gameTitle: 'Resident Evil 4 Remake', genre: 'SURVIVAL_HORROR', combatMotionThreshold: 34, bossSensitivity: 74, stealthLumaThreshold: 48, motionAvg: 16, crimsonAvg: 18 },
@@ -233,6 +293,38 @@ export function detectGameArchetype(proc: string, title: string): GenreArchetype
     }
   }
   return GENRE_ARCHETYPES.OPEN_WORLD_RPG;
+}
+
+export function isOnlineCompetitiveGame(procOrTitle: string): boolean {
+  if (!procOrTitle) return false;
+  const s = procOrTitle.toLowerCase();
+  const onlineKeywords = [
+    'cs2',
+    'csgo',
+    'counter-strike',
+    'counterstrike',
+    'valorant',
+    'dota',
+    'dota2',
+    'league of legends',
+    'leagueclient',
+    'deadlock',
+    'r5apex',
+    'apex',
+    'overwatch',
+    'pubg',
+    'tslgame',
+    'fortnite',
+    'rainbowsix',
+    'r6',
+    'marvelrivals',
+    'marvel rivals',
+    'crossfire',
+    'pointblank',
+    'warzone',
+    'cod',
+  ];
+  return onlineKeywords.some((kw) => s.includes(kw));
 }
 
 const DEFAULT_STATE: NeuralEvolutionState = {

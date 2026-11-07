@@ -67,6 +67,8 @@ export interface TelemetrySnapshot {
   isCutscene?: boolean;
   isNewLocation?: boolean;
   gameAudioDucked?: boolean;
+  isOnlineGame?: boolean;
+  isRespawnSpectating?: boolean;
   sceneKey?: string;
   sceneEmotion?: string;
   sceneLabel?: string;

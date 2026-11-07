@@ -9,6 +9,7 @@ import {
   recordPlayerFeedback,
   getNeuralBrainState,
   executeBatchPretraining,
+  isOnlineCompetitiveGame,
 } from '@/lib/neural-evolution';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +51,8 @@ const SCENE_LABELS: Record<string, string> = {
   MAJESTIC: 'Вход в новую локацию',
   STEALTH: 'Скрытное проникновение',
   EXPLORE: 'Атмосферное исследование',
+  RESPAWN: '💀 Ожидание возрождения (Spectator Downtime)',
+  CLUTCH: '⚡ Киберспорт: Решающий клатч / Дуэль',
   DRAMA_CUTSCENE: 'Трагическая катсцена / Драма',
   MAJESTIC_CUTSCENE: 'Воодушевляющая катсцена / Панорама',
   NEW_LOCATION_MAJESTIC: 'Новая локация / Величественная панорама',
@@ -240,6 +243,9 @@ export async function GET() {
         currentVibe: finalVibe,
       });
 
+      const isOnline = !isStandby && (Boolean(parsed.isOnlineGame) || isOnlineCompetitiveGame(proc));
+      const isRespawnSpectating = !isStandby && Boolean(parsed.isRespawnSpectating);
+
       lastSnapshot = {
         timestamp: now,
         activeWindowTitle: title,
@@ -256,6 +262,8 @@ export async function GET() {
         luminance: luma,
         compositeIntensity: intensity,
         inferredVibe: finalVibe,
+        isOnlineGame: isOnline,
+        isRespawnSpectating: isRespawnSpectating,
         isCutscene:
           !isStandby &&
           (Boolean(parsed.isCutscene) ||

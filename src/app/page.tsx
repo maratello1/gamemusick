@@ -466,6 +466,9 @@ export default function GameVibeSpotifyApp() {
   const [isDialogueDucked, setIsDialogueDucked] = useState<boolean>(false);
   const isDialogueDuckedRef = useRef<boolean>(false);
 
+  const [competitiveFootstepsDucking, setCompetitiveFootstepsDucking] = useState<boolean>(true);
+  const competitiveFootstepsDuckingRef = useRef<boolean>(true);
+
   const [isMiniHudMode, setIsMiniHudMode] = useState<boolean>(false);
   const [showNeuralLogs, setShowNeuralLogs] = useState<boolean>(false);
   const [isPretraining, setIsPretraining] = useState<boolean>(false);
@@ -485,6 +488,10 @@ export default function GameVibeSpotifyApp() {
   useEffect(() => {
     autoDialogueDuckingRef.current = autoDialogueDucking;
   }, [autoDialogueDucking]);
+
+  useEffect(() => {
+    competitiveFootstepsDuckingRef.current = competitiveFootstepsDucking;
+  }, [competitiveFootstepsDucking]);
 
   // Keep refs synchronized
   useEffect(() => {
@@ -715,10 +722,20 @@ export default function GameVibeSpotifyApp() {
         }
       }
 
+      const isOnlineCombat =
+        Boolean(telemetry?.isOnlineGame) &&
+        (activeVibeRef.current === 'COMBAT' ||
+          activeVibeRef.current === 'BOSSFIGHT' ||
+          (telemetry?.motionDelta ?? 0) >= 44);
+      const isClutchDucked =
+        competitiveFootstepsDuckingRef.current && isOnlineCombat;
+
       const targetVol = isMuted
         ? 0
         : isDialogueDuckedRef.current && autoDialogueDuckingRef.current
         ? Math.max(8, Math.round(volume * 0.42))
+        : isClutchDucked
+        ? Math.max(6, Math.round(volume * 0.28))
         : volume;
 
       // Smooth fade-out if already playing and crossfade is enabled
@@ -1211,6 +1228,18 @@ export default function GameVibeSpotifyApp() {
             return;
           }
 
+          const isOnline = Boolean(data.isOnlineGame);
+          const isRespawnSpectating = Boolean(data.isRespawnSpectating);
+
+          // If in an online game and waiting for respawn / spectating:
+          if (isOnline && isRespawnSpectating) {
+            lastCombatSpikeRef.current = 0;
+            if (currentVibe !== 'DRAMA' && (trackPlayDurationSec >= 15 || currentVibe === 'COMBAT')) {
+              switchToSceneSmoothly('DRAMA');
+            }
+            return;
+          }
+
           const isActivelyFighting =
             targetVibe === 'COMBAT' ||
             targetVibe === 'BOSSFIGHT' ||
@@ -1386,18 +1415,40 @@ export default function GameVibeSpotifyApp() {
     return () => clearInterval(timer);
   }, []);
 
-  // Synchronize master volume, mute & smart dialogue ducking across YouTube player and audio fallback
+  // Synchronize master volume, mute, smart dialogue ducking & competitive footsteps ducking across YouTube player and audio fallback
   useEffect(() => {
     const baseVol = isMuted ? 0 : volume;
+    const isOnline = Boolean(telemetry?.isOnlineGame);
+    const isEsportsCombat =
+      isOnline &&
+      (activeVibe === 'COMBAT' ||
+        activeVibe === 'BOSSFIGHT' ||
+        (telemetry?.motionDelta ?? 0) >= 44);
+    const isClutchDucked = competitiveFootstepsDucking && isEsportsCombat;
+
     const effectiveVol =
-      isDialogueDucked && autoDialogueDucking ? Math.max(8, Math.round(baseVol * 0.42)) : baseVol;
+      isDialogueDucked && autoDialogueDucking
+        ? Math.max(8, Math.round(baseVol * 0.42))
+        : isClutchDucked
+        ? Math.max(6, Math.round(baseVol * 0.28))
+        : baseVol;
+
     if (ytPlayerRef.current?.setVolume) {
       ytPlayerRef.current.setVolume(effectiveVol);
     }
     if (audioRef.current) {
       audioRef.current.volume = effectiveVol / 100;
     }
-  }, [volume, isMuted, isDialogueDucked, autoDialogueDucking]);
+  }, [
+    volume,
+    isMuted,
+    isDialogueDucked,
+    autoDialogueDucking,
+    competitiveFootstepsDucking,
+    activeVibe,
+    telemetry?.isOnlineGame,
+    telemetry?.motionDelta,
+  ]);
 
   // Global Hotkey & Desktop Mini-HUD listener (Alt+M toggles Ultra-Mini In-Game HUD)
   useEffect(() => {
@@ -2131,6 +2182,12 @@ export default function GameVibeSpotifyApp() {
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
             <span className="truncate">Сенсор: {telemetry.detectedProcess}</span>
           </span>
+          {telemetry.isOnlineGame && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FF6A00]/15 border border-[#FF6A00]/40 text-[10px] font-semibold text-[#FF6A00] tracking-wide shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] animate-pulse shrink-0" />
+              <span>КИБЕРСПОРТ / ОНЛАЙН</span>
+            </span>
+          )}
           <span className="hidden md:inline text-[10px] font-mono text-[#6E666A] whitespace-nowrap">
             Хоткеи: Alt+1..5 (Сцены) · Alt+M (Мини-HUD) · Alt+P (Поверх игры)
           </span>
@@ -2498,6 +2555,45 @@ export default function GameVibeSpotifyApp() {
                   <span className={`font-mono text-[11px] ${telemetry.gameAudioDucked ? 'text-[#82C341]' : 'text-[#8C8482]'}`}>
                     {telemetry.gameAudioDucked ? 'Приглушен (18%)' : 'Обычный (100%)'}
                   </span>
+                </div>
+
+                {/* Online / Esports Mode & Footsteps Ducking */}
+                {telemetry.isOnlineGame && (
+                  <div className="p-2 rounded bg-[#FF6A00]/10 border border-[#FF6A00]/30 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[#FF6A00] flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] animate-pulse" />
+                        Онлайн-режим (Киберспорт)
+                      </span>
+                      <span className="text-[10px] font-mono text-[#FF6A00]/90">
+                        {telemetry.isRespawnSpectating ? '💀 РЕСПАВН' : '🎯 APM DAMPED'}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-[#A8A0A4] leading-tight">
+                      {telemetry.isRespawnSpectating
+                        ? 'Ожидание возрождения: активен чилловый саундтрек'
+                        : 'Нормализация кликов мыши (APM) и приглушение музыки во время стрельбы'}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between text-[11px] pt-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[#EDE9E8]">🎧 Фокус на шагах</span>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-[#1C181C] text-[#8C8482] border border-[#2A2629]">Ducking</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCompetitiveFootstepsDucking((v) => !v)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition ${
+                      competitiveFootstepsDucking
+                        ? 'bg-[#FF6A00] text-black font-bold'
+                        : 'bg-[#1E1B1D] text-[#8C8482]'
+                    }`}
+                    title="Приглушает музыку до 28% во время стрельбы и перестрелок в онлайн-играх"
+                  >
+                    {competitiveFootstepsDucking ? 'ВКЛ (28%)' : 'ВЫКЛ'}
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
@@ -2960,6 +3056,27 @@ export default function GameVibeSpotifyApp() {
                         <span>
                           Приглушение в диалогах: {autoDialogueDucking ? 'ВКЛ' : 'ВЫКЛ'}
                           {isDialogueDucked && autoDialogueDucking ? ' · АКТИВНО' : ''}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCompetitiveFootstepsDucking((v) => !v)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition ${
+                          competitiveFootstepsDucking
+                            ? 'bg-[#2E180D] border-[#FF6A00]/50 text-[#FF9E4A]'
+                            : 'bg-[#161418] border-[#262226] text-[#8C8482]'
+                        }`}
+                        title="Автоматически приглушать музыку до 28% во время стрельбы и перестрелок в онлайн-играх (CS2, Valorant, Apex, Dota 2), чтобы слышать шаги противника и инфу"
+                      >
+                        <Volume2 className="w-3 h-3 text-[#FF6A00]" />
+                        <span>
+                          Фокус на шагах (Киберспорт): {competitiveFootstepsDucking ? 'ВКЛ' : 'ВЫКЛ'}
+                          {competitiveFootstepsDucking &&
+                          telemetry.isOnlineGame &&
+                          (activeVibe === 'COMBAT' || activeVibe === 'BOSSFIGHT' || telemetry.motionDelta >= 44)
+                            ? ' · 28% DUCKED'
+                            : ''}
                         </span>
                       </button>
                     </div>
@@ -4336,6 +4453,19 @@ export default function GameVibeSpotifyApp() {
             </div>
           )}
 
+          {competitiveFootstepsDucking &&
+            telemetry.isOnlineGame &&
+            (activeVibe === 'COMBAT' ||
+              activeVibe === 'BOSSFIGHT' ||
+              telemetry.motionDelta >= 44) && (
+              <div
+                className="px-2 py-1 rounded bg-[#2E180D] border border-[#FF6A00]/50 text-[11px] text-[#FF9E4A] font-medium flex items-center gap-1 shrink-0"
+                title="Фокус на шагах: музыка приглушена до 28% во время перестрелки / клатча"
+              >
+                <span>🎧 Шаги (28%)</span>
+              </div>
+            )}
+
           <div className="px-2.5 py-1 rounded bg-[#141215] border border-[#242023] text-[11px] text-[#9E9694]">
             Динамика: <span className="font-mono text-[#EDE9E8]">{telemetry.motionDelta}%</span>
           </div>
@@ -4676,6 +4806,15 @@ export default function GameVibeSpotifyApp() {
                     🔉 Диалог
                   </span>
                 )}
+                {competitiveFootstepsDucking &&
+                  telemetry.isOnlineGame &&
+                  (activeVibe === 'COMBAT' ||
+                    activeVibe === 'BOSSFIGHT' ||
+                    telemetry.motionDelta >= 44) && (
+                    <span className="px-1.5 py-0.5 rounded bg-[#2E180D] border border-[#FF6A00]/50 text-[10px] text-[#FF9E4A] font-semibold shrink-0">
+                      🎧 Шаги 28%
+                    </span>
+                  )}
               </div>
 
               <button

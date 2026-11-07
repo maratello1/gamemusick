@@ -72,6 +72,8 @@ extern "system" {
     fn GetProcAddress(hModule: isize, lpProcName: *const u8) -> isize;
     fn CreateMutexA(lpMutexAttributes: isize, bInitialOwner: i32, lpName: *const u8) -> isize;
     fn GetLastError() -> u32;
+    fn SetLastError(dwErrCode: u32);
+    fn AttachConsole(dwProcessId: u32) -> i32;
 }
 
 #[link(name = "gdi32")]
@@ -415,16 +417,52 @@ fn load_learned_thresholds(file_path: &std::path::Path) -> (i32, i32, i32) {
     (combat, stealth, boss)
 }
 
+fn is_online_competitive_game(proc: &str) -> bool {
+    let p = proc.to_lowercase();
+    p.contains("cs2")
+        || p.contains("csgo")
+        || p.contains("counter-strike")
+        || p.contains("counterstrike")
+        || p.contains("valorant")
+        || p.contains("dota2")
+        || p.contains("dota")
+        || p.contains("league of legends")
+        || p.contains("leagueclient")
+        || p.contains("deadlock")
+        || p.contains("r5apex")
+        || p.contains("apex")
+        || p.contains("overwatch")
+        || p.contains("pubg")
+        || p.contains("tslgame")
+        || p.contains("fortnite")
+        || p.contains("rainbowsix")
+        || p.contains("r6")
+        || p.contains("marvelrivals")
+        || p.contains("crossfire")
+        || p.contains("pointblank")
+        || p.contains("warzone")
+        || p.contains("cod")
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let is_once = args.iter().any(|a| a == "--once");
 
+    if is_once {
+        unsafe {
+            AttachConsole(0xFFFFFFFF);
+        }
+    }
+
     // Single-instance enforcement: if not running --once, ensure only ONE sensor process runs globally
     const ERROR_ALREADY_EXISTS: u32 = 183;
-    let _mutex = unsafe {
-        CreateMutexA(0, 0, b"Local\\GameMusick_Sensor_Instance_Mutex\0".as_ptr())
+    let (_mutex_handle, is_duplicate) = unsafe {
+        SetLastError(0);
+        let h = CreateMutexA(0, 0, b"GameMusick_Sensor_Instance_Mutex_v2\0".as_ptr());
+        let err = GetLastError();
+        (h, h != 0 && err == ERROR_ALREADY_EXISTS)
     };
-    if !is_once && unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+    if !is_once && is_duplicate {
         // Another sensor daemon is already actively monitoring at 50Hz!
         return;
     }
@@ -451,6 +489,7 @@ fn main() {
     let mut letterbox_streak = 0;
     let mut black_screen_streak = 0;
     let mut boss_bar_streak = 0;
+    let mut online_respawn_streak = 0i32;
 
     let mut prev_key_states = [false; 256];
     let mut prev_pad_buttons = [0u16; 4];
@@ -489,6 +528,43 @@ fn main() {
 
     loop {
         unsafe {
+            let cur_ms = now_ms();
+
+            // Window & active game detection (checks foreground, falls back to running game window)
+            let hwnd_fg = GetForegroundWindow();
+            let proc_fg = get_process_name(hwnd_fg);
+            let title_fg = get_window_title(hwnd_fg);
+
+            let (_hwnd, proc_now, title_now, game_rect) = if !proc_fg.is_empty() && !is_denylisted(&proc_fg) {
+                let mut rect = RECT::default();
+                let _ = GetWindowRect(hwnd_fg, &mut rect);
+                (hwnd_fg, proc_fg, title_fg, rect)
+            } else if let Some(bg_game) = find_running_game() {
+                (bg_game.hwnd, bg_game.proc, bg_game.title, bg_game.rect)
+            } else {
+                (0, String::new(), String::new(), RECT {
+                    left: 0,
+                    top: 0,
+                    right: GetSystemMetrics(0).max(800),
+                    bottom: GetSystemMetrics(1).max(600),
+                })
+            };
+
+            let is_real_game = !proc_now.is_empty();
+
+            if is_real_game {
+                last_game_proc = proc_now;
+                if !title_now.is_empty() {
+                    last_game_title = title_now;
+                }
+                last_game_seen_ms = cur_ms;
+            } else if cur_ms.saturating_sub(last_game_seen_ms) > 4000 {
+                last_game_proc = String::from("IDLE_STANDBY");
+                last_game_title = String::from("IDLE_STANDBY");
+            }
+
+            let is_online = is_online_competitive_game(&last_game_proc);
+
             let mut pt_prev = POINT::default();
             GetCursorPos(&mut pt_prev);
 
@@ -507,9 +583,26 @@ fn main() {
                     let is_down = (st as u16 & 0x8000) != 0;
                     if is_down {
                         if !prev_key_states[vk] {
-                            attack_edge_presses += if vk == 0x01 || vk == 0x02 { 16 } else { 12 };
+                            if is_online {
+                                if vk == 0x02 {
+                                    // Right click: navigation / steering in MOBAs & tactical aim
+                                    attack_edge_presses += 2;
+                                } else if vk == 0x01 {
+                                    // Left click: attack / shooting
+                                    attack_edge_presses += 14;
+                                } else {
+                                    // Abilities (Q, E, R, F, numbers)
+                                    attack_edge_presses += 12;
+                                }
+                            } else {
+                                attack_edge_presses += if vk == 0x01 || vk == 0x02 { 16 } else { 12 };
+                            }
                         }
-                        attack_held_ticks += if vk == 0x01 || vk == 0x02 { 4 } else { 2 };
+                        if is_online {
+                            attack_held_ticks += if vk == 0x02 { 1 } else { 2 };
+                        } else {
+                            attack_held_ticks += if vk == 0x01 || vk == 0x02 { 4 } else { 2 };
+                        }
                     }
                     prev_key_states[vk] = is_down;
                 }
@@ -526,7 +619,7 @@ fn main() {
                     let is_down = (st as u16 & 0x8000) != 0;
                     if is_down {
                         if !prev_key_states[vk] {
-                            move_edge_presses += 7;
+                            move_edge_presses += if is_online { 4 } else { 7 };
                         }
                         move_held_ticks += 1;
                     }
@@ -561,40 +654,6 @@ fn main() {
                 }
 
                 thread::sleep(Duration::from_millis(20));
-            }
-
-            // Window & active game detection (checks foreground, falls back to running game window)
-            let hwnd_fg = GetForegroundWindow();
-            let proc_fg = get_process_name(hwnd_fg);
-            let title_fg = get_window_title(hwnd_fg);
-
-            let (_hwnd, proc_now, title_now, game_rect) = if !proc_fg.is_empty() && !is_denylisted(&proc_fg) {
-                let mut rect = RECT::default();
-                let _ = GetWindowRect(hwnd_fg, &mut rect);
-                (hwnd_fg, proc_fg, title_fg, rect)
-            } else if let Some(bg_game) = find_running_game() {
-                (bg_game.hwnd, bg_game.proc, bg_game.title, bg_game.rect)
-            } else {
-                (0, String::new(), String::new(), RECT {
-                    left: 0,
-                    top: 0,
-                    right: GetSystemMetrics(0).max(800),
-                    bottom: GetSystemMetrics(1).max(600),
-                })
-            };
-
-            let cur_ms = now_ms();
-            let is_real_game = !proc_now.is_empty();
-
-            if is_real_game {
-                last_game_proc = proc_now;
-                if !title_now.is_empty() {
-                    last_game_title = title_now;
-                }
-                last_game_seen_ms = cur_ms;
-            } else if cur_ms.saturating_sub(last_game_seen_ms) > 4000 {
-                last_game_proc = String::from("IDLE_STANDBY");
-                last_game_title = String::from("IDLE_STANDBY");
             }
 
             let vis = sample_game_visuals(game_rect);
@@ -643,17 +702,31 @@ fn main() {
             }
 
             // Combat & Energy State Machine
-            let walk_base = if move_held_ticks > 0 { 16 } else { 8 };
-            let input_combat = (walk_base
-                + attack_edge_presses
-                + attack_held_ticks
-                + move_edge_presses
-                + pad_attack_score
-                + (cursor_travel / 28).min(30))
-            .clamp(8, 100);
+            let walk_base = if move_held_ticks > 0 { if is_online { 10 } else { 16 } } else { 8 };
+            let input_combat = if is_online {
+                (walk_base
+                    + (attack_edge_presses * 70 / 100)
+                    + (attack_held_ticks * 60 / 100)
+                    + move_edge_presses
+                    + pad_attack_score
+                    + (cursor_travel / 55).min(20))
+                .clamp(8, 100)
+            } else {
+                (walk_base
+                    + attack_edge_presses
+                    + attack_held_ticks
+                    + move_edge_presses
+                    + pad_attack_score
+                    + (cursor_travel / 28).min(30))
+                .clamp(8, 100)
+            };
 
-            let instant_energy = input_combat.max((optical_delta_score * 85) / 100)
-                + (vis.red_score / 3).min(20);
+            let instant_energy = if is_online {
+                // In online games: balance APM with verified optical screen action:
+                ((input_combat * 55) / 100) + ((optical_delta_score * 50) / 100) + (vis.red_score / 3).min(15)
+            } else {
+                input_combat.max((optical_delta_score * 85) / 100) + (vis.red_score / 3).min(20)
+            };
             let instant_clamped = instant_energy.clamp(8, 100) as f32;
 
             if instant_clamped >= (learned_combat as f32 + 2.0) {
@@ -681,6 +754,25 @@ fn main() {
                 0
             };
 
+            // Online Respawn / Spectating State Machine
+            let mut is_respawn_spectating = false;
+            if is_online {
+                let recent_combat = cur_ms.saturating_sub(last_combat_spike_ms) < 28000;
+                let zero_inputs = attack_edge_presses <= 1 && move_edge_presses == 0 && move_held_ticks == 0 && cursor_travel < 250;
+                if recent_combat && zero_inputs {
+                    online_respawn_streak += 1;
+                } else if !zero_inputs {
+                    online_respawn_streak = 0;
+                }
+
+                if online_respawn_streak >= 6 {
+                    is_respawn_spectating = true;
+                    rolling_energy = (rolling_energy * 0.72).max(10.0);
+                }
+            } else {
+                online_respawn_streak = 0;
+            }
+
             if (is_fighting && boss_bar_streak >= 2)
                 || (combat_duration_ms > 32000 && final_motion >= (learned_boss - 17))
                 || final_motion >= learned_boss
@@ -702,6 +794,8 @@ fn main() {
 
             let (vibe, scene_label) = if is_standby {
                 ("EXPLORE", "STANDBY")
+            } else if is_respawn_spectating {
+                ("DRAMA", "RESPAWN")
             } else if in_boss_hold {
                 ("BOSSFIGHT", "BOSSFIGHT")
             } else if is_fighting || in_combat_hold {
@@ -722,7 +816,7 @@ fn main() {
             let out_room_wipe = if is_standby { "false" } else if is_recent_room_change { "true" } else { "false" };
 
             let json = format!(
-                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":false,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{}}}",
+                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":false,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{},\"isOnlineGame\":{},\"isRespawnSpectating\":{}}}",
                 cur_ms,
                 last_game_proc,
                 last_game_title,
@@ -735,7 +829,9 @@ fn main() {
                 out_cutscene,
                 out_room_wipe,
                 learned_combat,
-                learned_stealth
+                learned_stealth,
+                if is_online { "true" } else { "false" },
+                if is_respawn_spectating { "true" } else { "false" }
             );
 
             if fs::write(&tmp_file, &json).is_ok() {

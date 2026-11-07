@@ -136,50 +136,107 @@ const ATMOSPHERE_ARCHETYPES: Record<string, AtmosphereArchetype> = {
       ],
     },
   },
-  moba: {
-    name: 'MOBA & Competitive Adrenaline',
+  competitive_fps: {
+    name: 'Competitive FPS & Drift Phonk',
     artists: [
-      'The Prodigy',
-      'Pendulum',
-      'Two Steps From Hell',
-      'Hans Zimmer',
-      'Mick Gordon',
-      'Carpenter Brut',
-      'The Glitch Mob',
-      'Celldweller',
       'Kordhell',
       'DVRST',
+      'Ghostface Playa',
+      'Interworld',
+      'Hensonn',
+      'Pharmacist',
+      'SXMPRA',
+      'Pendulum',
+      'The Prodigy',
+      'Carpenter Brut',
+      'Sub Focus',
+      'Lorn',
+      'Skeler',
     ],
     descriptors: {
       EXPLORE: [
-        'chill focus electronic ambient',
-        'calm atmospheric laning synth beat',
-        'meditative game score',
+        'drift phonk gaming workout chill',
+        'wave phonk atmospheric night drive',
+        'dnb liquid atmospheric gaming chill',
+        'competitive cs2 warmup beats',
+      ],
+      MAJESTIC: [
+        'epic electronic triumph crescendo',
+        'cyberpunk stadium triumph synthwave',
+        'drum and bass euphoric drop',
+      ],
+      DRAMA: [
+        'sad wave phonk slow reverb',
+        'chill lo fi gaming respawn beat',
+        'melancholic synthwave night rain',
+        'calm downtime esports lofi',
+      ],
+      STEALTH: [
+        'dark wave phonk bass tension',
+        'deep dark dubstep suspense',
+        'esports clutch tension drone',
+      ],
+      COMBAT: [
+        'aggressive drift phonk combat action',
+        'high energy phonk gym gaming',
+        'intense drum and bass combat drop',
+        'hardstyle phonk battle adrenaline',
+      ],
+      BOSSFIGHT: [
+        'ultimate drift phonk boss fight bass boosted',
+        'monumental phonk rage combat',
+        'heavy bass neurofunk dnb drop',
+      ],
+      VICTORY: [
+        'phonk victory celebration triumph',
+        'epic synthwave championship victory',
+      ],
+    },
+  },
+  moba: {
+    name: 'MOBA & Tactical Esports',
+    artists: [
+      'The Glitch Mob',
+      'Pendulum',
+      'The Prodigy',
+      'Two Steps From Hell',
+      'Hans Zimmer',
+      'Celldweller',
+      'Kordhell',
+      'DVRST',
+      'Mick Gordon',
+    ],
+    descriptors: {
+      EXPLORE: [
+        'relaxing laning phase electronic beats',
+        'chill lofi dota farming beats',
+        'atmospheric synth ambient focus',
       ],
       MAJESTIC: [
         'epic victory horn orchestra',
         'cinematic brass crescendo triumph',
       ],
       DRAMA: [
-        'cinematic tension countdown dark',
-        'heavy suspense strings bass',
+        'melancholic esports downtime respawn',
+        'calm lofi waiting for respawn',
+        'sad ambient death screen chill',
       ],
       STEALTH: [
-        'dark espionage synth tension',
-        'suspense stealth tension drone',
+        'gank tension suspense electronic',
+        'roaming fog of war stealth synth',
       ],
       COMBAT: [
-        'high energy battle hybrid combat',
-        'furious synth drum battle',
-        'epic teamfight orchestral',
+        'teamfight high energy electronic combat',
+        'epic hybrid orchestral teamfight',
+        'furious bass battle rush',
       ],
       BOSSFIGHT: [
-        'colossal boss hybrid battle',
-        'relentless dark synth combat',
+        'roshan baron colossal battle hybrid',
+        'intense base defense clutch climax',
       ],
       VICTORY: [
-        'epic stadium triumph fanfare',
-        'euphoric victory hybrid',
+        'gg victory anthem electronic',
+        'stadium triumph fanfare esports',
       ],
     },
   },
@@ -403,10 +460,27 @@ export async function GET(request: NextRequest) {
       ) {
         archetypeKey = 'scifi';
       } else if (
+        gameLower.includes('cs2') ||
+        gameLower.includes('csgo') ||
+        gameLower.includes('counter') ||
+        gameLower.includes('valorant') ||
+        gameLower.includes('rainbow') ||
+        gameLower.includes('r6') ||
+        gameLower.includes('apex') ||
+        gameLower.includes('pubg') ||
+        gameLower.includes('tslgame') ||
+        gameLower.includes('fortnite') ||
+        gameLower.includes('overwatch') ||
+        gameLower.includes('marvelrivals') ||
+        gameLower.includes('warzone') ||
+        gameLower.includes('crossfire')
+      ) {
+        archetypeKey = 'competitive_fps';
+      } else if (
         gameLower.includes('dota') ||
         gameLower.includes('league') ||
-        gameLower.includes('counter') ||
-        gameLower.includes('apex')
+        gameLower.includes('deadlock') ||
+        gameLower.includes('smite')
       ) {
         archetypeKey = 'moba';
       } else if (
@@ -423,7 +497,42 @@ export async function GET(request: NextRequest) {
       archetypeLabel = arch.name;
 
       // If active game is known, anchor searches around this real game world!
-      if (isGameActive) {
+      if (isGameActive && archetypeKey === 'competitive_fps') {
+        if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+          ytQueries.push('aggressive drift phonk gym battle bass');
+          ytQueries.push('intense phonk combat gaming adrenaline');
+          ytQueries.push(`${gameClean} phonk montage workout`);
+        } else if (vibe === 'DRAMA') {
+          ytQueries.push('sad wave phonk slow reverb');
+          ytQueries.push('lofi gaming beats respawn chill');
+          ytQueries.push('calm synthwave downtime chill');
+        } else if (vibe === 'STEALTH') {
+          ytQueries.push('dark wave phonk clutch tension bass');
+          ytQueries.push('deep dark electronic clutch suspense');
+        } else if (vibe === 'MAJESTIC' || vibe === 'VICTORY') {
+          ytQueries.push('phonk victory triumph celebration');
+          ytQueries.push('epic electronic stadium victory drops');
+        } else {
+          ytQueries.push('drift phonk gaming warmup chill');
+          ytQueries.push('wave phonk atmospheric night drive');
+          ytQueries.push('liquid dnb chill gaming');
+        }
+      } else if (isGameActive && archetypeKey === 'moba') {
+        if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
+          ytQueries.push('high energy electronic teamfight battle');
+          ytQueries.push('epic hybrid orchestral teamfight');
+        } else if (vibe === 'DRAMA') {
+          ytQueries.push('calm lofi waiting for respawn beats');
+          ytQueries.push('melancholic esports downtime chill');
+        } else if (vibe === 'STEALTH') {
+          ytQueries.push('gank tension electronic stealth drone');
+        } else if (vibe === 'VICTORY') {
+          ytQueries.push('gg victory anthem electronic esports');
+        } else {
+          ytQueries.push('relaxing laning phase electronic beats');
+          ytQueries.push('chill lofi gaming farming focus');
+        }
+      } else if (isGameActive) {
         if (vibe === 'COMBAT' || vibe === 'BOSSFIGHT') {
           ytQueries.push(`${gameClean} combat battle action soundtrack ost`);
           ytQueries.push(`${gameClean} epic boss fight theme ost`);
