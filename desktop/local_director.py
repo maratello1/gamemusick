@@ -233,6 +233,11 @@ async def ocr_crop(img, lang='en-US'):
 
 def analyze_text_sentiment(text):
     text_lower = text.lower()
+    if any(p in text_lower for p in ['you died', 'вы погибли', 'потрачено', 'смерть', 'wasted', 'defeat']):
+        return 'DRAMA', 'Экран гибели / Поражение'
+    if any(p in text_lower for p in ['victory', 'felled', 'slain', 'победа', 'враг повержен', 'босс повержен', 'quest completed']):
+        return 'MAJESTIC', 'Триумф и Победа'
+
     words = set(text_lower.replace(',', ' ').replace('.', ' ').replace('!', ' ').replace('?', ' ').split())
 
     drama_score = sum(1 for w in words if w in DRAMA_WORDS)
@@ -249,6 +254,36 @@ def analyze_text_sentiment(text):
     if loc_score > 0:
         return 'EXPLORE', f'Новая область: {text[:30]}'
     return 'DRAMA', 'Сюжетный диалог'
+
+
+def detect_boss_healthbar(rect):
+    """
+    Fast heuristic detector for wide horizontal Boss HP bars at top (y=8..14%) or bottom (y=83..89%) of screen.
+    """
+    try:
+        for y_rel in (0.08, 0.85):
+            strip = grab_window_crop(rect, 0.24, y_rel, 0.52, 0.045)
+            small = strip.resize((64, 6), Image.Resampling.NEAREST)
+            pixels = list(small.getdata())
+            red_cols = 0
+            for x_col in range(64):
+                col_has_hp = False
+                for y_row in range(6):
+                    r, g, b = pixels[y_row * 64 + x_col]
+                    # Deep crimson / bright red boss HP bar OR bright gold/amber boss bar
+                    is_crimson = (r > 135 and g < 55 and b < 55 and (r - max(g, b)) > 85)
+                    is_gold_hp = (r > 185 and g > 130 and b < 60 and (r - b) > 120)
+                    if is_crimson or is_gold_hp:
+                        col_has_hp = True
+                        break
+                if col_has_hp:
+                    red_cols += 1
+            # If >= 58% of the horizontal center strip has contiguous crimson/gold HP pixels
+            if red_cols >= 37:
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def sample_cinematic_bars_and_luma(rect):
@@ -303,10 +338,14 @@ async def run_director():
     prev_keys = [False] * 256
 
     last_combat_ms = 0
+    combat_streak_start_ms = 0
+    last_boss_ms = 0
+    last_stealth_ms = 0
     last_cutscene_ms = 0
     last_room_wipe_ms = 0
     black_screen_streak = 0
     letterbox_streak = 0
+    boss_bar_streak = 0
 
     active_vibe = 'EXPLORE'
     active_scene_type = 'exploration'
@@ -335,25 +374,36 @@ async def run_director():
 
             # 2. Key Action Sampling (250ms window: 5 checks x 50ms)
             tick_presses = 0
+            crouch_held = False
             for _ in range(5):
                 for vk in ATTACK_VKEYS:
                     is_down = bool(user32.GetAsyncKeyState(vk) & 0x8000)
                     if is_down and not prev_keys[vk]:
                         tick_presses += 1
                     prev_keys[vk] = is_down
+                # Check Stealth/Crouch keys: Left Ctrl (0x11 / 0xA2) or 'C' (0x43)
+                if bool(user32.GetAsyncKeyState(0x11) & 0x8000) or bool(user32.GetAsyncKeyState(0x43) & 0x8000):
+                    crouch_held = True
                 await asyncio.sleep(0.05)
 
             combat_presses_history[history_idx] = tick_presses
             history_idx = (history_idx + 1) % len(combat_presses_history)
             total_presses_2s = sum(combat_presses_history)
 
-            # 3. Visual Sampling: Letterbox & Screen Luminance
+            # 3. Visual Sampling: Letterbox, Screen Luminance & Boss HP Bar
             is_letterbox, center_luma = sample_cinematic_bars_and_luma(game_rect)
             if is_letterbox:
                 letterbox_streak += 1
             else:
                 letterbox_streak = 0
             sustained_letterbox = (letterbox_streak >= 3)
+
+            has_boss_bar = detect_boss_healthbar(game_rect) if center_luma > 10 else False
+            if has_boss_bar:
+                boss_bar_streak += 1
+            else:
+                boss_bar_streak = max(0, boss_bar_streak - 1)
+            sustained_boss_bar = (boss_bar_streak >= 2)
 
             # Screen wipe / Room transition (fade to black)
             if center_luma <= 3:
@@ -392,14 +442,37 @@ async def run_director():
             if is_dialogue_active or sustained_letterbox:
                 last_cutscene_ms = now_ms
 
-            # 5. Scene State Machine
+            # 5. Scene State Machine (Supports all 6 buckets: EXPLORE, COMBAT, BOSSFIGHT, DRAMA, MAJESTIC, STEALTH)
             is_fighting = (total_presses_2s >= 3)
+            if is_fighting:
+                if combat_streak_start_ms == 0:
+                    combat_streak_start_ms = now_ms
+                last_combat_ms = now_ms
+            elif now_ms - last_combat_ms > 8000:
+                combat_streak_start_ms = 0
+
+            combat_duration_ms = (now_ms - combat_streak_start_ms) if combat_streak_start_ms > 0 else 0
+            is_boss_escalated = (
+                (is_fighting and sustained_boss_bar)
+                or (combat_duration_ms > 32000 and total_presses_2s >= 5)
+            )
+            if is_boss_escalated:
+                last_boss_ms = now_ms
+
+            if crouch_held and not is_fighting and center_luma < 45:
+                last_stealth_ms = now_ms
+
+            in_boss_hold = (now_ms - last_boss_ms < 22000)
             in_combat_hold = (now_ms - last_combat_ms < 18000)
+            in_stealth_hold = (now_ms - last_stealth_ms < 14000)
             in_cutscene_hold = (now_ms - last_cutscene_ms < 12000)
             is_recent_room_change = (now_ms - last_room_wipe_ms < 10000)
 
-            if is_fighting:
-                last_combat_ms = now_ms
+            if is_boss_escalated or in_boss_hold:
+                active_vibe = 'BOSSFIGHT'
+                active_scene_type = 'boss_battle'
+                scene_label = '🔥 Эпическая битва с Боссом'
+            elif is_fighting:
                 active_vibe = 'COMBAT'
                 active_scene_type = 'combat'
                 scene_label = 'Сражение / Боевой экшен'
@@ -416,6 +489,10 @@ async def run_director():
                 active_scene_type = 'cutscene'
                 if not is_dialogue_active:
                     scene_label = 'Кинематографическая катсцена'
+            elif in_stealth_hold:
+                active_vibe = 'STEALTH'
+                active_scene_type = 'stealth'
+                scene_label = 'Скрытное проникновение'
             else:
                 active_vibe = 'EXPLORE'
                 active_scene_type = 'exploration'

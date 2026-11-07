@@ -61,10 +61,58 @@ function createDefaultScenePlaylist(name: string, gameTag = 'Для любых �
           genreTag: 'Battle Action',
         },
       ],
-      BOSSFIGHT: [],
-      DRAMA: [],
-      MAJESTIC: [],
-      STEALTH: [],
+      BOSSFIGHT: [
+        {
+          id: 'yt-ffg31qA_kDE',
+          videoId: 'ffg31qA_kDE',
+          title: 'Godskin Apostles — Final Phase Orchestral Mix',
+          artist: 'Elden Ring OST',
+          album: 'Boss Themes',
+          duration: '04:42',
+          thumbnail: 'https://i.ytimg.com/vi/ffg31qA_kDE/hq720.jpg',
+          vibe: 'BOSSFIGHT',
+          genreTag: 'Boss Fight',
+        },
+      ],
+      DRAMA: [
+        {
+          id: 'yt-F9vA7L8H4xI',
+          videoId: 'F9vA7L8H4xI',
+          title: 'Priscilla Song (The Wolven Storm Instrumental)',
+          artist: 'The Witcher 3 OST',
+          album: 'Cinematic Story',
+          duration: '03:35',
+          thumbnail: 'https://i.ytimg.com/vi/F9vA7L8H4xI/hq720.jpg',
+          vibe: 'DRAMA',
+          genreTag: 'Story & Drama',
+        },
+      ],
+      MAJESTIC: [
+        {
+          id: 'yt-fd3a189vcVc',
+          videoId: 'fd3a189vcVc',
+          title: 'Secunda — Night Sky Atmosphere',
+          artist: 'Jeremy Soule',
+          album: 'Skyrim Atmospheres',
+          duration: '02:05',
+          thumbnail: 'https://i.ytimg.com/vi/fd3a189vcVc/hq720.jpg',
+          vibe: 'MAJESTIC',
+          genreTag: 'Vista & Panorama',
+        },
+      ],
+      STEALTH: [
+        {
+          id: 'yt-eb6_J1dq1hk',
+          videoId: 'eb6_J1dq1hk',
+          title: 'Dark Cyberpunk Stealth Drone Mix',
+          artist: 'Cryo Chamber',
+          album: 'Noir Infiltration',
+          duration: '04:15',
+          thumbnail: 'https://i.ytimg.com/vi/eb6_J1dq1hk/hq720.jpg',
+          vibe: 'STEALTH',
+          genreTag: 'Stealth & Tension',
+        },
+      ],
     },
   };
 }
@@ -392,6 +440,90 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         ok: true,
         playlist: pl,
+        activeAccount,
+      });
+    }
+
+    // 10. IMPORT PLAYLIST FROM SHARE CODE OR JSON
+    if (action === 'IMPORT_PLAYLIST') {
+      const rawData = body.playlistData;
+      let parsedPl: Partial<ScenePlaylist> | null = null;
+
+      if (typeof rawData === 'string') {
+        const trimmed = rawData.trim();
+        if (trimmed.startsWith('GV2:')) {
+          const b64 = trimmed.slice(4);
+          const decoded = Buffer.from(b64, 'base64').toString('utf-8');
+          parsedPl = JSON.parse(decoded);
+        } else {
+          parsedPl = JSON.parse(trimmed);
+        }
+      } else if (rawData && typeof rawData === 'object') {
+        parsedPl = rawData as Partial<ScenePlaylist>;
+      }
+
+      if (!parsedPl || typeof parsedPl !== 'object') {
+        return NextResponse.json({ error: 'Некорректный формат подборки' }, { status: 400 });
+      }
+
+      const now = Date.now();
+      const bucketIds: SceneBucketId[] = ['EXPLORE', 'COMBAT', 'BOSSFIGHT', 'DRAMA', 'MAJESTIC', 'STEALTH'];
+      const cleanScenes: Record<SceneBucketId, TrackItem[]> = {
+        EXPLORE: [],
+        COMBAT: [],
+        BOSSFIGHT: [],
+        DRAMA: [],
+        MAJESTIC: [],
+        STEALTH: [],
+      };
+
+      if (parsedPl.scenes && typeof parsedPl.scenes === 'object') {
+        for (const bId of bucketIds) {
+          const list = (parsedPl.scenes as Record<string, unknown>)[bId];
+          if (Array.isArray(list)) {
+            cleanScenes[bId] = list
+              .filter((t): t is TrackItem => Boolean(t && typeof t === 'object' && 'title' in t))
+              .map((t) => ({
+                id: String(t.id || `yt-${t.videoId || Math.random().toString(36).slice(2, 7)}`),
+                videoId: t.videoId ? String(t.videoId) : '',
+                title: String(t.title || 'Track'),
+                artist: String(t.artist || 'Unknown Artist'),
+                album: String(t.album || 'Imported Scene'),
+                duration: String(t.duration || '03:30'),
+                thumbnail: String(
+                  t.thumbnail ||
+                    (t.videoId
+                      ? `https://i.ytimg.com/vi/${t.videoId}/hq720.jpg`
+                      : 'https://i.ytimg.com/vi/7G7yCE2nZ1Y/hq720.jpg')
+                ),
+                vibe: bId,
+                genreTag: String(t.genreTag || bId),
+              }));
+          }
+        }
+      }
+
+      const importedPl: ScenePlaylist = {
+        id: `pl-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        name: String(parsedPl.name || 'Импортированная подборка').trim(),
+        gameTag: String(parsedPl.gameTag || 'Для любых игр').trim(),
+        description: String(
+          parsedPl.description || 'Импортированный сценарный сет для ИИ-режиссера'
+        ).trim(),
+        createdAt: now,
+        updatedAt: now,
+        scenes: cleanScenes,
+      };
+
+      if (!activeAccount.playlists) activeAccount.playlists = [];
+      activeAccount.playlists.push(importedPl);
+      activeAccount.selectedPlaylistId = importedPl.id;
+      activeAccount.useCustomPlaylistInAutopilot = true;
+
+      saveAccountsStore(store);
+      return NextResponse.json({
+        ok: true,
+        playlist: importedPl,
         activeAccount,
       });
     }

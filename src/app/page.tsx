@@ -38,6 +38,12 @@ import {
   Link,
   ChevronDown,
   X,
+  Download,
+  Upload,
+  Share2,
+  Minimize2,
+  Maximize2,
+  Copy,
 } from 'lucide-react';
 import { FALLBACK_REAL_TRACKS, VIBE_STATES } from '@/lib/defaultData';
 import { DirectorScene, TelemetrySnapshot, TrackItem, VibeStateId } from '@/types/vibe';
@@ -439,6 +445,40 @@ export default function GameVibeSpotifyApp() {
   const cutsceneStreakRef = useRef<number>(0);
   const prevDetectedProcessRef = useRef<string>('');
 
+  // v2.0 Pro Audio Engine: Smooth Crossfade, Explore Timecode Memory, Smart Dialogue Ducking, Mini-HUD & Playlist Share
+  const [crossfadeEnabled, setCrossfadeEnabled] = useState<boolean>(true);
+  const crossfadeEnabledRef = useRef<boolean>(true);
+  const [resumeExplorePosition, setResumeExplorePosition] = useState<boolean>(true);
+  const resumeExplorePositionRef = useRef<boolean>(true);
+  const savedExploreBookmarkRef = useRef<{
+    track: TrackItem;
+    timeSec: number;
+    savedAt: number;
+  } | null>(null);
+  const [lastResumedTimecode, setLastResumedTimecode] = useState<string | null>(null);
+
+  const [autoDialogueDucking, setAutoDialogueDucking] = useState<boolean>(true);
+  const autoDialogueDuckingRef = useRef<boolean>(true);
+  const [isDialogueDucked, setIsDialogueDucked] = useState<boolean>(false);
+  const isDialogueDuckedRef = useRef<boolean>(false);
+
+  const [isMiniHudMode, setIsMiniHudMode] = useState<boolean>(false);
+  const [showImportPlaylistModal, setShowImportPlaylistModal] = useState<boolean>(false);
+  const [importPlaylistCode, setImportPlaylistCode] = useState<string>('');
+  const [playlistShareFeedback, setPlaylistShareFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    crossfadeEnabledRef.current = crossfadeEnabled;
+  }, [crossfadeEnabled]);
+
+  useEffect(() => {
+    resumeExplorePositionRef.current = resumeExplorePosition;
+  }, [resumeExplorePosition]);
+
+  useEffect(() => {
+    autoDialogueDuckingRef.current = autoDialogueDucking;
+  }, [autoDialogueDucking]);
+
   // Keep refs synchronized
   useEffect(() => {
     activeVibeRef.current = activeVibe;
@@ -638,18 +678,71 @@ export default function GameVibeSpotifyApp() {
   /**
    * Unified Audio Playback Execution:
    * Uses YouTube Official Studio Master engine for instant, uncompressed, authentic full-length tracks
-   * with zero buffering delay, plus HTML5 <audio> support for local PC tracks.
-   * Synchronizes with Windows Core Audio ducking for in-game audio.
+   * with smooth volume crossfade, exploration timecode bookmarking, and smart dialogue ducking.
    */
   const executePlayTrack = useCallback(
-    async (track: TrackItem) => {
+    async (
+      track: TrackItem,
+      options?: { resumeSec?: number; skipCrossfade?: boolean }
+    ) => {
+      // 0. Save current EXPLORE track timecode before switching to Combat/Boss/Drama
+      const prevTrack = currentTrackRef.current;
+      if (
+        prevTrack &&
+        prevTrack.vibe === 'EXPLORE' &&
+        track.vibe !== 'EXPLORE' &&
+        resumeExplorePositionRef.current &&
+        ytPlayerRef.current?.getCurrentTime
+      ) {
+        try {
+          const curSec = ytPlayerRef.current.getCurrentTime();
+          if (typeof curSec === 'number' && curSec >= 8) {
+            savedExploreBookmarkRef.current = {
+              track: prevTrack,
+              timeSec: Math.floor(curSec),
+              savedAt: Date.now(),
+            };
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const targetVol = isMuted
+        ? 0
+        : isDialogueDuckedRef.current && autoDialogueDuckingRef.current
+        ? Math.max(8, Math.round(volume * 0.42))
+        : volume;
+
+      // Smooth fade-out if already playing and crossfade is enabled
+      if (
+        isPlayingRef.current &&
+        crossfadeEnabledRef.current &&
+        !options?.skipCrossfade &&
+        ytPlayerRef.current?.setVolume &&
+        !isMuted
+      ) {
+        try {
+          const steps = [0.7, 0.45, 0.2, 0.08];
+          for (const factor of steps) {
+            ytPlayerRef.current.setVolume(Math.max(4, Math.round(targetVol * factor)));
+            await new Promise((r) => setTimeout(r, 70));
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const startSec =
+        options?.resumeSec && options.resumeSec >= 5 ? Math.floor(options.resumeSec) : 0;
+
       currentTrackStartTimeRef.current = Date.now();
       activeMacroModeRef.current =
         track.vibe === 'COMBAT' || track.vibe === 'BOSSFIGHT' ? 'COMBAT' : 'EXPLORE';
       currentTrackRef.current = track;
       setCurrentTrack(track);
       setDurationSec(parseDurationStringToSec(track.duration));
-      setProgressSec(0);
+      setProgressSec(startSec);
       setIsPlaying(true);
       isPlayingRef.current = true;
 
@@ -685,7 +778,8 @@ export default function GameVibeSpotifyApp() {
         }
         if (audioRef.current) {
           audioRef.current.src = track.previewUrl;
-          audioRef.current.volume = isMuted ? 0 : volume / 100;
+          audioRef.current.currentTime = startSec;
+          audioRef.current.volume = targetVol / 100;
           audioRef.current.play().catch(() => {});
         }
         return;
@@ -715,9 +809,32 @@ export default function GameVibeSpotifyApp() {
       if (vId) {
         if (audioRef.current) audioRef.current.pause();
         if (ytPlayerRef.current?.loadVideoById) {
-          ytPlayerRef.current.loadVideoById(vId);
-          ytPlayerRef.current.setVolume(isMuted ? 0 : volume);
-          ytPlayerRef.current.playVideo();
+          if (startSec > 0) {
+            ytPlayerRef.current.loadVideoById({
+              videoId: vId,
+              startSeconds: startSec,
+            });
+          } else {
+            ytPlayerRef.current.loadVideoById(vId);
+          }
+
+          if (crossfadeEnabledRef.current && !options?.skipCrossfade && !isMuted) {
+            ytPlayerRef.current.setVolume(Math.max(6, Math.round(targetVol * 0.15)));
+            ytPlayerRef.current.playVideo();
+            // Smooth fade-in ramp
+            const rampSteps = [0.35, 0.55, 0.78, 1.0];
+            for (const factor of rampSteps) {
+              await new Promise((r) => setTimeout(r, 95));
+              try {
+                ytPlayerRef.current?.setVolume(Math.round(targetVol * factor));
+              } catch {
+                // ignore
+              }
+            }
+          } else {
+            ytPlayerRef.current.setVolume(targetVol);
+            ytPlayerRef.current.playVideo();
+          }
         } else {
           pendingVideoIdRef.current = vId;
         }
@@ -728,8 +845,8 @@ export default function GameVibeSpotifyApp() {
 
   /**
    * Smooth Intelligent Scene Switcher:
-   * Transitions between narrative/game scenes (Explore, Majestic Vista, Tragic Drama, Combat)
-   * with musical crossfade and strict hysteresis so songs play stably.
+   * Transitions between narrative/game scenes (Explore, Majestic Vista, Tragic Drama, Combat, Boss, Stealth)
+   * with musical crossfade, explore timecode resumption, and strict hysteresis so songs play stably.
    */
   const switchToSceneSmoothly = useCallback(
     async (targetVibe: VibeStateId) => {
@@ -738,6 +855,27 @@ export default function GameVibeSpotifyApp() {
       setActiveVibe(targetVibe);
       activeMacroModeRef.current =
         targetVibe === 'COMBAT' || targetVibe === 'BOSSFIGHT' ? 'COMBAT' : 'EXPLORE';
+
+      // 0. Check if returning to EXPLORE and we have a saved bookmark from before combat/cutscene
+      if (
+        targetVibe === 'EXPLORE' &&
+        resumeExplorePositionRef.current &&
+        savedExploreBookmarkRef.current &&
+        Date.now() - savedExploreBookmarkRef.current.savedAt < 15 * 60 * 1000
+      ) {
+        const bm = savedExploreBookmarkRef.current;
+        savedExploreBookmarkRef.current = null;
+        const mm = Math.floor(bm.timeSec / 60);
+        const ss = String(bm.timeSec % 60).padStart(2, '0');
+        setLastResumedTimecode(`${mm}:${ss}`);
+        setResolvedMoodQuery(
+          `⏪ Продолжение с ${mm}:${ss} · ${bm.track.artist} — ${bm.track.title}`
+        );
+        executePlayTrack(bm.track, { resumeSec: bm.timeSec });
+        return;
+      }
+
+      setLastResumedTimecode(null);
 
       // 1. Check custom user scene playlist if enabled
       if (
@@ -932,6 +1070,16 @@ export default function GameVibeSpotifyApp() {
         };
         setTelemetry(data);
 
+        // Smart Dialogue Ducking: smoothly lower music volume when in-game dialogue subtitles are active
+        const hasActiveSubtitles = Boolean(
+          (data.dialogueText && data.dialogueText.trim().length >= 4) ||
+            (data.director?.onScreenText && data.director.onScreenText.trim().length >= 4)
+        );
+        if (hasActiveSubtitles !== isDialogueDuckedRef.current) {
+          isDialogueDuckedRef.current = hasActiveSubtitles;
+          setIsDialogueDucked(hasActiveSubtitles);
+        }
+
         // Auto Game Switch: detect when player switches active game and dynamically reload matching atmosphere decks
         if (data.detectedProcess && data.detectedProcess !== prevDetectedProcessRef.current) {
           const isInitial = prevDetectedProcessRef.current === '';
@@ -978,8 +1126,10 @@ export default function GameVibeSpotifyApp() {
             isActivelyFighting || now - lastCombatSpikeRef.current < 14000;
 
           if (inCombatSession) {
-            // Player is in battle!
-            if (currentVibe !== 'COMBAT' && currentVibe !== 'BOSSFIGHT') {
+            // Player is in battle or Boss Fight!
+            if (targetVibe === 'BOSSFIGHT' && currentVibe !== 'BOSSFIGHT') {
+              switchToSceneSmoothly('BOSSFIGHT');
+            } else if (currentVibe !== 'COMBAT' && currentVibe !== 'BOSSFIGHT') {
               // Entering battle: immediately switch to battle theme!
               switchToSceneSmoothly('COMBAT');
             }
@@ -1118,16 +1268,48 @@ export default function GameVibeSpotifyApp() {
     return () => clearInterval(timer);
   }, []);
 
-  // Synchronize master volume & mute across YouTube player and audio fallback
+  // Synchronize master volume, mute & smart dialogue ducking across YouTube player and audio fallback
   useEffect(() => {
-    const vol = isMuted ? 0 : volume;
+    const baseVol = isMuted ? 0 : volume;
+    const effectiveVol =
+      isDialogueDucked && autoDialogueDucking ? Math.max(8, Math.round(baseVol * 0.42)) : baseVol;
     if (ytPlayerRef.current?.setVolume) {
-      ytPlayerRef.current.setVolume(vol);
+      ytPlayerRef.current.setVolume(effectiveVol);
     }
     if (audioRef.current) {
-      audioRef.current.volume = vol / 100;
+      audioRef.current.volume = effectiveVol / 100;
     }
-  }, [volume, isMuted]);
+  }, [volume, isMuted, isDialogueDucked, autoDialogueDucking]);
+
+  // Global Hotkey & Desktop Mini-HUD listener (Alt+M toggles Ultra-Mini In-Game HUD)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && (e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь')) {
+        e.preventDefault();
+        setIsMiniHudMode((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    const w = window as unknown as {
+      gamevibeDesktop?: {
+        onMiniHudChange?: (cb: (isMini: boolean) => void) => void;
+        onGlobalHotkeyVibe?: (cb: (vibeId: VibeStateId) => void) => void;
+      };
+    };
+    if (w.gamevibeDesktop?.onMiniHudChange) {
+      w.gamevibeDesktop.onMiniHudChange((isMini) => {
+        setIsMiniHudMode(Boolean(isMini));
+      });
+    }
+    if (w.gamevibeDesktop?.onGlobalHotkeyVibe) {
+      w.gamevibeDesktop.onGlobalHotkeyVibe((vibeId) => {
+        switchToSceneSmoothly(vibeId);
+      });
+    }
+
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [switchToSceneSmoothly]);
 
   const handleSaveAccountProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1678,9 +1860,112 @@ export default function GameVibeSpotifyApp() {
     setAlwaysOnTop(nextState);
     const w = window as unknown as {
       chrome?: { webview?: { postMessage: (msg: string) => void } };
+      gamevibeDesktop?: { toggleAlwaysOnTop?: () => Promise<boolean> };
     };
+    if (w.gamevibeDesktop?.toggleAlwaysOnTop) {
+      w.gamevibeDesktop.toggleAlwaysOnTop().catch(() => {});
+    }
     if (w.chrome?.webview) {
       w.chrome.webview.postMessage(nextState ? 'SET_TOPMOST:1' : 'SET_TOPMOST:0');
+    }
+  };
+
+  const toggleMiniHud = () => {
+    const next = !isMiniHudMode;
+    setIsMiniHudMode(next);
+    const w = window as unknown as {
+      gamevibeDesktop?: { toggleMiniHud?: (force?: boolean) => Promise<boolean> };
+    };
+    if (w.gamevibeDesktop?.toggleMiniHud) {
+      w.gamevibeDesktop.toggleMiniHud(next).catch(() => {});
+    }
+  };
+
+  const handleExportScenePlaylist = async (mode: 'code' | 'file') => {
+    if (!activeScenePlaylist) return;
+    const payload = {
+      name: activeScenePlaylist.name,
+      gameTag: activeScenePlaylist.gameTag,
+      description: activeScenePlaylist.description,
+      scenes: activeScenePlaylist.scenes,
+    };
+    const jsonStr = JSON.stringify(payload, null, 2);
+
+    if (mode === 'code') {
+      try {
+        const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        const shareCode = `GV2:${b64}`;
+        await navigator.clipboard.writeText(shareCode);
+        setPlaylistShareFeedback('✓ Код подборки скопирован в буфер обмена!');
+        setTimeout(() => setPlaylistShareFeedback(null), 3500);
+      } catch {
+        setPlaylistShareFeedback('Скопируйте JSON вручную через экспорт файла');
+        setTimeout(() => setPlaylistShareFeedback(null), 3500);
+      }
+    } else {
+      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = (activeScenePlaylist.name || 'gamevibe-playlist')
+        .replace(/[^a-zA-Z0-9а-яА-ЯёЁ_-]/g, '_')
+        .slice(0, 40);
+      a.download = `${safeName}.gamevibe.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setPlaylistShareFeedback('✓ Файл подборки (.gamevibe.json) скачан!');
+      setTimeout(() => setPlaylistShareFeedback(null), 3500);
+    }
+  };
+
+  const submitImportPlaylistPayload = async (rawPayload: string) => {
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'IMPORT_PLAYLIST',
+          playlistData: rawPayload,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.playlist) {
+        await loadAccounts();
+        setActiveScenePlaylist(data.playlist);
+        activeScenePlaylistRef.current = data.playlist;
+        setSelectedPlaylistId(data.playlist.id);
+        setUseCustomPlaylistInAutopilot(true);
+        useCustomPlaylistInAutopilotRef.current = true;
+        setShowImportPlaylistModal(false);
+        setImportPlaylistCode('');
+        setPlaylistShareFeedback(`✓ Подборка «${data.playlist.name}» успешно импортирована!`);
+        setTimeout(() => setPlaylistShareFeedback(null), 4000);
+      } else {
+        setPlaylistShareFeedback(`Ошибка: ${data.error || 'Некорректный код или JSON'}`);
+        setTimeout(() => setPlaylistShareFeedback(null), 4000);
+      }
+    } catch {
+      setPlaylistShareFeedback('Ошибка при чтении кода подборки');
+      setTimeout(() => setPlaylistShareFeedback(null), 4000);
+    }
+  };
+
+  const handleImportScenePlaylist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importPlaylistCode.trim()) return;
+    await submitImportPlaylistPayload(importPlaylistCode.trim());
+  };
+
+  const handleImportPlaylistFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      await submitImportPlaylistPayload(text);
+    } catch {
+      setPlaylistShareFeedback('Не удалось прочитать JSON-файл');
     }
   };
 
@@ -1885,14 +2170,24 @@ export default function GameVibeSpotifyApp() {
                     {activeAccount ? activeAccount.username : 'Аккаунт'}
                   </span>
                 </div>
-                <button
-                  onClick={() => setShowCreatePlaylistModal(true)}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#EDE9E8] transition"
-                  title="Создать новую подборку со сценами"
-                >
-                  <Plus className="w-3 h-3 text-[#B84A62]" />
-                  <span>Создать</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowImportPlaylistModal(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#EDE9E8] transition"
+                    title="Импортировать чужую подборку по коду или JSON"
+                  >
+                    <Upload className="w-3 h-3 text-[#B84A62]" />
+                    <span>Импорт</span>
+                  </button>
+                  <button
+                    onClick={() => setShowCreatePlaylistModal(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#EDE9E8] transition"
+                    title="Создать новую подборку со сценами"
+                  >
+                    <Plus className="w-3 h-3 text-[#B84A62]" />
+                    <span>Создать</span>
+                  </button>
+                </div>
               </div>
 
               {scenePlaylists.length === 0 ? (
@@ -2065,11 +2360,11 @@ export default function GameVibeSpotifyApp() {
               )}
             </form>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Account Switcher & Manager */}
               <button
                 onClick={() => setShowAccountModal(true)}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-xs text-[#EDE9E8] transition"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-xs text-[#EDE9E8] transition whitespace-nowrap"
                 title="Сменить или добавить аккаунт игрока"
               >
                 <div
@@ -2086,7 +2381,7 @@ export default function GameVibeSpotifyApp() {
 
               <button
                 onClick={() => setActiveSection('account')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition whitespace-nowrap ${
                   activeSection === 'account'
                     ? 'bg-[#251218] border-[#6E1D2F] text-white'
                     : 'bg-[#1A181B] hover:bg-[#242024] border-[#2A2629] text-[#EDE9E8]'
@@ -2098,8 +2393,21 @@ export default function GameVibeSpotifyApp() {
               </button>
 
               <button
+                onClick={toggleMiniHud}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition whitespace-nowrap ${
+                  isMiniHudMode
+                    ? 'bg-[#6E1D2F] border-[#8E2940] text-white'
+                    : 'bg-[#1A181B] border-[#2A2629] text-[#8C8482] hover:text-[#EDE9E8]'
+                }`}
+                title="Компактный игровой мини-оверлей (Alt + M)"
+              >
+                <Minimize2 className="w-3.5 h-3.5 text-[#B84A62]" />
+                <span>Мини-HUD</span>
+              </button>
+
+              <button
                 onClick={toggleAlwaysOnTop}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition whitespace-nowrap ${
                   alwaysOnTop
                     ? 'bg-[#6E1D2F] border-[#8E2940] text-white'
                     : 'bg-[#1A181B] border-[#2A2629] text-[#8C8482] hover:text-[#EDE9E8]'
@@ -2239,6 +2547,57 @@ export default function GameVibeSpotifyApp() {
                       >
                         <User className="w-3.5 h-3.5 text-[#B84A62]" />
                         <span>Настроить жанры и предпочтения аккаунта</span>
+                      </button>
+                    </div>
+
+                    {/* v2.0 Adaptive Audio Engine DSP Toggles */}
+                    <div className="pt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCrossfadeEnabled((v) => !v)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition ${
+                          crossfadeEnabled
+                            ? 'bg-[#18261E] border-[#10B981]/40 text-[#6EE7B7]'
+                            : 'bg-[#161418] border-[#262226] text-[#8C8482]'
+                        }`}
+                        title="Плавное затухание и нарастание громкости при смене сцены"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Кроссфейд сцен: {crossfadeEnabled ? 'ВКЛ' : 'ВЫКЛ'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setResumeExplorePosition((v) => !v)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition ${
+                          resumeExplorePosition
+                            ? 'bg-[#18261E] border-[#10B981]/40 text-[#6EE7B7]'
+                            : 'bg-[#161418] border-[#262226] text-[#8C8482]'
+                        }`}
+                        title="После окончания битвы спокойный трек продолжается с той секунды, где прервался"
+                      >
+                        <Compass className="w-3 h-3" />
+                        <span>
+                          Память таймкода: {resumeExplorePosition ? 'ВКЛ' : 'ВЫКЛ'}
+                          {lastResumedTimecode ? ` (с ${lastResumedTimecode})` : ''}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAutoDialogueDucking((v) => !v)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition ${
+                          autoDialogueDucking
+                            ? 'bg-[#18261E] border-[#10B981]/40 text-[#6EE7B7]'
+                            : 'bg-[#161418] border-[#262226] text-[#8C8482]'
+                        }`}
+                        title="Автоматически снижать громкость музыки на 55% во время сюжетных диалогов и субтитров"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                        <span>
+                          Приглушение в диалогах: {autoDialogueDucking ? 'ВКЛ' : 'ВЫКЛ'}
+                          {isDialogueDucked && autoDialogueDucking ? ' · АКТИВНО' : ''}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -2735,7 +3094,7 @@ export default function GameVibeSpotifyApp() {
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             onClick={handleToggleCustomPlaylistAutopilot}
                             className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition shadow ${
@@ -2753,6 +3112,33 @@ export default function GameVibeSpotifyApp() {
                           </button>
 
                           <button
+                            onClick={() => handleExportScenePlaylist('code')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D191D] hover:bg-[#282228] border border-[#362E36] text-xs font-medium text-[#EDE9E8] transition"
+                            title="Скопировать код подборки для отправки другу в Telegram или Discord"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-[#B84A62]" />
+                            <span>Код для друзей</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleExportScenePlaylist('file')}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D191D] hover:bg-[#282228] border border-[#362E36] text-xs font-medium text-[#EDE9E8] transition"
+                            title="Скачать подборку в виде файла .gamevibe.json"
+                          >
+                            <Download className="w-3.5 h-3.5 text-[#B84A62]" />
+                            <span>JSON</span>
+                          </button>
+
+                          <button
+                            onClick={() => setShowImportPlaylistModal(true)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D191D] hover:bg-[#282228] border border-[#362E36] text-xs font-medium text-[#EDE9E8] transition"
+                            title="Импортировать чужую подборку по коду или JSON-файлу"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-[#B84A62]" />
+                            <span>Импорт</span>
+                          </button>
+
+                          <button
                             onClick={() => handleDeleteScenePlaylist(activeScenePlaylist.id)}
                             className="p-1.5 rounded-lg bg-[#1D191D] hover:bg-[#2F151C] border border-[#362E36] text-[#8C8482] hover:text-[#EA7B93] transition"
                             title="Удалить эту подборку"
@@ -2761,6 +3147,13 @@ export default function GameVibeSpotifyApp() {
                           </button>
                         </div>
                       </div>
+
+                      {playlistShareFeedback && (
+                        <div className="p-2.5 rounded-lg bg-[#18261E] border border-[#10B981]/40 text-xs text-[#6EE7B7] flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#10B981] shrink-0" />
+                          <span>{playlistShareFeedback}</span>
+                        </div>
+                      )}
 
                       <div className="space-y-1">
                         <h2 className="text-2xl font-bold text-[#EDE9E8] tracking-tight">
@@ -3570,7 +3963,16 @@ export default function GameVibeSpotifyApp() {
         </div>
 
         {/* Right: Autonomous Activity + Volume */}
-        <div className="hidden sm:flex items-center justify-end gap-4 w-[30%] min-w-[180px]">
+        <div className="hidden sm:flex items-center justify-end gap-3 w-[30%] min-w-[180px]">
+          {isDialogueDucked && autoDialogueDucking && (
+            <div
+              className="px-2 py-1 rounded bg-[#251218] border border-[#6E1D2F] text-[11px] text-[#FF85A0] font-medium flex items-center gap-1"
+              title="Громкость музыки автоматически приглушена на время диалога в игре"
+            >
+              <span>🔉 Диалог</span>
+            </div>
+          )}
+
           <div className="px-2.5 py-1 rounded bg-[#141215] border border-[#242023] text-[11px] text-[#9E9694]">
             Динамика: <span className="font-mono text-[#EDE9E8]">{telemetry.motionDelta}%</span>
           </div>
@@ -3817,6 +4219,171 @@ export default function GameVibeSpotifyApp() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT SCENE PLAYLIST MODAL (Share Code or .gamevibe.json File) */}
+      {showImportPlaylistModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-[#141215] border border-[#2A2429] p-6 space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-[#242025]">
+              <div className="flex items-center gap-2.5">
+                <Upload className="w-5 h-5 text-[#B84A62]" />
+                <h3 className="text-base font-bold text-[#EDE9E8]">Импорт подборки со сценами</h3>
+              </div>
+              <button
+                onClick={() => setShowImportPlaylistModal(false)}
+                className="p-1 rounded-md text-[#8C8482] hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#8C8482] leading-relaxed">
+              Вставьте код подборки (<code className="text-[#EDE9E8]">GV2:...</code>), которым с вами поделился друг, или загрузите сохраненный файл <code className="text-[#EDE9E8]">.gamevibe.json</code>.
+            </p>
+
+            <form onSubmit={handleImportScenePlaylist} className="space-y-3 pt-1">
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-[#8C8482]">Код подборки или JSON:</label>
+                <textarea
+                  rows={4}
+                  value={importPlaylistCode}
+                  onChange={(e) => setImportPlaylistCode(e.target.value)}
+                  placeholder="Вставьте сюда код GV2:eyJuYW1lIjoi... или содержимое JSON"
+                  className="w-full px-3 py-2 rounded-lg bg-[#110F12] border border-[#2A242B] text-xs font-mono text-[#EDE9E8] outline-none focus:border-[#6E1D2F]"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D191D] hover:bg-[#282228] border border-[#362E36] text-xs font-medium text-[#EDE9E8] cursor-pointer transition">
+                  <FolderOpen className="w-3.5 h-3.5 text-[#B84A62]" />
+                  <span>Загрузить .JSON файл</span>
+                  <input
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={handleImportPlaylistFile}
+                    className="hidden"
+                  />
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportPlaylistModal(false)}
+                    className="px-3 py-1.5 rounded-lg text-xs text-[#8C8482] hover:text-white"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!importPlaylistCode.trim()}
+                    className="px-4 py-1.5 rounded-lg bg-[#6E1D2F] hover:bg-[#852339] text-xs font-semibold text-white transition disabled:opacity-50"
+                  >
+                    Импортировать
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ULTRA-MINI IN-GAME HUD OVERLAY BAR (Alt + M) */}
+      {isMiniHudMode && (
+        <div className="fixed inset-0 z-40 bg-[#080809]/95 backdrop-blur-md flex flex-col justify-between p-3 sm:p-4 select-none">
+          <div className="max-w-xl w-full mx-auto my-auto rounded-2xl bg-[#121014] border border-[#381C26] shadow-2xl p-3.5 space-y-3">
+            {/* Top row: Active Game + Scene Badge + Expand Button */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="px-2 py-0.5 rounded bg-[#6E1D2F] text-[10px] font-bold uppercase tracking-wider text-white">
+                  {SCENE_BUCKET_CONFIGS[activeVibe as SceneBucketId]?.shortLabel || currentSceneMeta.shortLabel}
+                </span>
+                <span className="text-xs font-medium text-[#D47A8D] truncate">
+                  {telemetry.sceneLabel || currentSceneMeta.label}
+                </span>
+                {isDialogueDucked && autoDialogueDucking && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#251218] border border-[#6E1D2F] text-[10px] text-[#FF85A0]">
+                    🔉 Диалог
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={toggleMiniHud}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1D191D] hover:bg-[#2A232A] border border-[#362E36] text-[11px] font-medium text-[#EDE9E8] transition shrink-0"
+                title="Развернуть полное окно (Alt + M)"
+              >
+                <Maximize2 className="w-3 h-3 text-[#B84A62]" />
+                <span>Развернуть</span>
+              </button>
+            </div>
+
+            {/* Middle row: Current Track + Play/Pause/Skip Controls */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <img
+                  src={currentTrack?.thumbnail || FALLBACK_REAL_TRACKS[0].thumbnail}
+                  alt={currentTrack?.title || 'cover'}
+                  className="w-11 h-11 rounded-lg object-cover border border-[#2C242B] shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-[#EDE9E8] truncate">
+                    {currentTrack?.title}
+                  </div>
+                  <div className="text-xs text-[#8C8482] truncate">
+                    {currentTrack?.artist} · {formatTime(progressSec)} / {formatTime(durationSec)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => skipTrack(-1)}
+                  className="p-2 rounded-lg bg-[#1A171C] hover:bg-[#242027] text-[#EDE9E8] transition"
+                  title="Предыдущий трек"
+                >
+                  <SkipBack className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={togglePlayPause}
+                  className="w-10 h-10 rounded-full bg-[#6E1D2F] hover:bg-[#852339] text-white flex items-center justify-center shadow transition"
+                  title={isPlaying ? 'Пауза' : 'Играть'}
+                >
+                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+                </button>
+                <button
+                  onClick={() => skipTrack(1)}
+                  className="p-2 rounded-lg bg-[#1A171C] hover:bg-[#242027] text-[#EDE9E8] transition"
+                  title="Следующий трек"
+                >
+                  <SkipForward className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom row: Quick Scene Override Pills */}
+            <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-[#221D24] flex-wrap">
+              {(Object.keys(SCENE_BUCKET_CONFIGS) as SceneBucketId[]).map((bId) => {
+                const conf = SCENE_BUCKET_CONFIGS[bId];
+                const isAct = activeVibe === bId;
+                return (
+                  <button
+                    key={bId}
+                    onClick={() => switchToSceneSmoothly(bId)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                      isAct
+                        ? 'bg-[#6E1D2F] text-white'
+                        : 'bg-[#18151A] text-[#8C8482] hover:text-[#EDE9E8]'
+                    }`}
+                  >
+                    {conf.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
