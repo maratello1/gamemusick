@@ -46,7 +46,7 @@ USER_INTEGRATIONS_FILE = os.path.join(DATA_DIR, 'user-integrations.json')
 DENYLIST_PROCESSES = {
     'explorer', 'msedge', 'chrome', 'firefox', 'opera', 'brave', 'vivaldi', 'chrome-headless-shell',
     'code', 'devenv', 'cursor', 'idea64', 'pycharm64', 'notepad', 'notepad++', 'windowsterminal',
-    'powershell', 'pwsh', 'cmd', 'conhost', 'gamevibe', 'interactive_sensor', 'node', 'python',
+    'powershell', 'pwsh', 'cmd', 'conhost', 'gamemusick', 'gamevibe', 'electron', 'interactive_sensor', 'node', 'python', 'antigravity',
     'searchhost', 'startmenuexperiencehost', 'shellexperiencehost', 'applicationframehost',
     'taskmgr', 'audiodg', 'system', 'idle', 'textinputhost', 'lockapp', 'dwm', 'csrss',
     'discord', 'telegram', 'slack', 'teams', 'whatsapp', 'steam', 'steamwebhelper',
@@ -328,9 +328,9 @@ async def run_director():
     cached_gemini_summary = ''
 
     last_game_info = {
-        'process': "Castlevania Belmont's Curse",
-        'title': "Castlevania: Belmont's Curse",
-        'last_seen': time.time()
+        'process': "Ожидание игры",
+        'title': "Ожидание игры",
+        'last_seen': 0
     }
 
     combat_presses_history = [0] * 8
@@ -366,11 +366,48 @@ async def run_director():
                 last_game_info['last_seen'] = time.time()
                 game_rect = game['rect']
             else:
-                # If alt-tabbed to GameVibe or brief overlay, keep last known game for 120s
+                if time.time() - last_game_info.get('last_seen', 0) > 6:
+                    last_game_info['process'] = "Ожидание игры"
+                    last_game_info['title'] = "Ожидание игры"
                 game_rect = (0, 0, user32.GetSystemMetrics(0), user32.GetSystemMetrics(1))
 
             game_title = last_game_info['title']
             game_proc = last_game_info['process']
+
+            if game_proc == "Ожидание игры":
+                # Standby mode: no game is running! Keep audio peaceful, no phantom triggers
+                director_payload = {
+                    'timestamp': now_ms,
+                    'ok': True,
+                    'process': 'Ожидание игры',
+                    'game': 'Ожидание игры',
+                    'sceneType': 'exploration',
+                    'vibe': 'EXPLORE',
+                    'mood': 'calm ambient',
+                    'tension': 1,
+                    'location': 'Рабочий стол',
+                    'summary': 'Ожидание запуска игры...',
+                    'onScreenText': '',
+                    'musicStyle': 'ambient relaxing soundtrack',
+                    'changeMusic': False,
+                    'picks': [],
+                    'hasGeminiVision': False
+                }
+                dialogue_payload = {
+                    'timestamp': now_ms,
+                    'text': '',
+                    'emotion': 'NONE',
+                    'label': 'Ожидание игры',
+                    'isDialogueActive': False
+                }
+                with open(SCENE_DIRECTOR_TMP, 'w', encoding='utf-8') as f:
+                    json.dump(director_payload, f, ensure_ascii=False)
+                os.replace(SCENE_DIRECTOR_TMP, SCENE_DIRECTOR_FILE)
+                with open(DIALOGUE_TMP, 'w', encoding='utf-8') as f:
+                    json.dump(dialogue_payload, f, ensure_ascii=False)
+                os.replace(DIALOGUE_TMP, DIALOGUE_FILE)
+                await asyncio.sleep(1.0)
+                continue
 
             # 2. Key Action Sampling (250ms window: 5 checks x 50ms)
             tick_presses = 0
@@ -600,10 +637,6 @@ async def run_director():
                 'label': scene_label,
                 'isDialogueActive': is_dialogue_active
             }
-
-            with open(LIVE_SENSOR_TMP, 'w', encoding='utf-8') as f:
-                json.dump(sensor_payload, f, ensure_ascii=False)
-            os.replace(LIVE_SENSOR_TMP, LIVE_SENSOR_FILE)
 
             with open(SCENE_DIRECTOR_TMP, 'w', encoding='utf-8') as f:
                 json.dump(director_payload, f, ensure_ascii=False)

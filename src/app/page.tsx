@@ -419,16 +419,16 @@ export default function GameVibeSpotifyApp() {
 
   const [telemetry, setTelemetry] = useState<TelemetrySnapshot>({
     timestamp: Date.now(),
-    activeWindowTitle: "Castlevania Belmont's Curse",
-    detectedProcess: "Castlevania Belmont's Curse",
+    activeWindowTitle: 'Ожидание игры',
+    detectedProcess: 'Ожидание игры',
     runningWindows: [],
-    motionDelta: 14,
+    motionDelta: 10,
     crimsonIndex: 0,
-    luminance: 25,
-    compositeIntensity: 14,
-    brightness: 25,
+    luminance: 30,
+    compositeIntensity: 10,
+    brightness: 30,
     inferredVibe: 'EXPLORE',
-    sensorMode: 'win32-interactive-50hz',
+    sensorMode: 'rust-win32-50hz-neural-synced',
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1159,17 +1159,29 @@ export default function GameVibeSpotifyApp() {
           setIsDialogueDucked(hasActiveSubtitles);
         }
 
-        // Auto Game Switch: detect when player switches active game and dynamically reload matching atmosphere decks
-        if (data.detectedProcess && data.detectedProcess !== prevDetectedProcessRef.current) {
+        // Auto Game Switch: detect when player switches active game and dynamically preload matching atmosphere decks
+        const isStandby = !data.detectedProcess || data.detectedProcess === 'Ожидание игры';
+        const isDenylisted = Boolean(
+          data.detectedProcess &&
+            (data.detectedProcess.toLowerCase().includes('electron') ||
+              data.detectedProcess.toLowerCase().includes('gamemusick') ||
+              data.detectedProcess.toLowerCase().includes('gamevibe'))
+        );
+
+        if (!isStandby && !isDenylisted && data.detectedProcess !== prevDetectedProcessRef.current) {
           const isInitial = prevDetectedProcessRef.current === '';
           prevDetectedProcessRef.current = data.detectedProcess;
           if (!isInitial) {
-            console.log(`[GameVibe] Active game changed to: ${data.detectedProcess}. Re-loading atmosphere...`);
+            console.log(`[GameMusick] Active game changed to: ${data.detectedProcess}. Preloading matching atmosphere...`);
             preloadAllDecks(accountProfile, audioModeRef.current, data.detectedProcess).then(() => {
               const newDeck = decksRef.current[activeVibeRef.current] || [];
               if (newDeck.length > 0) {
                 setLiveStreamTracks(newDeck);
-                executePlayTrack(newDeck[0]);
+                // CRITICAL: NEVER cut off a song if it is currently playing!
+                // Only start a track if the player hasn't started music yet.
+                if (!isPlayingRef.current) {
+                  executePlayTrack(newDeck[0]);
+                }
               }
             });
           }
@@ -1190,6 +1202,13 @@ export default function GameVibeSpotifyApp() {
             (now - currentTrackStartTimeRef.current) / 1000;
           const currentVibe = activeVibeRef.current;
           const targetVibe: VibeStateId = data.inferredVibe || 'EXPLORE';
+
+          // If no game is running (idle standby), stay calmly in current scene without phantom battle or cutscenes!
+          if (isStandby) {
+            cutsceneStreakRef.current = 0;
+            lastCombatSpikeRef.current = 0;
+            return;
+          }
 
           const isActivelyFighting =
             targetVibe === 'COMBAT' ||

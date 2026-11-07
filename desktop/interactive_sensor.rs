@@ -95,7 +95,7 @@ const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 const SRCCOPY: u32 = 0x00CC0020;
 const CAPTUREBLT: u32 = 0x40000000;
 
-const DENYLIST: [&str; 24] = [
+const DENYLIST: [&str; 33] = [
     "explorer",
     "msedge",
     "chrome",
@@ -104,8 +104,10 @@ const DENYLIST: [&str; 24] = [
     "opera",
     "yandex",
     "vivaldi",
+    "gamemusick",
     "gamevibe",
     "electron",
+    "antigravity",
     "searchhost",
     "shellexperiencehost",
     "applicationframehost",
@@ -116,10 +118,17 @@ const DENYLIST: [&str; 24] = [
     "windowsterminal",
     "code",
     "devenv",
+    "cursor",
+    "idea64",
+    "pycharm64",
+    "rider64",
+    "clion64",
+    "sublime_text",
     "discord",
     "telegram",
     "spotify",
     "steamwebhelper",
+    "epicgameslauncher",
 ];
 
 fn is_denylisted(proc_name: &str) -> bool {
@@ -345,8 +354,6 @@ fn main() {
     let _ = fs::create_dir_all(&out_dir);
     let out_file = out_dir.join("live-sensor.json");
     let tmp_file = out_dir.join("live-sensor.tmp.json");
-    let dir_file = out_dir.join("scene-director.json");
-    let dir_tmp = out_dir.join("scene-director.tmp.json");
     let brain_file = out_dir.join("neural-evolution.json");
 
     let mut learned_combat = 42;
@@ -383,8 +390,9 @@ fn main() {
         0x25, 0x26, 0x27, 0x28, // Arrows
     ];
 
-    let mut last_game_proc = String::from("Castlevania Belmont's Curse");
-    let mut last_game_title = String::from("Castlevania: Belmont's Curse");
+    let mut last_game_proc = String::from("IDLE_STANDBY");
+    let mut last_game_title = String::from("IDLE_STANDBY");
+    let mut last_game_seen_ms: u128 = 0;
 
     let xinput_get_state: Option<XInputGetStateFn> = unsafe {
         let h_mod = LoadLibraryA(b"xinput1_4.dll\0".as_ptr());
@@ -489,11 +497,18 @@ fn main() {
             };
             let _ = GetWindowRect(hwnd, &mut game_rect);
 
-            if !proc_now.is_empty() && !is_denylisted(&proc_now) {
+            let cur_ms = now_ms();
+            let is_real_game = !proc_now.is_empty() && !is_denylisted(&proc_now);
+
+            if is_real_game {
                 last_game_proc = proc_now;
                 if !title_now.is_empty() {
                     last_game_title = title_now;
                 }
+                last_game_seen_ms = cur_ms;
+            } else if cur_ms.saturating_sub(last_game_seen_ms) > 8000 {
+                last_game_proc = String::from("IDLE_STANDBY");
+                last_game_title = String::from("IDLE_STANDBY");
             }
 
             let vis = sample_game_visuals(game_rect);
@@ -506,8 +521,6 @@ fn main() {
             }
             let avg_luma = (luma_sum / 16).clamp(2, 100);
             let optical_delta_score = (optical_diff_sum / 2).clamp(0, 100);
-
-            let cur_ms = now_ms();
 
             // Dynamic Neural Evolution Brain Sync (Every ~3.5 seconds)
             if cur_ms.saturating_sub(last_brain_sync_ms) > 3500 {
@@ -599,70 +612,48 @@ fn main() {
             let is_recent_room_change = cur_ms.saturating_sub(last_room_wipe_ms) < 10000;
             let in_stealth_hold = cur_ms.saturating_sub(last_stealth_ms) < 14000;
 
-            let (vibe, scene_label) = if in_boss_hold {
-                ("BOSSFIGHT", "🔥 Эпическая битва с Боссом")
+            let is_standby = last_game_proc == "IDLE_STANDBY" || last_game_proc.is_empty();
+
+            let (vibe, scene_label) = if is_standby {
+                ("EXPLORE", "STANDBY")
+            } else if in_boss_hold {
+                ("BOSSFIGHT", "BOSSFIGHT")
             } else if is_fighting || in_combat_hold {
-                ("COMBAT", "Сражение / Боевой экшен")
+                ("COMBAT", "COMBAT")
             } else if is_recent_room_change {
-                ("MAJESTIC", "Вход в новую локацию")
+                ("MAJESTIC", "MAJESTIC")
             } else if in_cutscene_hold {
-                ("DRAMA", "Кинематографическая катсцена")
+                ("DRAMA", "DRAMA")
             } else if in_stealth_hold {
-                ("STEALTH", "Скрытное проникновение")
+                ("STEALTH", "STEALTH")
             } else {
-                ("EXPLORE", "Атмосферное исследование")
+                ("EXPLORE", "EXPLORE")
             };
 
+            let out_motion = if is_standby { 10 } else { final_motion };
+            let out_red = if is_standby { 0 } else { vis.red_score };
+            let out_cutscene = if is_standby { "false" } else if in_cutscene_hold { "true" } else { "false" };
+            let out_room_wipe = if is_standby { "false" } else if is_recent_room_change { "true" } else { "false" };
+
             let json = format!(
-                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":true,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{}}}",
+                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":false,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{}}}",
                 cur_ms,
                 last_game_proc,
                 last_game_title,
-                final_motion,
-                vis.red_score,
+                out_motion,
+                out_red,
                 avg_luma,
                 vibe,
                 vibe,
                 scene_label,
-                if in_cutscene_hold { "true" } else { "false" },
-                if is_recent_room_change { "true" } else { "false" },
+                out_cutscene,
+                out_room_wipe,
                 learned_combat,
                 learned_stealth
             );
 
             if fs::write(&tmp_file, &json).is_ok() {
                 let _ = fs::rename(&tmp_file, &out_file);
-            }
-
-            // If Python local_director is not actively writing scene-director.json, write it from Rust
-            let write_dir = match fs::metadata(&dir_file).and_then(|m| m.modified()) {
-                Ok(mod_time) => {
-                    SystemTime::now()
-                        .duration_since(mod_time)
-                        .unwrap_or(Duration::from_secs(99))
-                        .as_secs()
-                        > 5
-                }
-                Err(_) => true,
-            };
-
-            if write_dir {
-                let dir_json = format!(
-                    "{{\"timestamp\":{},\"ok\":true,\"process\":\"{}\",\"game\":\"{}\",\"sceneType\":\"{}\",\"vibe\":\"{}\",\"mood\":\"{} atmosphere\",\"tension\":{},\"location\":\"Игровой мир\",\"summary\":\"{}\",\"onScreenText\":\"\",\"musicStyle\":\"{} {} ost\",\"changeMusic\":false,\"picks\":[]}}",
-                    cur_ms,
-                    last_game_proc,
-                    last_game_title,
-                    vibe.to_lowercase(),
-                    vibe,
-                    vibe.to_lowercase(),
-                    if vibe == "BOSSFIGHT" { 10 } else if vibe == "COMBAT" { 8 } else { 3 },
-                    scene_label,
-                    last_game_title,
-                    vibe.to_lowercase()
-                );
-                if fs::write(&dir_tmp, &dir_json).is_ok() {
-                    let _ = fs::rename(&dir_tmp, &dir_file);
-                }
             }
         }
     }
