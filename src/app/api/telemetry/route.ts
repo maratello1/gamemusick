@@ -8,6 +8,7 @@ import {
   tickNeuralEvolution,
   recordPlayerFeedback,
   getNeuralBrainState,
+  executeBatchPretraining,
 } from '@/lib/neural-evolution';
 
 export const dynamic = 'force-dynamic';
@@ -259,6 +260,17 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    if (body.action === 'batch_pretrain') {
+      const updatedBrain = executeBatchPretraining();
+      lastSnapshot.neuralEvolution = updatedBrain;
+      return NextResponse.json({
+        ok: true,
+        message: 'Batch pretraining completed on benchmark dataset',
+        neuralEvolution: updatedBrain,
+      });
+    }
+
     const {
       motionDelta = lastSnapshot.motionDelta,
       crimsonIndex = lastSnapshot.crimsonIndex,

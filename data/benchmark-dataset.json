@@ -1,0 +1,6395 @@
+{
+  "version": "2.0.0",
+  "description": "GameMusick Grounded Telemetry Benchmark Dataset (120+ Curated PC Gameplay Sequences)",
+  "sources": [
+    "Bingsu/Gameplay_Images (Hugging Face)",
+    "originlab/game-recordings-v4",
+    "NES-VMDB & AGAIN Telemetry Corpus"
+  ],
+  "totalSequences": 152,
+  "sequences": [
+    {
+      "id": "SEQ_001",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 63.8,
+      "avgCrimson": 53.8,
+      "avgLuma": 28.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 55.8,
+          "crimsonIndex": 46.0,
+          "luminance": 26.7
+        },
+        {
+          "motionDelta": 79.3,
+          "crimsonIndex": 62.1,
+          "luminance": 46.8
+        },
+        {
+          "motionDelta": 57.9,
+          "crimsonIndex": 51.9,
+          "luminance": 20.9
+        },
+        {
+          "motionDelta": 62.2,
+          "crimsonIndex": 55.2,
+          "luminance": 20.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_002",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 54.0,
+      "avgCrimson": 25.4,
+      "avgLuma": 44.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 60.6,
+          "crimsonIndex": 36.0,
+          "luminance": 39.7
+        },
+        {
+          "motionDelta": 53.7,
+          "crimsonIndex": 23.3,
+          "luminance": 55.4
+        },
+        {
+          "motionDelta": 61.7,
+          "crimsonIndex": 19.8,
+          "luminance": 39.8
+        },
+        {
+          "motionDelta": 49.2,
+          "crimsonIndex": 21.5,
+          "luminance": 51.7
+        },
+        {
+          "motionDelta": 44.7,
+          "crimsonIndex": 26.4,
+          "luminance": 37.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_003",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 17.2,
+      "avgCrimson": 4.9,
+      "avgLuma": 36.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 6.5,
+          "luminance": 45.5
+        },
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 7.8,
+          "luminance": 33.2
+        },
+        {
+          "motionDelta": 18.8,
+          "crimsonIndex": 6.6,
+          "luminance": 41.6
+        },
+        {
+          "motionDelta": 23.8,
+          "crimsonIndex": 4.6,
+          "luminance": 44.7
+        },
+        {
+          "motionDelta": 10.7,
+          "crimsonIndex": 1.8,
+          "luminance": 30.1
+        },
+        {
+          "motionDelta": 11.3,
+          "crimsonIndex": 1.9,
+          "luminance": 23.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_004",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.7,
+      "avgCrimson": 2.6,
+      "avgLuma": 20.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 19.3,
+          "crimsonIndex": 4.2,
+          "luminance": 12.9
+        },
+        {
+          "motionDelta": 17.7,
+          "crimsonIndex": 3.4,
+          "luminance": 22.6
+        },
+        {
+          "motionDelta": 22.9,
+          "crimsonIndex": 0.4,
+          "luminance": 21.4
+        },
+        {
+          "motionDelta": 20.5,
+          "crimsonIndex": 1.2,
+          "luminance": 18.3
+        },
+        {
+          "motionDelta": 16.3,
+          "crimsonIndex": 4.6,
+          "luminance": 22.4
+        },
+        {
+          "motionDelta": 15.5,
+          "crimsonIndex": 1.6,
+          "luminance": 23.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_005",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 14.2,
+      "avgCrimson": 10.5,
+      "avgLuma": 29.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.2,
+          "crimsonIndex": 5.5,
+          "luminance": 22.9
+        },
+        {
+          "motionDelta": 11.7,
+          "crimsonIndex": 8.2,
+          "luminance": 38.6
+        },
+        {
+          "motionDelta": 20.3,
+          "crimsonIndex": 9.7,
+          "luminance": 31.4
+        },
+        {
+          "motionDelta": 13.5,
+          "crimsonIndex": 18.7,
+          "luminance": 26.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_006",
+      "game": "Elden Ring",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.6,
+      "avgCrimson": 2.3,
+      "avgLuma": 82.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 3.0,
+          "luminance": 81.2
+        },
+        {
+          "motionDelta": 26.0,
+          "crimsonIndex": 1.7,
+          "luminance": 82.5
+        },
+        {
+          "motionDelta": 19.8,
+          "crimsonIndex": 4.0,
+          "luminance": 69.1
+        },
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 3.0,
+          "luminance": 90.8
+        },
+        {
+          "motionDelta": 16.4,
+          "crimsonIndex": 0.6,
+          "luminance": 85.4
+        },
+        {
+          "motionDelta": 23.5,
+          "crimsonIndex": 1.5,
+          "luminance": 82.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_007",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 71.6,
+      "avgCrimson": 56.4,
+      "avgLuma": 39.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 72.5,
+          "crimsonIndex": 73.8,
+          "luminance": 45.8
+        },
+        {
+          "motionDelta": 55.4,
+          "crimsonIndex": 63.8,
+          "luminance": 40.5
+        },
+        {
+          "motionDelta": 72.7,
+          "crimsonIndex": 45.7,
+          "luminance": 39.2
+        },
+        {
+          "motionDelta": 58.7,
+          "crimsonIndex": 52.4,
+          "luminance": 33.6
+        },
+        {
+          "motionDelta": 86.5,
+          "crimsonIndex": 70.0,
+          "luminance": 27.9
+        },
+        {
+          "motionDelta": 71.5,
+          "crimsonIndex": 42.1,
+          "luminance": 47.4
+        },
+        {
+          "motionDelta": 83.7,
+          "crimsonIndex": 46.9,
+          "luminance": 39.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_008",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 53.4,
+      "avgCrimson": 33.1,
+      "avgLuma": 44.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 46.0,
+          "crimsonIndex": 37.9,
+          "luminance": 43.9
+        },
+        {
+          "motionDelta": 62.2,
+          "crimsonIndex": 30.9,
+          "luminance": 25.0
+        },
+        {
+          "motionDelta": 50.4,
+          "crimsonIndex": 15.6,
+          "luminance": 57.5
+        },
+        {
+          "motionDelta": 64.8,
+          "crimsonIndex": 39.9,
+          "luminance": 35.8
+        },
+        {
+          "motionDelta": 43.5,
+          "crimsonIndex": 41.3,
+          "luminance": 58.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_009",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.2,
+      "avgCrimson": 4.1,
+      "avgLuma": 47.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.7,
+          "crimsonIndex": 6.5,
+          "luminance": 54.2
+        },
+        {
+          "motionDelta": 18.5,
+          "crimsonIndex": 1.0,
+          "luminance": 43.1
+        },
+        {
+          "motionDelta": 25.1,
+          "crimsonIndex": 1.3,
+          "luminance": 38.5
+        },
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 7.7,
+          "luminance": 52.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_010",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.3,
+      "avgCrimson": 2.0,
+      "avgLuma": 14.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.4,
+          "crimsonIndex": 2.0,
+          "luminance": 22.1
+        },
+        {
+          "motionDelta": 18.0,
+          "crimsonIndex": 4.5,
+          "luminance": 18.1
+        },
+        {
+          "motionDelta": 16.0,
+          "crimsonIndex": 0.3,
+          "luminance": 10.4
+        },
+        {
+          "motionDelta": 20.9,
+          "crimsonIndex": 2.9,
+          "luminance": 10.1
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 0.3,
+          "luminance": 11.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_011",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 19.4,
+      "avgCrimson": 11.2,
+      "avgLuma": 21.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 20.0,
+          "crimsonIndex": 6.1,
+          "luminance": 21.0
+        },
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 8.2,
+          "luminance": 18.3
+        },
+        {
+          "motionDelta": 21.1,
+          "crimsonIndex": 13.6,
+          "luminance": 26.8
+        },
+        {
+          "motionDelta": 19.0,
+          "crimsonIndex": 17.1,
+          "luminance": 19.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_012",
+      "game": "Dark Souls III",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.9,
+      "avgCrimson": 0.6,
+      "avgLuma": 79.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 24.5,
+          "crimsonIndex": 1.4,
+          "luminance": 77.3
+        },
+        {
+          "motionDelta": 27.8,
+          "crimsonIndex": 0.2,
+          "luminance": 84.6
+        },
+        {
+          "motionDelta": 24.3,
+          "crimsonIndex": 0.2,
+          "luminance": 86.8
+        },
+        {
+          "motionDelta": 26.8,
+          "crimsonIndex": 0.4,
+          "luminance": 70.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_013",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 73.0,
+      "avgCrimson": 43.4,
+      "avgLuma": 35.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 59.6,
+          "crimsonIndex": 42.3,
+          "luminance": 33.9
+        },
+        {
+          "motionDelta": 83.9,
+          "crimsonIndex": 38.0,
+          "luminance": 44.2
+        },
+        {
+          "motionDelta": 83.2,
+          "crimsonIndex": 38.9,
+          "luminance": 39.6
+        },
+        {
+          "motionDelta": 72.8,
+          "crimsonIndex": 35.6,
+          "luminance": 22.8
+        },
+        {
+          "motionDelta": 79.9,
+          "crimsonIndex": 44.5,
+          "luminance": 32.2
+        },
+        {
+          "motionDelta": 70.9,
+          "crimsonIndex": 69.6,
+          "luminance": 47.1
+        },
+        {
+          "motionDelta": 60.4,
+          "crimsonIndex": 35.1,
+          "luminance": 31.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_014",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 54.7,
+      "avgCrimson": 24.6,
+      "avgLuma": 40.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 49.4,
+          "crimsonIndex": 35.9,
+          "luminance": 50.6
+        },
+        {
+          "motionDelta": 62.4,
+          "crimsonIndex": 34.9,
+          "luminance": 42.0
+        },
+        {
+          "motionDelta": 46.9,
+          "crimsonIndex": 21.5,
+          "luminance": 27.0
+        },
+        {
+          "motionDelta": 61.1,
+          "crimsonIndex": 16.8,
+          "luminance": 36.0
+        },
+        {
+          "motionDelta": 43.3,
+          "crimsonIndex": 29.3,
+          "luminance": 57.2
+        },
+        {
+          "motionDelta": 55.8,
+          "crimsonIndex": 16.7,
+          "luminance": 42.8
+        },
+        {
+          "motionDelta": 64.1,
+          "crimsonIndex": 17.1,
+          "luminance": 27.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_015",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 16.9,
+      "avgCrimson": 3.7,
+      "avgLuma": 33.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.5,
+          "crimsonIndex": 7.5,
+          "luminance": 39.9
+        },
+        {
+          "motionDelta": 19.3,
+          "crimsonIndex": 0.3,
+          "luminance": 22.9
+        },
+        {
+          "motionDelta": 20.5,
+          "crimsonIndex": 4.5,
+          "luminance": 31.1
+        },
+        {
+          "motionDelta": 14.2,
+          "crimsonIndex": 5.4,
+          "luminance": 31.0
+        },
+        {
+          "motionDelta": 14.2,
+          "crimsonIndex": 1.0,
+          "luminance": 42.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_016",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.0,
+      "avgCrimson": 2.6,
+      "avgLuma": 22.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.1,
+          "crimsonIndex": 3.8,
+          "luminance": 11.3
+        },
+        {
+          "motionDelta": 19.3,
+          "crimsonIndex": 5.0,
+          "luminance": 27.9
+        },
+        {
+          "motionDelta": 13.2,
+          "crimsonIndex": 1.1,
+          "luminance": 14.8
+        },
+        {
+          "motionDelta": 26.9,
+          "crimsonIndex": 4.4,
+          "luminance": 25.8
+        },
+        {
+          "motionDelta": 17.9,
+          "crimsonIndex": 0.8,
+          "luminance": 25.0
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 3.1,
+          "luminance": 27.8
+        },
+        {
+          "motionDelta": 22.5,
+          "crimsonIndex": 0.0,
+          "luminance": 24.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_017",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 13.2,
+      "avgCrimson": 12.1,
+      "avgLuma": 33.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.0,
+          "crimsonIndex": 6.6,
+          "luminance": 37.0
+        },
+        {
+          "motionDelta": 11.7,
+          "crimsonIndex": 18.3,
+          "luminance": 33.6
+        },
+        {
+          "motionDelta": 10.2,
+          "crimsonIndex": 9.2,
+          "luminance": 20.3
+        },
+        {
+          "motionDelta": 12.8,
+          "crimsonIndex": 15.3,
+          "luminance": 36.3
+        },
+        {
+          "motionDelta": 15.1,
+          "crimsonIndex": 8.8,
+          "luminance": 37.7
+        },
+        {
+          "motionDelta": 8.7,
+          "crimsonIndex": 14.5,
+          "luminance": 35.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_018",
+      "game": "Sekiro: Shadows Die Twice",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.3,
+      "avgCrimson": 2.4,
+      "avgLuma": 78.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.1,
+          "crimsonIndex": 3.1,
+          "luminance": 84.1
+        },
+        {
+          "motionDelta": 18.2,
+          "crimsonIndex": 3.0,
+          "luminance": 81.6
+        },
+        {
+          "motionDelta": 20.8,
+          "crimsonIndex": 0.0,
+          "luminance": 67.3
+        },
+        {
+          "motionDelta": 28.1,
+          "crimsonIndex": 3.6,
+          "luminance": 81.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_019",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 71.7,
+      "avgCrimson": 57.6,
+      "avgLuma": 37.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 74.2,
+          "crimsonIndex": 40.9,
+          "luminance": 23.8
+        },
+        {
+          "motionDelta": 65.2,
+          "crimsonIndex": 71.0,
+          "luminance": 43.9
+        },
+        {
+          "motionDelta": 83.4,
+          "crimsonIndex": 71.0,
+          "luminance": 26.3
+        },
+        {
+          "motionDelta": 63.2,
+          "crimsonIndex": 39.1,
+          "luminance": 43.4
+        },
+        {
+          "motionDelta": 84.2,
+          "crimsonIndex": 51.3,
+          "luminance": 38.6
+        },
+        {
+          "motionDelta": 60.1,
+          "crimsonIndex": 72.2,
+          "luminance": 45.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_020",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 61.4,
+      "avgCrimson": 27.6,
+      "avgLuma": 49.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 64.9,
+          "crimsonIndex": 15.7,
+          "luminance": 50.8
+        },
+        {
+          "motionDelta": 50.6,
+          "crimsonIndex": 42.9,
+          "luminance": 53.1
+        },
+        {
+          "motionDelta": 64.5,
+          "crimsonIndex": 39.3,
+          "luminance": 34.3
+        },
+        {
+          "motionDelta": 62.5,
+          "crimsonIndex": 18.2,
+          "luminance": 55.5
+        },
+        {
+          "motionDelta": 64.3,
+          "crimsonIndex": 21.7,
+          "luminance": 53.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_021",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.9,
+      "avgCrimson": 3.1,
+      "avgLuma": 39.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 15.6,
+          "crimsonIndex": 6.6,
+          "luminance": 50.5
+        },
+        {
+          "motionDelta": 13.6,
+          "crimsonIndex": 5.3,
+          "luminance": 33.9
+        },
+        {
+          "motionDelta": 14.5,
+          "crimsonIndex": 0.6,
+          "luminance": 47.1
+        },
+        {
+          "motionDelta": 15.6,
+          "crimsonIndex": 4.1,
+          "luminance": 43.8
+        },
+        {
+          "motionDelta": 23.5,
+          "crimsonIndex": 2.6,
+          "luminance": 21.0
+        },
+        {
+          "motionDelta": 24.0,
+          "crimsonIndex": 2.1,
+          "luminance": 40.3
+        },
+        {
+          "motionDelta": 25.7,
+          "crimsonIndex": 0.3,
+          "luminance": 40.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_022",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.6,
+      "avgCrimson": 2.7,
+      "avgLuma": 17.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.7,
+          "crimsonIndex": 1.6,
+          "luminance": 20.9
+        },
+        {
+          "motionDelta": 20.2,
+          "crimsonIndex": 1.9,
+          "luminance": 20.4
+        },
+        {
+          "motionDelta": 16.1,
+          "crimsonIndex": 3.5,
+          "luminance": 10.0
+        },
+        {
+          "motionDelta": 26.8,
+          "crimsonIndex": 2.7,
+          "luminance": 22.9
+        },
+        {
+          "motionDelta": 23.9,
+          "crimsonIndex": 3.4,
+          "luminance": 16.6
+        },
+        {
+          "motionDelta": 13.1,
+          "crimsonIndex": 3.3,
+          "luminance": 15.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_023",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 16.3,
+      "avgCrimson": 11.5,
+      "avgLuma": 26.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 6.9,
+          "luminance": 37.5
+        },
+        {
+          "motionDelta": 15.1,
+          "crimsonIndex": 15.0,
+          "luminance": 23.2
+        },
+        {
+          "motionDelta": 17.8,
+          "crimsonIndex": 13.3,
+          "luminance": 19.8
+        },
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 10.7,
+          "luminance": 33.7
+        },
+        {
+          "motionDelta": 10.4,
+          "crimsonIndex": 13.5,
+          "luminance": 25.2
+        },
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 9.6,
+          "luminance": 20.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_024",
+      "game": "Lies of P",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.2,
+      "avgCrimson": 1.6,
+      "avgLuma": 79.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.4,
+          "crimsonIndex": 1.8,
+          "luminance": 71.4
+        },
+        {
+          "motionDelta": 21.6,
+          "crimsonIndex": 3.6,
+          "luminance": 88.9
+        },
+        {
+          "motionDelta": 16.7,
+          "crimsonIndex": 0.3,
+          "luminance": 80.5
+        },
+        {
+          "motionDelta": 24.1,
+          "crimsonIndex": 1.3,
+          "luminance": 89.6
+        },
+        {
+          "motionDelta": 26.0,
+          "crimsonIndex": 2.7,
+          "luminance": 71.7
+        },
+        {
+          "motionDelta": 17.2,
+          "crimsonIndex": 0.1,
+          "luminance": 72.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_025",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 77.7,
+      "avgCrimson": 63.7,
+      "avgLuma": 32.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 75.2,
+          "crimsonIndex": 65.7,
+          "luminance": 33.7
+        },
+        {
+          "motionDelta": 84.2,
+          "crimsonIndex": 58.0,
+          "luminance": 41.6
+        },
+        {
+          "motionDelta": 67.7,
+          "crimsonIndex": 51.0,
+          "luminance": 24.4
+        },
+        {
+          "motionDelta": 77.7,
+          "crimsonIndex": 70.7,
+          "luminance": 45.8
+        },
+        {
+          "motionDelta": 84.2,
+          "crimsonIndex": 66.1,
+          "luminance": 26.6
+        },
+        {
+          "motionDelta": 81.5,
+          "crimsonIndex": 62.8,
+          "luminance": 33.9
+        },
+        {
+          "motionDelta": 73.4,
+          "crimsonIndex": 71.7,
+          "luminance": 23.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_026",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 60.6,
+      "avgCrimson": 35.1,
+      "avgLuma": 49.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 62.8,
+          "crimsonIndex": 35.0,
+          "luminance": 59.6
+        },
+        {
+          "motionDelta": 57.5,
+          "crimsonIndex": 43.5,
+          "luminance": 56.2
+        },
+        {
+          "motionDelta": 57.9,
+          "crimsonIndex": 36.6,
+          "luminance": 42.7
+        },
+        {
+          "motionDelta": 63.6,
+          "crimsonIndex": 31.4,
+          "luminance": 56.4
+        },
+        {
+          "motionDelta": 61.3,
+          "crimsonIndex": 29.2,
+          "luminance": 34.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_027",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.6,
+      "avgCrimson": 1.6,
+      "avgLuma": 33.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.4,
+          "crimsonIndex": 2.2,
+          "luminance": 47.2
+        },
+        {
+          "motionDelta": 17.8,
+          "crimsonIndex": 1.9,
+          "luminance": 35.4
+        },
+        {
+          "motionDelta": 21.4,
+          "crimsonIndex": 1.9,
+          "luminance": 31.8
+        },
+        {
+          "motionDelta": 24.3,
+          "crimsonIndex": 0.6,
+          "luminance": 25.3
+        },
+        {
+          "motionDelta": 16.1,
+          "crimsonIndex": 1.2,
+          "luminance": 27.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_028",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.7,
+      "avgCrimson": 2.7,
+      "avgLuma": 20.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 18.5,
+          "crimsonIndex": 2.7,
+          "luminance": 17.5
+        },
+        {
+          "motionDelta": 15.3,
+          "crimsonIndex": 2.1,
+          "luminance": 26.3
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 3.5,
+          "luminance": 25.4
+        },
+        {
+          "motionDelta": 24.2,
+          "crimsonIndex": 1.9,
+          "luminance": 10.1
+        },
+        {
+          "motionDelta": 17.6,
+          "crimsonIndex": 3.8,
+          "luminance": 25.4
+        },
+        {
+          "motionDelta": 27.3,
+          "crimsonIndex": 2.1,
+          "luminance": 23.5
+        },
+        {
+          "motionDelta": 20.7,
+          "crimsonIndex": 3.0,
+          "luminance": 14.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_029",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 16.4,
+      "avgCrimson": 14.6,
+      "avgLuma": 30.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.8,
+          "crimsonIndex": 12.3,
+          "luminance": 24.7
+        },
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 17.0,
+          "luminance": 33.1
+        },
+        {
+          "motionDelta": 19.8,
+          "crimsonIndex": 18.8,
+          "luminance": 39.5
+        },
+        {
+          "motionDelta": 15.5,
+          "crimsonIndex": 18.6,
+          "luminance": 29.8
+        },
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 6.3,
+          "luminance": 25.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_030",
+      "game": "Black Myth: Wukong",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.4,
+      "avgCrimson": 2.4,
+      "avgLuma": 79.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.9,
+          "crimsonIndex": 1.0,
+          "luminance": 74.8
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 1.4,
+          "luminance": 91.4
+        },
+        {
+          "motionDelta": 18.5,
+          "crimsonIndex": 3.8,
+          "luminance": 77.6
+        },
+        {
+          "motionDelta": 27.4,
+          "crimsonIndex": 1.9,
+          "luminance": 87.5
+        },
+        {
+          "motionDelta": 14.8,
+          "crimsonIndex": 3.8,
+          "luminance": 71.7
+        },
+        {
+          "motionDelta": 15.1,
+          "crimsonIndex": 3.8,
+          "luminance": 66.2
+        },
+        {
+          "motionDelta": 14.5,
+          "crimsonIndex": 1.0,
+          "luminance": 90.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_031",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Битва с боссом на арене",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 72.1,
+      "avgCrimson": 58.2,
+      "avgLuma": 34.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 62.9,
+          "crimsonIndex": 53.9,
+          "luminance": 23.4
+        },
+        {
+          "motionDelta": 86.3,
+          "crimsonIndex": 53.6,
+          "luminance": 27.7
+        },
+        {
+          "motionDelta": 67.2,
+          "crimsonIndex": 59.2,
+          "luminance": 48.9
+        },
+        {
+          "motionDelta": 78.7,
+          "crimsonIndex": 66.1,
+          "luminance": 24.9
+        },
+        {
+          "motionDelta": 65.3,
+          "crimsonIndex": 58.1,
+          "luminance": 47.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_032",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Внезапная засада рыцарей",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 55.6,
+      "avgCrimson": 32.4,
+      "avgLuma": 43.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 52.3,
+          "crimsonIndex": 36.5,
+          "luminance": 27.7
+        },
+        {
+          "motionDelta": 60.0,
+          "crimsonIndex": 33.8,
+          "luminance": 28.6
+        },
+        {
+          "motionDelta": 62.1,
+          "crimsonIndex": 40.5,
+          "luminance": 46.0
+        },
+        {
+          "motionDelta": 45.1,
+          "crimsonIndex": 44.5,
+          "luminance": 52.4
+        },
+        {
+          "motionDelta": 51.0,
+          "crimsonIndex": 27.9,
+          "luminance": 38.0
+        },
+        {
+          "motionDelta": 55.2,
+          "crimsonIndex": 25.2,
+          "luminance": 54.7
+        },
+        {
+          "motionDelta": 63.4,
+          "crimsonIndex": 18.2,
+          "luminance": 58.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_033",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Исследование руин замка",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.0,
+      "avgCrimson": 2.3,
+      "avgLuma": 45.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 3.5,
+          "luminance": 45.7
+        },
+        {
+          "motionDelta": 25.4,
+          "crimsonIndex": 2.2,
+          "luminance": 48.3
+        },
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 3.9,
+          "luminance": 35.2
+        },
+        {
+          "motionDelta": 21.7,
+          "crimsonIndex": 2.1,
+          "luminance": 49.8
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 0.7,
+          "luminance": 50.9
+        },
+        {
+          "motionDelta": 13.9,
+          "crimsonIndex": 3.7,
+          "luminance": 41.4
+        },
+        {
+          "motionDelta": 16.1,
+          "crimsonIndex": 0.2,
+          "luminance": 49.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_034",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Скрытное проникновение за спину",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 17.8,
+      "avgCrimson": 2.4,
+      "avgLuma": 19.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 19.8,
+          "crimsonIndex": 1.8,
+          "luminance": 14.7
+        },
+        {
+          "motionDelta": 16.5,
+          "crimsonIndex": 3.0,
+          "luminance": 25.8
+        },
+        {
+          "motionDelta": 20.9,
+          "crimsonIndex": 2.6,
+          "luminance": 13.4
+        },
+        {
+          "motionDelta": 15.9,
+          "crimsonIndex": 2.0,
+          "luminance": 20.0
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 2.4,
+          "luminance": 22.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_035",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Катсцена фазы 2 босса",
+      "expectedVibe": "DRAMA",
+      "isBoss": true,
+      "isCutscene": true,
+      "avgMotion": 15.9,
+      "avgCrimson": 8.9,
+      "avgLuma": 25.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 19.1,
+          "crimsonIndex": 6.4,
+          "luminance": 20.5
+        },
+        {
+          "motionDelta": 17.7,
+          "crimsonIndex": 9.6,
+          "luminance": 29.5
+        },
+        {
+          "motionDelta": 14.6,
+          "crimsonIndex": 13.0,
+          "luminance": 25.6
+        },
+        {
+          "motionDelta": 18.4,
+          "crimsonIndex": 10.0,
+          "luminance": 32.6
+        },
+        {
+          "motionDelta": 11.8,
+          "crimsonIndex": 8.8,
+          "luminance": 18.0
+        },
+        {
+          "motionDelta": 10.7,
+          "crimsonIndex": 6.8,
+          "luminance": 28.4
+        },
+        {
+          "motionDelta": 18.7,
+          "crimsonIndex": 7.8,
+          "luminance": 20.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_036",
+      "game": "Bloodborne",
+      "genre": "SOULSLIKE",
+      "scenarioName": "Выход на панораму Древа Эрд",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 19.9,
+      "avgCrimson": 1.9,
+      "avgLuma": 79.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 18.4,
+          "crimsonIndex": 2.4,
+          "luminance": 87.8
+        },
+        {
+          "motionDelta": 23.5,
+          "crimsonIndex": 3.9,
+          "luminance": 90.0
+        },
+        {
+          "motionDelta": 18.7,
+          "crimsonIndex": 1.4,
+          "luminance": 74.1
+        },
+        {
+          "motionDelta": 25.3,
+          "crimsonIndex": 0.5,
+          "luminance": 66.4
+        },
+        {
+          "motionDelta": 14.9,
+          "crimsonIndex": 1.2,
+          "luminance": 93.3
+        },
+        {
+          "motionDelta": 24.2,
+          "crimsonIndex": 3.0,
+          "luminance": 68.1
+        },
+        {
+          "motionDelta": 14.2,
+          "crimsonIndex": 1.1,
+          "luminance": 79.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_037",
+      "game": "DOOM Eternal",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 80.4,
+      "avgCrimson": 34.9,
+      "avgLuma": 50.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 73.5,
+          "crimsonIndex": 21.5,
+          "luminance": 67.9
+        },
+        {
+          "motionDelta": 82.3,
+          "crimsonIndex": 44.7,
+          "luminance": 49.0
+        },
+        {
+          "motionDelta": 70.2,
+          "crimsonIndex": 38.9,
+          "luminance": 36.9
+        },
+        {
+          "motionDelta": 72.5,
+          "crimsonIndex": 36.9,
+          "luminance": 45.6
+        },
+        {
+          "motionDelta": 97.8,
+          "crimsonIndex": 23.6,
+          "luminance": 61.8
+        },
+        {
+          "motionDelta": 86.2,
+          "crimsonIndex": 43.7,
+          "luminance": 42.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_038",
+      "game": "DOOM Eternal",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 84.7,
+      "avgCrimson": 42.8,
+      "avgLuma": 52.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 86.3,
+          "crimsonIndex": 45.5,
+          "luminance": 60.1
+        },
+        {
+          "motionDelta": 99.8,
+          "crimsonIndex": 40.7,
+          "luminance": 51.7
+        },
+        {
+          "motionDelta": 90.2,
+          "crimsonIndex": 55.9,
+          "luminance": 63.2
+        },
+        {
+          "motionDelta": 80.2,
+          "crimsonIndex": 37.4,
+          "luminance": 53.1
+        },
+        {
+          "motionDelta": 78.9,
+          "crimsonIndex": 36.1,
+          "luminance": 32.6
+        },
+        {
+          "motionDelta": 75.1,
+          "crimsonIndex": 45.8,
+          "luminance": 50.8
+        },
+        {
+          "motionDelta": 82.3,
+          "crimsonIndex": 38.1,
+          "luminance": 54.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_039",
+      "game": "DOOM Eternal",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 35.3,
+      "avgCrimson": 2.8,
+      "avgLuma": 37.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 29.4,
+          "crimsonIndex": 1.4,
+          "luminance": 32.9
+        },
+        {
+          "motionDelta": 43.8,
+          "crimsonIndex": 3.5,
+          "luminance": 49.1
+        },
+        {
+          "motionDelta": 32.0,
+          "crimsonIndex": 0.7,
+          "luminance": 31.7
+        },
+        {
+          "motionDelta": 31.0,
+          "crimsonIndex": 1.6,
+          "luminance": 29.3
+        },
+        {
+          "motionDelta": 29.2,
+          "crimsonIndex": 4.8,
+          "luminance": 42.9
+        },
+        {
+          "motionDelta": 44.5,
+          "crimsonIndex": 5.5,
+          "luminance": 38.2
+        },
+        {
+          "motionDelta": 37.4,
+          "crimsonIndex": 1.8,
+          "luminance": 37.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_040",
+      "game": "DOOM Eternal",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 10.8,
+      "avgCrimson": 2.0,
+      "avgLuma": 32.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.5,
+          "crimsonIndex": 2.0,
+          "luminance": 22.0
+        },
+        {
+          "motionDelta": 5.5,
+          "crimsonIndex": 1.7,
+          "luminance": 28.1
+        },
+        {
+          "motionDelta": 8.3,
+          "crimsonIndex": 0.4,
+          "luminance": 44.0
+        },
+        {
+          "motionDelta": 15.9,
+          "crimsonIndex": 2.3,
+          "luminance": 43.8
+        },
+        {
+          "motionDelta": 18.0,
+          "crimsonIndex": 2.7,
+          "luminance": 26.7
+        },
+        {
+          "motionDelta": 5.5,
+          "crimsonIndex": 3.0,
+          "luminance": 31.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_041",
+      "game": "DOOM Eternal",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.0,
+      "avgCrimson": 1.1,
+      "avgLuma": 70.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 30.7,
+          "crimsonIndex": 0.4,
+          "luminance": 72.6
+        },
+        {
+          "motionDelta": 26.2,
+          "crimsonIndex": 1.0,
+          "luminance": 57.7
+        },
+        {
+          "motionDelta": 21.6,
+          "crimsonIndex": 0.7,
+          "luminance": 75.1
+        },
+        {
+          "motionDelta": 29.7,
+          "crimsonIndex": 0.7,
+          "luminance": 75.8
+        },
+        {
+          "motionDelta": 20.6,
+          "crimsonIndex": 1.9,
+          "luminance": 79.4
+        },
+        {
+          "motionDelta": 24.8,
+          "crimsonIndex": 0.9,
+          "luminance": 64.4
+        },
+        {
+          "motionDelta": 21.2,
+          "crimsonIndex": 1.9,
+          "luminance": 67.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_042",
+      "game": "Ultrakill",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 83.2,
+      "avgCrimson": 39.4,
+      "avgLuma": 50.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 87.7,
+          "crimsonIndex": 36.3,
+          "luminance": 49.5
+        },
+        {
+          "motionDelta": 73.6,
+          "crimsonIndex": 30.9,
+          "luminance": 61.5
+        },
+        {
+          "motionDelta": 86.8,
+          "crimsonIndex": 42.8,
+          "luminance": 42.1
+        },
+        {
+          "motionDelta": 84.5,
+          "crimsonIndex": 47.8,
+          "luminance": 50.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_043",
+      "game": "Ultrakill",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 89.8,
+      "avgCrimson": 43.5,
+      "avgLuma": 51.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 78.0,
+          "crimsonIndex": 64.1,
+          "luminance": 51.3
+        },
+        {
+          "motionDelta": 81.0,
+          "crimsonIndex": 35.5,
+          "luminance": 49.3
+        },
+        {
+          "motionDelta": 88.8,
+          "crimsonIndex": 33.3,
+          "luminance": 64.7
+        },
+        {
+          "motionDelta": 97.8,
+          "crimsonIndex": 46.2,
+          "luminance": 34.1
+        },
+        {
+          "motionDelta": 95.8,
+          "crimsonIndex": 47.4,
+          "luminance": 55.1
+        },
+        {
+          "motionDelta": 87.7,
+          "crimsonIndex": 39.6,
+          "luminance": 59.2
+        },
+        {
+          "motionDelta": 99.5,
+          "crimsonIndex": 38.5,
+          "luminance": 49.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_044",
+      "game": "Ultrakill",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 37.9,
+      "avgCrimson": 2.4,
+      "avgLuma": 44.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 31.8,
+          "crimsonIndex": 3.6,
+          "luminance": 47.4
+        },
+        {
+          "motionDelta": 30.7,
+          "crimsonIndex": 0.4,
+          "luminance": 48.2
+        },
+        {
+          "motionDelta": 45.1,
+          "crimsonIndex": 2.0,
+          "luminance": 48.6
+        },
+        {
+          "motionDelta": 33.3,
+          "crimsonIndex": 0.0,
+          "luminance": 46.8
+        },
+        {
+          "motionDelta": 44.7,
+          "crimsonIndex": 3.5,
+          "luminance": 44.8
+        },
+        {
+          "motionDelta": 45.3,
+          "crimsonIndex": 2.7,
+          "luminance": 39.5
+        },
+        {
+          "motionDelta": 34.6,
+          "crimsonIndex": 4.6,
+          "luminance": 36.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_045",
+      "game": "Ultrakill",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 10.9,
+      "avgCrimson": 2.9,
+      "avgLuma": 35.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.3,
+          "crimsonIndex": 3.9,
+          "luminance": 26.0
+        },
+        {
+          "motionDelta": 10.0,
+          "crimsonIndex": 3.4,
+          "luminance": 30.3
+        },
+        {
+          "motionDelta": 9.1,
+          "crimsonIndex": 1.9,
+          "luminance": 42.8
+        },
+        {
+          "motionDelta": 10.0,
+          "crimsonIndex": 4.0,
+          "luminance": 39.8
+        },
+        {
+          "motionDelta": 13.5,
+          "crimsonIndex": 0.6,
+          "luminance": 44.1
+        },
+        {
+          "motionDelta": 6.6,
+          "crimsonIndex": 3.9,
+          "luminance": 28.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_046",
+      "game": "Ultrakill",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 27.8,
+      "avgCrimson": 0.8,
+      "avgLuma": 70.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 30.0,
+          "crimsonIndex": 0.9,
+          "luminance": 70.8
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 1.4,
+          "luminance": 67.3
+        },
+        {
+          "motionDelta": 26.5,
+          "crimsonIndex": 0.3,
+          "luminance": 69.1
+        },
+        {
+          "motionDelta": 31.5,
+          "crimsonIndex": 0.7,
+          "luminance": 75.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_047",
+      "game": "Cyberpunk 2077",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 83.5,
+      "avgCrimson": 40.0,
+      "avgLuma": 57.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 93.6,
+          "crimsonIndex": 45.6,
+          "luminance": 65.1
+        },
+        {
+          "motionDelta": 79.4,
+          "crimsonIndex": 29.5,
+          "luminance": 60.2
+        },
+        {
+          "motionDelta": 90.8,
+          "crimsonIndex": 46.2,
+          "luminance": 36.3
+        },
+        {
+          "motionDelta": 70.1,
+          "crimsonIndex": 38.9,
+          "luminance": 67.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_048",
+      "game": "Cyberpunk 2077",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 90.1,
+      "avgCrimson": 51.2,
+      "avgLuma": 40.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 93.7,
+          "crimsonIndex": 45.2,
+          "luminance": 33.4
+        },
+        {
+          "motionDelta": 90.8,
+          "crimsonIndex": 60.5,
+          "luminance": 45.5
+        },
+        {
+          "motionDelta": 92.4,
+          "crimsonIndex": 61.6,
+          "luminance": 31.6
+        },
+        {
+          "motionDelta": 94.9,
+          "crimsonIndex": 40.3,
+          "luminance": 43.1
+        },
+        {
+          "motionDelta": 78.6,
+          "crimsonIndex": 48.6,
+          "luminance": 49.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_049",
+      "game": "Cyberpunk 2077",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 36.4,
+      "avgCrimson": 1.8,
+      "avgLuma": 43.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 31.4,
+          "crimsonIndex": 0.5,
+          "luminance": 51.1
+        },
+        {
+          "motionDelta": 40.4,
+          "crimsonIndex": 1.4,
+          "luminance": 52.4
+        },
+        {
+          "motionDelta": 30.9,
+          "crimsonIndex": 2.8,
+          "luminance": 32.6
+        },
+        {
+          "motionDelta": 33.1,
+          "crimsonIndex": 0.1,
+          "luminance": 49.1
+        },
+        {
+          "motionDelta": 46.0,
+          "crimsonIndex": 4.1,
+          "luminance": 29.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_050",
+      "game": "Cyberpunk 2077",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 13.0,
+      "avgCrimson": 2.8,
+      "avgLuma": 30.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 4.0,
+          "luminance": 27.5
+        },
+        {
+          "motionDelta": 17.5,
+          "crimsonIndex": 2.8,
+          "luminance": 31.4
+        },
+        {
+          "motionDelta": 8.9,
+          "crimsonIndex": 4.0,
+          "luminance": 41.3
+        },
+        {
+          "motionDelta": 6.4,
+          "crimsonIndex": 1.5,
+          "luminance": 29.0
+        },
+        {
+          "motionDelta": 8.8,
+          "crimsonIndex": 2.8,
+          "luminance": 20.5
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 1.6,
+          "luminance": 20.2
+        },
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 3.1,
+          "luminance": 44.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_051",
+      "game": "Cyberpunk 2077",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 22.9,
+      "avgCrimson": 1.2,
+      "avgLuma": 66.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 29.3,
+          "crimsonIndex": 1.8,
+          "luminance": 78.3
+        },
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 1.6,
+          "luminance": 61.6
+        },
+        {
+          "motionDelta": 19.0,
+          "crimsonIndex": 0.5,
+          "luminance": 77.7
+        },
+        {
+          "motionDelta": 28.3,
+          "crimsonIndex": 1.4,
+          "luminance": 59.1
+        },
+        {
+          "motionDelta": 17.6,
+          "crimsonIndex": 1.3,
+          "luminance": 56.2
+        },
+        {
+          "motionDelta": 28.6,
+          "crimsonIndex": 0.1,
+          "luminance": 65.9
+        },
+        {
+          "motionDelta": 18.1,
+          "crimsonIndex": 1.8,
+          "luminance": 64.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_052",
+      "game": "Apex Legends",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 83.7,
+      "avgCrimson": 36.2,
+      "avgLuma": 64.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 73.3,
+          "crimsonIndex": 24.0,
+          "luminance": 53.9
+        },
+        {
+          "motionDelta": 97.1,
+          "crimsonIndex": 35.9,
+          "luminance": 67.0
+        },
+        {
+          "motionDelta": 92.9,
+          "crimsonIndex": 27.7,
+          "luminance": 63.9
+        },
+        {
+          "motionDelta": 82.5,
+          "crimsonIndex": 44.2,
+          "luminance": 61.1
+        },
+        {
+          "motionDelta": 78.2,
+          "crimsonIndex": 23.5,
+          "luminance": 68.7
+        },
+        {
+          "motionDelta": 72.2,
+          "crimsonIndex": 49.0,
+          "luminance": 65.1
+        },
+        {
+          "motionDelta": 89.7,
+          "crimsonIndex": 49.4,
+          "luminance": 68.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_053",
+      "game": "Apex Legends",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 83.7,
+      "avgCrimson": 49.9,
+      "avgLuma": 48.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 77.3,
+          "crimsonIndex": 43.8,
+          "luminance": 39.3
+        },
+        {
+          "motionDelta": 78.1,
+          "crimsonIndex": 42.9,
+          "luminance": 56.2
+        },
+        {
+          "motionDelta": 81.6,
+          "crimsonIndex": 43.3,
+          "luminance": 52.3
+        },
+        {
+          "motionDelta": 84.3,
+          "crimsonIndex": 53.6,
+          "luminance": 46.5
+        },
+        {
+          "motionDelta": 90.5,
+          "crimsonIndex": 63.0,
+          "luminance": 41.5
+        },
+        {
+          "motionDelta": 90.3,
+          "crimsonIndex": 52.7,
+          "luminance": 52.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_054",
+      "game": "Apex Legends",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 37.3,
+      "avgCrimson": 2.9,
+      "avgLuma": 40.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 46.2,
+          "crimsonIndex": 1.8,
+          "luminance": 37.2
+        },
+        {
+          "motionDelta": 30.8,
+          "crimsonIndex": 5.7,
+          "luminance": 34.1
+        },
+        {
+          "motionDelta": 37.9,
+          "crimsonIndex": 0.6,
+          "luminance": 51.6
+        },
+        {
+          "motionDelta": 30.7,
+          "crimsonIndex": 2.7,
+          "luminance": 45.1
+        },
+        {
+          "motionDelta": 42.9,
+          "crimsonIndex": 5.7,
+          "luminance": 37.6
+        },
+        {
+          "motionDelta": 42.8,
+          "crimsonIndex": 0.9,
+          "luminance": 37.4
+        },
+        {
+          "motionDelta": 30.0,
+          "crimsonIndex": 2.9,
+          "luminance": 37.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_055",
+      "game": "Apex Legends",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 11.1,
+      "avgCrimson": 2.4,
+      "avgLuma": 31.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 5.4,
+          "crimsonIndex": 1.5,
+          "luminance": 31.1
+        },
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 3.4,
+          "luminance": 22.5
+        },
+        {
+          "motionDelta": 13.9,
+          "crimsonIndex": 2.2,
+          "luminance": 44.4
+        },
+        {
+          "motionDelta": 9.7,
+          "crimsonIndex": 1.6,
+          "luminance": 24.7
+        },
+        {
+          "motionDelta": 6.6,
+          "crimsonIndex": 3.4,
+          "luminance": 31.4
+        },
+        {
+          "motionDelta": 13.6,
+          "crimsonIndex": 2.6,
+          "luminance": 34.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_056",
+      "game": "Apex Legends",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 22.5,
+      "avgCrimson": 0.9,
+      "avgLuma": 80.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.8,
+          "crimsonIndex": 0.7,
+          "luminance": 84.7
+        },
+        {
+          "motionDelta": 28.6,
+          "crimsonIndex": 0.4,
+          "luminance": 79.9
+        },
+        {
+          "motionDelta": 24.9,
+          "crimsonIndex": 1.2,
+          "luminance": 79.4
+        },
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 1.5,
+          "luminance": 78.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_057",
+      "game": "Titanfall 2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 86.5,
+      "avgCrimson": 38.8,
+      "avgLuma": 47.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 76.3,
+          "crimsonIndex": 49.5,
+          "luminance": 69.6
+        },
+        {
+          "motionDelta": 84.2,
+          "crimsonIndex": 44.0,
+          "luminance": 38.8
+        },
+        {
+          "motionDelta": 94.0,
+          "crimsonIndex": 24.0,
+          "luminance": 47.5
+        },
+        {
+          "motionDelta": 91.7,
+          "crimsonIndex": 37.7,
+          "luminance": 35.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_058",
+      "game": "Titanfall 2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 92.0,
+      "avgCrimson": 41.4,
+      "avgLuma": 50.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 76.3,
+          "crimsonIndex": 56.0,
+          "luminance": 48.4
+        },
+        {
+          "motionDelta": 93.6,
+          "crimsonIndex": 46.7,
+          "luminance": 57.2
+        },
+        {
+          "motionDelta": 87.8,
+          "crimsonIndex": 33.8,
+          "luminance": 47.6
+        },
+        {
+          "motionDelta": 98.6,
+          "crimsonIndex": 31.5,
+          "luminance": 57.4
+        },
+        {
+          "motionDelta": 96.7,
+          "crimsonIndex": 48.3,
+          "luminance": 46.0
+        },
+        {
+          "motionDelta": 99.1,
+          "crimsonIndex": 32.1,
+          "luminance": 46.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_059",
+      "game": "Titanfall 2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 37.4,
+      "avgCrimson": 3.3,
+      "avgLuma": 38.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 36.5,
+          "crimsonIndex": 0.6,
+          "luminance": 46.4
+        },
+        {
+          "motionDelta": 36.9,
+          "crimsonIndex": 5.4,
+          "luminance": 34.7
+        },
+        {
+          "motionDelta": 31.0,
+          "crimsonIndex": 0.8,
+          "luminance": 43.7
+        },
+        {
+          "motionDelta": 39.7,
+          "crimsonIndex": 4.3,
+          "luminance": 36.4
+        },
+        {
+          "motionDelta": 39.9,
+          "crimsonIndex": 1.8,
+          "luminance": 40.2
+        },
+        {
+          "motionDelta": 36.6,
+          "crimsonIndex": 4.8,
+          "luminance": 28.4
+        },
+        {
+          "motionDelta": 41.1,
+          "crimsonIndex": 5.3,
+          "luminance": 41.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_060",
+      "game": "Titanfall 2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 11.8,
+      "avgCrimson": 1.9,
+      "avgLuma": 31.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 10.6,
+          "crimsonIndex": 3.6,
+          "luminance": 30.3
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 1.6,
+          "luminance": 38.2
+        },
+        {
+          "motionDelta": 9.1,
+          "crimsonIndex": 1.3,
+          "luminance": 26.4
+        },
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 2.7,
+          "luminance": 31.9
+        },
+        {
+          "motionDelta": 6.2,
+          "crimsonIndex": 0.3,
+          "luminance": 30.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_061",
+      "game": "Titanfall 2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.1,
+      "avgCrimson": 1.1,
+      "avgLuma": 71.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 29.0,
+          "crimsonIndex": 1.1,
+          "luminance": 72.6
+        },
+        {
+          "motionDelta": 25.0,
+          "crimsonIndex": 0.7,
+          "luminance": 58.7
+        },
+        {
+          "motionDelta": 21.7,
+          "crimsonIndex": 1.3,
+          "luminance": 77.5
+        },
+        {
+          "motionDelta": 29.9,
+          "crimsonIndex": 1.4,
+          "luminance": 84.1
+        },
+        {
+          "motionDelta": 25.6,
+          "crimsonIndex": 0.7,
+          "luminance": 72.3
+        },
+        {
+          "motionDelta": 19.4,
+          "crimsonIndex": 1.3,
+          "luminance": 61.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_062",
+      "game": "Trepang2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Бойня на арене с толпой демонов",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 82.0,
+      "avgCrimson": 35.8,
+      "avgLuma": 50.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 78.5,
+          "crimsonIndex": 36.7,
+          "luminance": 39.0
+        },
+        {
+          "motionDelta": 76.4,
+          "crimsonIndex": 26.8,
+          "luminance": 50.0
+        },
+        {
+          "motionDelta": 84.8,
+          "crimsonIndex": 43.0,
+          "luminance": 56.8
+        },
+        {
+          "motionDelta": 88.2,
+          "crimsonIndex": 36.7,
+          "luminance": 56.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_063",
+      "game": "Trepang2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Дуэль с Мародёром (босс)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 85.5,
+      "avgCrimson": 47.2,
+      "avgLuma": 41.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 75.7,
+          "crimsonIndex": 39.6,
+          "luminance": 56.7
+        },
+        {
+          "motionDelta": 98.0,
+          "crimsonIndex": 42.3,
+          "luminance": 36.3
+        },
+        {
+          "motionDelta": 78.6,
+          "crimsonIndex": 53.0,
+          "luminance": 32.4
+        },
+        {
+          "motionDelta": 93.5,
+          "crimsonIndex": 64.0,
+          "luminance": 33.2
+        },
+        {
+          "motionDelta": 88.3,
+          "crimsonIndex": 43.2,
+          "luminance": 45.9
+        },
+        {
+          "motionDelta": 78.9,
+          "crimsonIndex": 40.9,
+          "luminance": 41.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_064",
+      "game": "Trepang2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сбор боеприпасов и перемещение",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 35.9,
+      "avgCrimson": 2.0,
+      "avgLuma": 39.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 45.7,
+          "crimsonIndex": 0.9,
+          "luminance": 47.6
+        },
+        {
+          "motionDelta": 29.0,
+          "crimsonIndex": 0.5,
+          "luminance": 38.3
+        },
+        {
+          "motionDelta": 36.5,
+          "crimsonIndex": 3.6,
+          "luminance": 37.4
+        },
+        {
+          "motionDelta": 32.3,
+          "crimsonIndex": 3.1,
+          "luminance": 35.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_065",
+      "game": "Trepang2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Сюжетный диалог в лифте",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 10.7,
+      "avgCrimson": 0.9,
+      "avgLuma": 29.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 8.7,
+          "crimsonIndex": 2.7,
+          "luminance": 32.2
+        },
+        {
+          "motionDelta": 13.7,
+          "crimsonIndex": 0.2,
+          "luminance": 29.9
+        },
+        {
+          "motionDelta": 12.8,
+          "crimsonIndex": 0.0,
+          "luminance": 27.5
+        },
+        {
+          "motionDelta": 7.7,
+          "crimsonIndex": 0.5,
+          "luminance": 26.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_066",
+      "game": "Trepang2",
+      "genre": "FAST_FPS",
+      "scenarioName": "Вид на Найт-Сити с крыши",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.6,
+      "avgCrimson": 1.0,
+      "avgLuma": 67.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.9,
+          "crimsonIndex": 1.0,
+          "luminance": 67.9
+        },
+        {
+          "motionDelta": 18.1,
+          "crimsonIndex": 1.1,
+          "luminance": 61.9
+        },
+        {
+          "motionDelta": 24.9,
+          "crimsonIndex": 1.3,
+          "luminance": 65.6
+        },
+        {
+          "motionDelta": 22.4,
+          "crimsonIndex": 1.5,
+          "luminance": 68.1
+        },
+        {
+          "motionDelta": 23.4,
+          "crimsonIndex": 0.2,
+          "luminance": 64.4
+        },
+        {
+          "motionDelta": 22.9,
+          "crimsonIndex": 0.8,
+          "luminance": 74.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_067",
+      "game": "Resident Evil 4 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Атака бензопильщика в деревне",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 62.1,
+      "avgCrimson": 35.5,
+      "avgLuma": 34.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 51.5,
+          "crimsonIndex": 25.7,
+          "luminance": 28.1
+        },
+        {
+          "motionDelta": 72.0,
+          "crimsonIndex": 46.6,
+          "luminance": 40.8
+        },
+        {
+          "motionDelta": 75.6,
+          "crimsonIndex": 28.1,
+          "luminance": 41.1
+        },
+        {
+          "motionDelta": 55.3,
+          "crimsonIndex": 45.6,
+          "luminance": 33.1
+        },
+        {
+          "motionDelta": 59.9,
+          "crimsonIndex": 35.9,
+          "luminance": 28.5
+        },
+        {
+          "motionDelta": 58.0,
+          "crimsonIndex": 30.9,
+          "luminance": 32.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_068",
+      "game": "Resident Evil 4 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Схватка с некроморфом в коридоре",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 45.2,
+      "avgCrimson": 28.6,
+      "avgLuma": 26.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 50.7,
+          "crimsonIndex": 23.8,
+          "luminance": 29.9
+        },
+        {
+          "motionDelta": 46.4,
+          "crimsonIndex": 46.7,
+          "luminance": 26.8
+        },
+        {
+          "motionDelta": 41.5,
+          "crimsonIndex": 21.1,
+          "luminance": 17.9
+        },
+        {
+          "motionDelta": 42.2,
+          "crimsonIndex": 22.6,
+          "luminance": 29.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_069",
+      "game": "Resident Evil 4 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Поиск ключей в туманном коридоре",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 16.7,
+      "avgCrimson": 3.7,
+      "avgLuma": 15.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 10.5,
+          "crimsonIndex": 3.9,
+          "luminance": 14.9
+        },
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 3.8,
+          "luminance": 14.1
+        },
+        {
+          "motionDelta": 20.9,
+          "crimsonIndex": 2.8,
+          "luminance": 17.4
+        },
+        {
+          "motionDelta": 16.7,
+          "crimsonIndex": 4.3,
+          "luminance": 17.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_070",
+      "game": "Resident Evil 4 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Осмотр безопасной комнаты у пишущей машинки",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 11.3,
+      "avgCrimson": 0.8,
+      "avgLuma": 34.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 10.4,
+          "crimsonIndex": 0.9,
+          "luminance": 37.6
+        },
+        {
+          "motionDelta": 14.0,
+          "crimsonIndex": 1.2,
+          "luminance": 32.0
+        },
+        {
+          "motionDelta": 6.7,
+          "crimsonIndex": 0.9,
+          "luminance": 25.8
+        },
+        {
+          "motionDelta": 9.7,
+          "crimsonIndex": 0.6,
+          "luminance": 37.9
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 0.2,
+          "luminance": 36.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_071",
+      "game": "Resident Evil 4 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Сюжетное откровение в катсцене",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 13.7,
+      "avgCrimson": 2.0,
+      "avgLuma": 25.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 12.6,
+          "crimsonIndex": 3.3,
+          "luminance": 30.8
+        },
+        {
+          "motionDelta": 17.0,
+          "crimsonIndex": 2.7,
+          "luminance": 31.2
+        },
+        {
+          "motionDelta": 14.5,
+          "crimsonIndex": 1.9,
+          "luminance": 24.5
+        },
+        {
+          "motionDelta": 9.5,
+          "crimsonIndex": 0.4,
+          "luminance": 17.1
+        },
+        {
+          "motionDelta": 17.0,
+          "crimsonIndex": 2.1,
+          "luminance": 29.3
+        },
+        {
+          "motionDelta": 13.0,
+          "crimsonIndex": 1.0,
+          "luminance": 20.0
+        },
+        {
+          "motionDelta": 12.4,
+          "crimsonIndex": 2.6,
+          "luminance": 25.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_072",
+      "game": "Silent Hill 2 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Атака бензопильщика в деревне",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 67.0,
+      "avgCrimson": 48.0,
+      "avgLuma": 28.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 58.9,
+          "crimsonIndex": 57.1,
+          "luminance": 29.7
+        },
+        {
+          "motionDelta": 71.2,
+          "crimsonIndex": 48.8,
+          "luminance": 21.3
+        },
+        {
+          "motionDelta": 66.9,
+          "crimsonIndex": 36.7,
+          "luminance": 28.2
+        },
+        {
+          "motionDelta": 64.7,
+          "crimsonIndex": 38.5,
+          "luminance": 26.3
+        },
+        {
+          "motionDelta": 73.5,
+          "crimsonIndex": 58.8,
+          "luminance": 35.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_073",
+      "game": "Silent Hill 2 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Схватка с некроморфом в коридоре",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 48.5,
+      "avgCrimson": 37.2,
+      "avgLuma": 27.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 46.0,
+          "crimsonIndex": 35.5,
+          "luminance": 15.3
+        },
+        {
+          "motionDelta": 46.4,
+          "crimsonIndex": 47.0,
+          "luminance": 28.1
+        },
+        {
+          "motionDelta": 47.4,
+          "crimsonIndex": 35.9,
+          "luminance": 33.6
+        },
+        {
+          "motionDelta": 45.4,
+          "crimsonIndex": 29.3,
+          "luminance": 30.2
+        },
+        {
+          "motionDelta": 57.5,
+          "crimsonIndex": 38.1,
+          "luminance": 31.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_074",
+      "game": "Silent Hill 2 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Поиск ключей в туманном коридоре",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 15.3,
+      "avgCrimson": 1.4,
+      "avgLuma": 13.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.0,
+          "crimsonIndex": 2.1,
+          "luminance": 12.5
+        },
+        {
+          "motionDelta": 13.1,
+          "crimsonIndex": 0.9,
+          "luminance": 9.9
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 2.4,
+          "luminance": 10.1
+        },
+        {
+          "motionDelta": 9.9,
+          "crimsonIndex": 0.4,
+          "luminance": 21.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_075",
+      "game": "Silent Hill 2 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Осмотр безопасной комнаты у пишущей машинки",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 10.6,
+      "avgCrimson": 1.2,
+      "avgLuma": 37.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.1,
+          "crimsonIndex": 1.1,
+          "luminance": 39.8
+        },
+        {
+          "motionDelta": 11.3,
+          "crimsonIndex": 1.3,
+          "luminance": 42.5
+        },
+        {
+          "motionDelta": 12.2,
+          "crimsonIndex": 1.2,
+          "luminance": 28.1
+        },
+        {
+          "motionDelta": 7.8,
+          "crimsonIndex": 1.4,
+          "luminance": 37.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_076",
+      "game": "Silent Hill 2 Remake",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Сюжетное откровение в катсцене",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 14.7,
+      "avgCrimson": 3.6,
+      "avgLuma": 25.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 15.2,
+          "crimsonIndex": 0.3,
+          "luminance": 22.3
+        },
+        {
+          "motionDelta": 15.2,
+          "crimsonIndex": 5.8,
+          "luminance": 27.2
+        },
+        {
+          "motionDelta": 15.5,
+          "crimsonIndex": 4.7,
+          "luminance": 19.7
+        },
+        {
+          "motionDelta": 10.4,
+          "crimsonIndex": 5.8,
+          "luminance": 30.7
+        },
+        {
+          "motionDelta": 17.0,
+          "crimsonIndex": 1.2,
+          "luminance": 28.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_077",
+      "game": "Dead Space",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Атака бензопильщика в деревне",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 64.0,
+      "avgCrimson": 45.1,
+      "avgLuma": 32.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 61.9,
+          "crimsonIndex": 34.9,
+          "luminance": 29.5
+        },
+        {
+          "motionDelta": 63.8,
+          "crimsonIndex": 58.8,
+          "luminance": 40.4
+        },
+        {
+          "motionDelta": 72.0,
+          "crimsonIndex": 29.8,
+          "luminance": 26.3
+        },
+        {
+          "motionDelta": 67.2,
+          "crimsonIndex": 55.6,
+          "luminance": 33.9
+        },
+        {
+          "motionDelta": 51.1,
+          "crimsonIndex": 54.6,
+          "luminance": 41.3
+        },
+        {
+          "motionDelta": 56.6,
+          "crimsonIndex": 51.7,
+          "luminance": 26.8
+        },
+        {
+          "motionDelta": 75.2,
+          "crimsonIndex": 30.2,
+          "luminance": 30.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_078",
+      "game": "Dead Space",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Схватка с некроморфом в коридоре",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 48.9,
+      "avgCrimson": 27.6,
+      "avgLuma": 22.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 57.6,
+          "crimsonIndex": 44.5,
+          "luminance": 33.4
+        },
+        {
+          "motionDelta": 48.0,
+          "crimsonIndex": 29.9,
+          "luminance": 20.6
+        },
+        {
+          "motionDelta": 47.3,
+          "crimsonIndex": 20.4,
+          "luminance": 17.2
+        },
+        {
+          "motionDelta": 45.6,
+          "crimsonIndex": 21.0,
+          "luminance": 28.4
+        },
+        {
+          "motionDelta": 46.0,
+          "crimsonIndex": 22.4,
+          "luminance": 12.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_079",
+      "game": "Dead Space",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Поиск ключей в туманном коридоре",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 13.9,
+      "avgCrimson": 2.5,
+      "avgLuma": 12.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.7,
+          "crimsonIndex": 0.7,
+          "luminance": 18.7
+        },
+        {
+          "motionDelta": 14.3,
+          "crimsonIndex": 0.0,
+          "luminance": 7.4
+        },
+        {
+          "motionDelta": 11.6,
+          "crimsonIndex": 4.2,
+          "luminance": 15.9
+        },
+        {
+          "motionDelta": 18.2,
+          "crimsonIndex": 2.6,
+          "luminance": 8.0
+        },
+        {
+          "motionDelta": 12.0,
+          "crimsonIndex": 1.5,
+          "luminance": 6.9
+        },
+        {
+          "motionDelta": 13.9,
+          "crimsonIndex": 4.0,
+          "luminance": 14.2
+        },
+        {
+          "motionDelta": 9.6,
+          "crimsonIndex": 4.5,
+          "luminance": 16.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_080",
+      "game": "Dead Space",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Осмотр безопасной комнаты у пишущей машинки",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 11.0,
+      "avgCrimson": 0.6,
+      "avgLuma": 38.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 12.3,
+          "crimsonIndex": 1.2,
+          "luminance": 39.4
+        },
+        {
+          "motionDelta": 8.9,
+          "crimsonIndex": 0.0,
+          "luminance": 32.1
+        },
+        {
+          "motionDelta": 11.7,
+          "crimsonIndex": 0.4,
+          "luminance": 38.4
+        },
+        {
+          "motionDelta": 11.2,
+          "crimsonIndex": 0.7,
+          "luminance": 44.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_081",
+      "game": "Dead Space",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Сюжетное откровение в катсцене",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 15.0,
+      "avgCrimson": 2.8,
+      "avgLuma": 25.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.9,
+          "crimsonIndex": 2.8,
+          "luminance": 27.7
+        },
+        {
+          "motionDelta": 17.8,
+          "crimsonIndex": 1.5,
+          "luminance": 15.3
+        },
+        {
+          "motionDelta": 15.9,
+          "crimsonIndex": 2.1,
+          "luminance": 29.7
+        },
+        {
+          "motionDelta": 14.3,
+          "crimsonIndex": 4.6,
+          "luminance": 29.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_082",
+      "game": "Alan Wake 2",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Атака бензопильщика в деревне",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 62.1,
+      "avgCrimson": 41.9,
+      "avgLuma": 33.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 52.0,
+          "crimsonIndex": 37.3,
+          "luminance": 28.5
+        },
+        {
+          "motionDelta": 67.3,
+          "crimsonIndex": 54.1,
+          "luminance": 37.1
+        },
+        {
+          "motionDelta": 77.4,
+          "crimsonIndex": 41.7,
+          "luminance": 24.6
+        },
+        {
+          "motionDelta": 52.0,
+          "crimsonIndex": 50.1,
+          "luminance": 43.6
+        },
+        {
+          "motionDelta": 49.1,
+          "crimsonIndex": 32.1,
+          "luminance": 39.8
+        },
+        {
+          "motionDelta": 74.6,
+          "crimsonIndex": 36.0,
+          "luminance": 27.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_083",
+      "game": "Alan Wake 2",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Схватка с некроморфом в коридоре",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 56.1,
+      "avgCrimson": 34.6,
+      "avgLuma": 23.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 61.7,
+          "crimsonIndex": 34.3,
+          "luminance": 17.8
+        },
+        {
+          "motionDelta": 56.1,
+          "crimsonIndex": 23.7,
+          "luminance": 20.2
+        },
+        {
+          "motionDelta": 56.7,
+          "crimsonIndex": 44.0,
+          "luminance": 19.6
+        },
+        {
+          "motionDelta": 41.0,
+          "crimsonIndex": 29.0,
+          "luminance": 32.5
+        },
+        {
+          "motionDelta": 55.8,
+          "crimsonIndex": 44.8,
+          "luminance": 20.9
+        },
+        {
+          "motionDelta": 61.4,
+          "crimsonIndex": 32.9,
+          "luminance": 23.4
+        },
+        {
+          "motionDelta": 60.2,
+          "crimsonIndex": 33.6,
+          "luminance": 30.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_084",
+      "game": "Alan Wake 2",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Поиск ключей в туманном коридоре",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 15.4,
+      "avgCrimson": 2.2,
+      "avgLuma": 15.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 9.1,
+          "crimsonIndex": 3.0,
+          "luminance": 20.8
+        },
+        {
+          "motionDelta": 15.6,
+          "crimsonIndex": 1.6,
+          "luminance": 7.4
+        },
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 1.5,
+          "luminance": 16.8
+        },
+        {
+          "motionDelta": 14.0,
+          "crimsonIndex": 3.4,
+          "luminance": 12.3
+        },
+        {
+          "motionDelta": 8.6,
+          "crimsonIndex": 4.4,
+          "luminance": 12.3
+        },
+        {
+          "motionDelta": 22.0,
+          "crimsonIndex": 1.4,
+          "luminance": 23.6
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 0.4,
+          "luminance": 17.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_085",
+      "game": "Alan Wake 2",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Осмотр безопасной комнаты у пишущей машинки",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 9.4,
+      "avgCrimson": 0.9,
+      "avgLuma": 33.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.1,
+          "crimsonIndex": 1.5,
+          "luminance": 28.2
+        },
+        {
+          "motionDelta": 6.3,
+          "crimsonIndex": 1.7,
+          "luminance": 38.6
+        },
+        {
+          "motionDelta": 10.4,
+          "crimsonIndex": 0.3,
+          "luminance": 29.7
+        },
+        {
+          "motionDelta": 12.5,
+          "crimsonIndex": 0.7,
+          "luminance": 44.0
+        },
+        {
+          "motionDelta": 6.3,
+          "crimsonIndex": 0.3,
+          "luminance": 34.0
+        },
+        {
+          "motionDelta": 9.7,
+          "crimsonIndex": 0.9,
+          "luminance": 26.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_086",
+      "game": "Alan Wake 2",
+      "genre": "SURVIVAL_HORROR",
+      "scenarioName": "Сюжетное откровение в катсцене",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 13.1,
+      "avgCrimson": 1.7,
+      "avgLuma": 28.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 13.3,
+          "crimsonIndex": 2.4,
+          "luminance": 28.0
+        },
+        {
+          "motionDelta": 10.5,
+          "crimsonIndex": 0.7,
+          "luminance": 29.7
+        },
+        {
+          "motionDelta": 13.0,
+          "crimsonIndex": 2.3,
+          "luminance": 26.2
+        },
+        {
+          "motionDelta": 10.6,
+          "crimsonIndex": 1.6,
+          "luminance": 23.9
+        },
+        {
+          "motionDelta": 18.0,
+          "crimsonIndex": 1.7,
+          "luminance": 33.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_087",
+      "game": "Dishonored 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Прокрадывание мимо патруля в тени",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.4,
+      "avgCrimson": 2.1,
+      "avgLuma": 22.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 16.8,
+          "crimsonIndex": 0.5,
+          "luminance": 11.6
+        },
+        {
+          "motionDelta": 16.4,
+          "crimsonIndex": 2.9,
+          "luminance": 31.9
+        },
+        {
+          "motionDelta": 25.3,
+          "crimsonIndex": 3.9,
+          "luminance": 31.7
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 2.8,
+          "luminance": 22.1
+        },
+        {
+          "motionDelta": 18.1,
+          "crimsonIndex": 1.2,
+          "luminance": 13.5
+        },
+        {
+          "motionDelta": 23.9,
+          "crimsonIndex": 2.8,
+          "luminance": 13.8
+        },
+        {
+          "motionDelta": 19.1,
+          "crimsonIndex": 0.9,
+          "luminance": 31.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_088",
+      "game": "Dishonored 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Тревога! Перестрелка с охраной",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 53.8,
+      "avgCrimson": 31.4,
+      "avgLuma": 39.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 50.6,
+          "crimsonIndex": 28.8,
+          "luminance": 35.8
+        },
+        {
+          "motionDelta": 60.0,
+          "crimsonIndex": 28.2,
+          "luminance": 54.5
+        },
+        {
+          "motionDelta": 47.6,
+          "crimsonIndex": 39.0,
+          "luminance": 27.0
+        },
+        {
+          "motionDelta": 55.1,
+          "crimsonIndex": 34.6,
+          "luminance": 39.4
+        },
+        {
+          "motionDelta": 55.5,
+          "crimsonIndex": 26.6,
+          "luminance": 42.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_089",
+      "game": "Dishonored 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Ликвидация ключевой цели (босса)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 70.0,
+      "avgCrimson": 32.2,
+      "avgLuma": 32.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 77.3,
+          "crimsonIndex": 38.0,
+          "luminance": 31.2
+        },
+        {
+          "motionDelta": 69.7,
+          "crimsonIndex": 29.6,
+          "luminance": 41.9
+        },
+        {
+          "motionDelta": 72.3,
+          "crimsonIndex": 37.9,
+          "luminance": 24.5
+        },
+        {
+          "motionDelta": 77.1,
+          "crimsonIndex": 32.1,
+          "luminance": 42.8
+        },
+        {
+          "motionDelta": 53.4,
+          "crimsonIndex": 23.5,
+          "luminance": 23.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_090",
+      "game": "Dishonored 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Осмотр локации через бинокль",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 13.7,
+      "avgCrimson": 1.2,
+      "avgLuma": 56.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 11.9,
+          "crimsonIndex": 1.9,
+          "luminance": 46.8
+        },
+        {
+          "motionDelta": 21.4,
+          "crimsonIndex": 1.0,
+          "luminance": 48.5
+        },
+        {
+          "motionDelta": 10.9,
+          "crimsonIndex": 0.4,
+          "luminance": 68.7
+        },
+        {
+          "motionDelta": 13.3,
+          "crimsonIndex": 1.3,
+          "luminance": 58.4
+        },
+        {
+          "motionDelta": 11.1,
+          "crimsonIndex": 1.3,
+          "luminance": 57.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_091",
+      "game": "Dishonored 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Вид на аномальную зону на рассвете",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 19.6,
+      "avgCrimson": 1.0,
+      "avgLuma": 72.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.4,
+          "crimsonIndex": 1.2,
+          "luminance": 87.1
+        },
+        {
+          "motionDelta": 16.7,
+          "crimsonIndex": 1.8,
+          "luminance": 61.2
+        },
+        {
+          "motionDelta": 24.1,
+          "crimsonIndex": 0.2,
+          "luminance": 88.5
+        },
+        {
+          "motionDelta": 22.8,
+          "crimsonIndex": 0.5,
+          "luminance": 66.3
+        },
+        {
+          "motionDelta": 20.0,
+          "crimsonIndex": 1.2,
+          "luminance": 60.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_092",
+      "game": "Hitman 3",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Прокрадывание мимо патруля в тени",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 22.9,
+      "avgCrimson": 1.3,
+      "avgLuma": 21.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.0,
+          "crimsonIndex": 1.2,
+          "luminance": 15.4
+        },
+        {
+          "motionDelta": 25.3,
+          "crimsonIndex": 1.6,
+          "luminance": 20.0
+        },
+        {
+          "motionDelta": 23.6,
+          "crimsonIndex": 0.6,
+          "luminance": 19.1
+        },
+        {
+          "motionDelta": 20.5,
+          "crimsonIndex": 1.4,
+          "luminance": 13.2
+        },
+        {
+          "motionDelta": 26.1,
+          "crimsonIndex": 1.3,
+          "luminance": 31.7
+        },
+        {
+          "motionDelta": 18.8,
+          "crimsonIndex": 1.6,
+          "luminance": 26.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_093",
+      "game": "Hitman 3",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Тревога! Перестрелка с охраной",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 56.7,
+      "avgCrimson": 24.7,
+      "avgLuma": 33.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 52.9,
+          "crimsonIndex": 28.1,
+          "luminance": 33.0
+        },
+        {
+          "motionDelta": 50.9,
+          "crimsonIndex": 18.5,
+          "luminance": 33.7
+        },
+        {
+          "motionDelta": 54.8,
+          "crimsonIndex": 32.0,
+          "luminance": 32.4
+        },
+        {
+          "motionDelta": 68.2,
+          "crimsonIndex": 20.2,
+          "luminance": 34.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_094",
+      "game": "Hitman 3",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Ликвидация ключевой цели (босса)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 60.4,
+      "avgCrimson": 33.5,
+      "avgLuma": 31.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 56.9,
+          "crimsonIndex": 24.5,
+          "luminance": 44.9
+        },
+        {
+          "motionDelta": 64.1,
+          "crimsonIndex": 44.6,
+          "luminance": 32.4
+        },
+        {
+          "motionDelta": 54.3,
+          "crimsonIndex": 31.0,
+          "luminance": 31.4
+        },
+        {
+          "motionDelta": 58.3,
+          "crimsonIndex": 36.3,
+          "luminance": 21.2
+        },
+        {
+          "motionDelta": 59.3,
+          "crimsonIndex": 36.7,
+          "luminance": 41.1
+        },
+        {
+          "motionDelta": 69.5,
+          "crimsonIndex": 28.0,
+          "luminance": 20.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_095",
+      "game": "Hitman 3",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Осмотр локации через бинокль",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 15.5,
+      "avgCrimson": 1.0,
+      "avgLuma": 58.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 15.2,
+          "crimsonIndex": 1.8,
+          "luminance": 61.8
+        },
+        {
+          "motionDelta": 19.2,
+          "crimsonIndex": 0.7,
+          "luminance": 52.0
+        },
+        {
+          "motionDelta": 16.8,
+          "crimsonIndex": 0.4,
+          "luminance": 56.6
+        },
+        {
+          "motionDelta": 10.9,
+          "crimsonIndex": 1.0,
+          "luminance": 62.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_096",
+      "game": "Hitman 3",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Вид на аномальную зону на рассвете",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.9,
+      "avgCrimson": 0.8,
+      "avgLuma": 73.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.6,
+          "crimsonIndex": 1.2,
+          "luminance": 78.3
+        },
+        {
+          "motionDelta": 13.8,
+          "crimsonIndex": 0.2,
+          "luminance": 71.2
+        },
+        {
+          "motionDelta": 25.8,
+          "crimsonIndex": 1.1,
+          "luminance": 71.0
+        },
+        {
+          "motionDelta": 14.0,
+          "crimsonIndex": 1.2,
+          "luminance": 72.0
+        },
+        {
+          "motionDelta": 12.6,
+          "crimsonIndex": 0.1,
+          "luminance": 81.4
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 1.0,
+          "luminance": 64.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_097",
+      "game": "Metal Gear Solid V",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Прокрадывание мимо патруля в тени",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.7,
+      "avgCrimson": 2.5,
+      "avgLuma": 22.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 2.5,
+          "luminance": 13.6
+        },
+        {
+          "motionDelta": 27.9,
+          "crimsonIndex": 3.0,
+          "luminance": 16.6
+        },
+        {
+          "motionDelta": 18.7,
+          "crimsonIndex": 3.3,
+          "luminance": 21.7
+        },
+        {
+          "motionDelta": 23.9,
+          "crimsonIndex": 1.2,
+          "luminance": 27.9
+        },
+        {
+          "motionDelta": 19.2,
+          "crimsonIndex": 2.7,
+          "luminance": 31.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_098",
+      "game": "Metal Gear Solid V",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Тревога! Перестрелка с охраной",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 58.5,
+      "avgCrimson": 32.7,
+      "avgLuma": 41.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 66.3,
+          "crimsonIndex": 34.9,
+          "luminance": 45.6
+        },
+        {
+          "motionDelta": 44.7,
+          "crimsonIndex": 28.3,
+          "luminance": 54.0
+        },
+        {
+          "motionDelta": 65.9,
+          "crimsonIndex": 36.2,
+          "luminance": 42.3
+        },
+        {
+          "motionDelta": 64.2,
+          "crimsonIndex": 31.2,
+          "luminance": 30.1
+        },
+        {
+          "motionDelta": 61.6,
+          "crimsonIndex": 32.1,
+          "luminance": 50.2
+        },
+        {
+          "motionDelta": 48.1,
+          "crimsonIndex": 33.7,
+          "luminance": 25.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_099",
+      "game": "Metal Gear Solid V",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Ликвидация ключевой цели (босса)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 64.6,
+      "avgCrimson": 32.8,
+      "avgLuma": 34.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 57.0,
+          "crimsonIndex": 32.3,
+          "luminance": 30.5
+        },
+        {
+          "motionDelta": 62.7,
+          "crimsonIndex": 25.7,
+          "luminance": 32.5
+        },
+        {
+          "motionDelta": 67.9,
+          "crimsonIndex": 33.2,
+          "luminance": 41.2
+        },
+        {
+          "motionDelta": 70.9,
+          "crimsonIndex": 39.8,
+          "luminance": 33.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_100",
+      "game": "Metal Gear Solid V",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Осмотр локации через бинокль",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 17.9,
+      "avgCrimson": 1.4,
+      "avgLuma": 56.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 22.0,
+          "crimsonIndex": 1.0,
+          "luminance": 51.3
+        },
+        {
+          "motionDelta": 21.5,
+          "crimsonIndex": 0.9,
+          "luminance": 56.0
+        },
+        {
+          "motionDelta": 16.6,
+          "crimsonIndex": 1.4,
+          "luminance": 66.0
+        },
+        {
+          "motionDelta": 18.2,
+          "crimsonIndex": 1.6,
+          "luminance": 47.9
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 1.9,
+          "luminance": 48.4
+        },
+        {
+          "motionDelta": 13.6,
+          "crimsonIndex": 1.9,
+          "luminance": 69.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_101",
+      "game": "Metal Gear Solid V",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Вид на аномальную зону на рассвете",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.6,
+      "avgCrimson": 1.4,
+      "avgLuma": 73.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 1.4,
+          "luminance": 74.7
+        },
+        {
+          "motionDelta": 18.7,
+          "crimsonIndex": 1.1,
+          "luminance": 88.0
+        },
+        {
+          "motionDelta": 22.1,
+          "crimsonIndex": 0.6,
+          "luminance": 77.2
+        },
+        {
+          "motionDelta": 19.6,
+          "crimsonIndex": 1.8,
+          "luminance": 71.8
+        },
+        {
+          "motionDelta": 16.8,
+          "crimsonIndex": 1.5,
+          "luminance": 64.4
+        },
+        {
+          "motionDelta": 12.6,
+          "crimsonIndex": 1.9,
+          "luminance": 62.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_102",
+      "game": "S.T.A.L.K.E.R. 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Прокрадывание мимо патруля в тени",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 19.4,
+      "avgCrimson": 1.6,
+      "avgLuma": 23.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.2,
+          "crimsonIndex": 3.0,
+          "luminance": 14.7
+        },
+        {
+          "motionDelta": 25.6,
+          "crimsonIndex": 1.1,
+          "luminance": 22.4
+        },
+        {
+          "motionDelta": 17.8,
+          "crimsonIndex": 0.4,
+          "luminance": 26.3
+        },
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 0.2,
+          "luminance": 29.9
+        },
+        {
+          "motionDelta": 17.2,
+          "crimsonIndex": 0.9,
+          "luminance": 12.2
+        },
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 1.9,
+          "luminance": 25.0
+        },
+        {
+          "motionDelta": 15.9,
+          "crimsonIndex": 3.9,
+          "luminance": 31.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_103",
+      "game": "S.T.A.L.K.E.R. 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Тревога! Перестрелка с охраной",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 55.3,
+      "avgCrimson": 33.1,
+      "avgLuma": 50.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 55.4,
+          "crimsonIndex": 40.3,
+          "luminance": 51.4
+        },
+        {
+          "motionDelta": 57.4,
+          "crimsonIndex": 21.2,
+          "luminance": 53.9
+        },
+        {
+          "motionDelta": 53.0,
+          "crimsonIndex": 32.8,
+          "luminance": 52.2
+        },
+        {
+          "motionDelta": 46.5,
+          "crimsonIndex": 30.9,
+          "luminance": 41.1
+        },
+        {
+          "motionDelta": 64.2,
+          "crimsonIndex": 40.4,
+          "luminance": 52.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_104",
+      "game": "S.T.A.L.K.E.R. 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Ликвидация ключевой цели (босса)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 60.0,
+      "avgCrimson": 39.0,
+      "avgLuma": 36.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 62.9,
+          "crimsonIndex": 43.5,
+          "luminance": 43.3
+        },
+        {
+          "motionDelta": 52.9,
+          "crimsonIndex": 43.4,
+          "luminance": 39.7
+        },
+        {
+          "motionDelta": 56.8,
+          "crimsonIndex": 41.0,
+          "luminance": 41.8
+        },
+        {
+          "motionDelta": 59.5,
+          "crimsonIndex": 21.0,
+          "luminance": 27.5
+        },
+        {
+          "motionDelta": 67.7,
+          "crimsonIndex": 46.0,
+          "luminance": 28.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_105",
+      "game": "S.T.A.L.K.E.R. 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Осмотр локации через бинокль",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.5,
+      "avgCrimson": 1.0,
+      "avgLuma": 53.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 1.1,
+          "luminance": 54.8
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 1.7,
+          "luminance": 54.0
+        },
+        {
+          "motionDelta": 12.3,
+          "crimsonIndex": 0.2,
+          "luminance": 44.9
+        },
+        {
+          "motionDelta": 15.5,
+          "crimsonIndex": 0.5,
+          "luminance": 45.6
+        },
+        {
+          "motionDelta": 18.8,
+          "crimsonIndex": 1.6,
+          "luminance": 57.0
+        },
+        {
+          "motionDelta": 19.1,
+          "crimsonIndex": 0.4,
+          "luminance": 65.7
+        },
+        {
+          "motionDelta": 20.8,
+          "crimsonIndex": 1.7,
+          "luminance": 55.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_106",
+      "game": "S.T.A.L.K.E.R. 2",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Вид на аномальную зону на рассвете",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 17.6,
+      "avgCrimson": 1.1,
+      "avgLuma": 73.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.6,
+          "crimsonIndex": 0.2,
+          "luminance": 89.5
+        },
+        {
+          "motionDelta": 18.7,
+          "crimsonIndex": 1.9,
+          "luminance": 60.2
+        },
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 0.9,
+          "luminance": 68.0
+        },
+        {
+          "motionDelta": 16.6,
+          "crimsonIndex": 1.2,
+          "luminance": 77.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_107",
+      "game": "Metro Exodus",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Прокрадывание мимо патруля в тени",
+      "expectedVibe": "STEALTH",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.7,
+      "avgCrimson": 1.9,
+      "avgLuma": 21.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 23.2,
+          "crimsonIndex": 2.8,
+          "luminance": 11.4
+        },
+        {
+          "motionDelta": 15.7,
+          "crimsonIndex": 1.2,
+          "luminance": 18.9
+        },
+        {
+          "motionDelta": 21.0,
+          "crimsonIndex": 3.6,
+          "luminance": 25.5
+        },
+        {
+          "motionDelta": 18.4,
+          "crimsonIndex": 0.5,
+          "luminance": 30.2
+        },
+        {
+          "motionDelta": 18.1,
+          "crimsonIndex": 2.5,
+          "luminance": 14.8
+        },
+        {
+          "motionDelta": 15.9,
+          "crimsonIndex": 0.6,
+          "luminance": 26.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_108",
+      "game": "Metro Exodus",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Тревога! Перестрелка с охраной",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 52.9,
+      "avgCrimson": 31.1,
+      "avgLuma": 39.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 55.6,
+          "crimsonIndex": 30.3,
+          "luminance": 39.1
+        },
+        {
+          "motionDelta": 59.1,
+          "crimsonIndex": 33.3,
+          "luminance": 31.6
+        },
+        {
+          "motionDelta": 50.9,
+          "crimsonIndex": 35.6,
+          "luminance": 51.2
+        },
+        {
+          "motionDelta": 46.3,
+          "crimsonIndex": 27.6,
+          "luminance": 46.1
+        },
+        {
+          "motionDelta": 46.2,
+          "crimsonIndex": 30.7,
+          "luminance": 26.9
+        },
+        {
+          "motionDelta": 59.3,
+          "crimsonIndex": 29.1,
+          "luminance": 42.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_109",
+      "game": "Metro Exodus",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Ликвидация ключевой цели (босса)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 64.7,
+      "avgCrimson": 37.4,
+      "avgLuma": 29.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 56.3,
+          "crimsonIndex": 43.9,
+          "luminance": 31.0
+        },
+        {
+          "motionDelta": 69.7,
+          "crimsonIndex": 40.1,
+          "luminance": 32.2
+        },
+        {
+          "motionDelta": 75.4,
+          "crimsonIndex": 32.5,
+          "luminance": 21.4
+        },
+        {
+          "motionDelta": 55.4,
+          "crimsonIndex": 31.6,
+          "luminance": 34.1
+        },
+        {
+          "motionDelta": 66.5,
+          "crimsonIndex": 38.8,
+          "luminance": 27.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_110",
+      "game": "Metro Exodus",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Осмотр локации через бинокль",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 13.3,
+      "avgCrimson": 1.4,
+      "avgLuma": 55.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.8,
+          "crimsonIndex": 1.6,
+          "luminance": 62.4
+        },
+        {
+          "motionDelta": 16.9,
+          "crimsonIndex": 0.1,
+          "luminance": 50.3
+        },
+        {
+          "motionDelta": 10.8,
+          "crimsonIndex": 2.0,
+          "luminance": 68.0
+        },
+        {
+          "motionDelta": 10.8,
+          "crimsonIndex": 1.9,
+          "luminance": 41.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_111",
+      "game": "Metro Exodus",
+      "genre": "STEALTH_SIM",
+      "scenarioName": "Вид на аномальную зону на рассвете",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.6,
+      "avgCrimson": 1.1,
+      "avgLuma": 81.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.5,
+          "crimsonIndex": 0.3,
+          "luminance": 79.2
+        },
+        {
+          "motionDelta": 22.2,
+          "crimsonIndex": 1.9,
+          "luminance": 71.2
+        },
+        {
+          "motionDelta": 24.5,
+          "crimsonIndex": 0.9,
+          "luminance": 87.5
+        },
+        {
+          "motionDelta": 17.3,
+          "crimsonIndex": 0.2,
+          "luminance": 88.9
+        },
+        {
+          "motionDelta": 24.2,
+          "crimsonIndex": 0.3,
+          "luminance": 85.8
+        },
+        {
+          "motionDelta": 13.7,
+          "crimsonIndex": 2.0,
+          "luminance": 71.8
+        },
+        {
+          "motionDelta": 13.8,
+          "crimsonIndex": 2.0,
+          "luminance": 85.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_112",
+      "game": "The Witcher 3: Wild Hunt",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Охота на грифона (контракт на чудовище)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 73.2,
+      "avgCrimson": 37.9,
+      "avgLuma": 40.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 81.4,
+          "crimsonIndex": 38.7,
+          "luminance": 55.2
+        },
+        {
+          "motionDelta": 65.9,
+          "crimsonIndex": 35.7,
+          "luminance": 38.0
+        },
+        {
+          "motionDelta": 66.9,
+          "crimsonIndex": 27.6,
+          "luminance": 36.6
+        },
+        {
+          "motionDelta": 78.5,
+          "crimsonIndex": 49.6,
+          "luminance": 31.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_113",
+      "game": "The Witcher 3: Wild Hunt",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Схватка с бандитами на тракте",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 52.8,
+      "avgCrimson": 25.9,
+      "avgLuma": 50.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 56.8,
+          "crimsonIndex": 34.5,
+          "luminance": 57.2
+        },
+        {
+          "motionDelta": 47.8,
+          "crimsonIndex": 13.6,
+          "luminance": 49.8
+        },
+        {
+          "motionDelta": 52.7,
+          "crimsonIndex": 28.1,
+          "luminance": 56.8
+        },
+        {
+          "motionDelta": 47.9,
+          "crimsonIndex": 13.1,
+          "luminance": 46.0
+        },
+        {
+          "motionDelta": 55.0,
+          "crimsonIndex": 30.1,
+          "luminance": 54.4
+        },
+        {
+          "motionDelta": 45.4,
+          "crimsonIndex": 35.8,
+          "luminance": 40.9
+        },
+        {
+          "motionDelta": 64.0,
+          "crimsonIndex": 25.8,
+          "luminance": 49.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_114",
+      "game": "The Witcher 3: Wild Hunt",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Верховая езда по полям Велена",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 23.1,
+      "avgCrimson": 2.3,
+      "avgLuma": 64.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.8,
+          "crimsonIndex": 3.5,
+          "luminance": 74.6
+        },
+        {
+          "motionDelta": 26.3,
+          "crimsonIndex": 1.7,
+          "luminance": 53.3
+        },
+        {
+          "motionDelta": 26.9,
+          "crimsonIndex": 2.4,
+          "luminance": 67.1
+        },
+        {
+          "motionDelta": 20.8,
+          "crimsonIndex": 2.7,
+          "luminance": 61.7
+        },
+        {
+          "motionDelta": 18.8,
+          "crimsonIndex": 1.4,
+          "luminance": 64.3
+        },
+        {
+          "motionDelta": 24.1,
+          "crimsonIndex": 2.1,
+          "luminance": 65.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_115",
+      "game": "The Witcher 3: Wild Hunt",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Панорамный вид со скалы на закате",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 18.3,
+      "avgCrimson": 1.4,
+      "avgLuma": 81.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.4,
+          "crimsonIndex": 0.8,
+          "luminance": 87.6
+        },
+        {
+          "motionDelta": 19.6,
+          "crimsonIndex": 1.7,
+          "luminance": 74.0
+        },
+        {
+          "motionDelta": 23.3,
+          "crimsonIndex": 1.6,
+          "luminance": 92.4
+        },
+        {
+          "motionDelta": 21.0,
+          "crimsonIndex": 1.9,
+          "luminance": 81.7
+        },
+        {
+          "motionDelta": 14.1,
+          "crimsonIndex": 0.5,
+          "luminance": 71.1
+        },
+        {
+          "motionDelta": 22.3,
+          "crimsonIndex": 1.8,
+          "luminance": 90.4
+        },
+        {
+          "motionDelta": 13.5,
+          "crimsonIndex": 1.4,
+          "luminance": 70.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_116",
+      "game": "The Witcher 3: Wild Hunt",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Трагический сюжетный диалог у костра",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 11.0,
+      "avgCrimson": 1.9,
+      "avgLuma": 31.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 9.8,
+          "crimsonIndex": 2.4,
+          "luminance": 20.8
+        },
+        {
+          "motionDelta": 6.7,
+          "crimsonIndex": 3.2,
+          "luminance": 31.8
+        },
+        {
+          "motionDelta": 12.7,
+          "crimsonIndex": 0.9,
+          "luminance": 24.2
+        },
+        {
+          "motionDelta": 15.1,
+          "crimsonIndex": 1.2,
+          "luminance": 38.2
+        },
+        {
+          "motionDelta": 8.1,
+          "crimsonIndex": 0.8,
+          "luminance": 34.8
+        },
+        {
+          "motionDelta": 13.5,
+          "crimsonIndex": 3.0,
+          "luminance": 38.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_117",
+      "game": "Red Dead Redemption 2",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Охота на грифона (контракт на чудовище)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 66.4,
+      "avgCrimson": 37.7,
+      "avgLuma": 49.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 65.1,
+          "crimsonIndex": 30.6,
+          "luminance": 41.3
+        },
+        {
+          "motionDelta": 61.9,
+          "crimsonIndex": 38.8,
+          "luminance": 52.7
+        },
+        {
+          "motionDelta": 62.6,
+          "crimsonIndex": 34.9,
+          "luminance": 60.9
+        },
+        {
+          "motionDelta": 67.0,
+          "crimsonIndex": 50.9,
+          "luminance": 55.3
+        },
+        {
+          "motionDelta": 75.3,
+          "crimsonIndex": 33.5,
+          "luminance": 37.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_118",
+      "game": "Red Dead Redemption 2",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Схватка с бандитами на тракте",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 50.9,
+      "avgCrimson": 24.4,
+      "avgLuma": 50.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 51.9,
+          "crimsonIndex": 25.5,
+          "luminance": 40.5
+        },
+        {
+          "motionDelta": 45.5,
+          "crimsonIndex": 18.3,
+          "luminance": 58.4
+        },
+        {
+          "motionDelta": 55.9,
+          "crimsonIndex": 22.0,
+          "luminance": 38.8
+        },
+        {
+          "motionDelta": 49.9,
+          "crimsonIndex": 21.1,
+          "luminance": 55.8
+        },
+        {
+          "motionDelta": 54.0,
+          "crimsonIndex": 27.7,
+          "luminance": 52.1
+        },
+        {
+          "motionDelta": 48.2,
+          "crimsonIndex": 31.7,
+          "luminance": 59.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_119",
+      "game": "Red Dead Redemption 2",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Верховая езда по полям Велена",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.1,
+      "avgCrimson": 2.3,
+      "avgLuma": 54.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 25.4,
+          "crimsonIndex": 2.9,
+          "luminance": 55.6
+        },
+        {
+          "motionDelta": 20.2,
+          "crimsonIndex": 2.2,
+          "luminance": 50.5
+        },
+        {
+          "motionDelta": 32.2,
+          "crimsonIndex": 4.0,
+          "luminance": 73.7
+        },
+        {
+          "motionDelta": 26.4,
+          "crimsonIndex": 3.4,
+          "luminance": 47.2
+        },
+        {
+          "motionDelta": 31.1,
+          "crimsonIndex": 0.2,
+          "luminance": 45.2
+        },
+        {
+          "motionDelta": 20.2,
+          "crimsonIndex": 2.5,
+          "luminance": 47.0
+        },
+        {
+          "motionDelta": 20.4,
+          "crimsonIndex": 0.9,
+          "luminance": 58.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_120",
+      "game": "Red Dead Redemption 2",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Панорамный вид со скалы на закате",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 19.7,
+      "avgCrimson": 1.1,
+      "avgLuma": 73.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 1.3,
+          "luminance": 83.5
+        },
+        {
+          "motionDelta": 19.7,
+          "crimsonIndex": 1.0,
+          "luminance": 65.2
+        },
+        {
+          "motionDelta": 20.8,
+          "crimsonIndex": 0.0,
+          "luminance": 80.9
+        },
+        {
+          "motionDelta": 16.4,
+          "crimsonIndex": 2.0,
+          "luminance": 65.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_121",
+      "game": "Red Dead Redemption 2",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Трагический сюжетный диалог у костра",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 11.6,
+      "avgCrimson": 2.8,
+      "avgLuma": 25.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.1,
+          "crimsonIndex": 3.6,
+          "luminance": 22.1
+        },
+        {
+          "motionDelta": 7.0,
+          "crimsonIndex": 0.6,
+          "luminance": 23.8
+        },
+        {
+          "motionDelta": 11.3,
+          "crimsonIndex": 3.3,
+          "luminance": 25.3
+        },
+        {
+          "motionDelta": 10.0,
+          "crimsonIndex": 1.5,
+          "luminance": 28.1
+        },
+        {
+          "motionDelta": 11.7,
+          "crimsonIndex": 4.0,
+          "luminance": 24.5
+        },
+        {
+          "motionDelta": 12.8,
+          "crimsonIndex": 3.4,
+          "luminance": 33.1
+        },
+        {
+          "motionDelta": 14.6,
+          "crimsonIndex": 3.0,
+          "luminance": 21.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_122",
+      "game": "Skyrim",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Охота на грифона (контракт на чудовище)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 70.7,
+      "avgCrimson": 38.6,
+      "avgLuma": 57.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 64.6,
+          "crimsonIndex": 39.1,
+          "luminance": 52.3
+        },
+        {
+          "motionDelta": 73.7,
+          "crimsonIndex": 25.0,
+          "luminance": 59.6
+        },
+        {
+          "motionDelta": 72.1,
+          "crimsonIndex": 33.9,
+          "luminance": 64.2
+        },
+        {
+          "motionDelta": 81.3,
+          "crimsonIndex": 54.2,
+          "luminance": 62.2
+        },
+        {
+          "motionDelta": 60.4,
+          "crimsonIndex": 54.4,
+          "luminance": 54.2
+        },
+        {
+          "motionDelta": 69.9,
+          "crimsonIndex": 31.8,
+          "luminance": 62.3
+        },
+        {
+          "motionDelta": 73.2,
+          "crimsonIndex": 32.1,
+          "luminance": 49.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_123",
+      "game": "Skyrim",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Схватка с бандитами на тракте",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 52.6,
+      "avgCrimson": 26.9,
+      "avgLuma": 47.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 46.3,
+          "crimsonIndex": 32.4,
+          "luminance": 35.4
+        },
+        {
+          "motionDelta": 47.0,
+          "crimsonIndex": 15.5,
+          "luminance": 55.5
+        },
+        {
+          "motionDelta": 61.7,
+          "crimsonIndex": 34.3,
+          "luminance": 42.5
+        },
+        {
+          "motionDelta": 55.5,
+          "crimsonIndex": 25.6,
+          "luminance": 56.2
+        }
+      ]
+    },
+    {
+      "id": "SEQ_124",
+      "game": "Skyrim",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Верховая езда по полям Велена",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.2,
+      "avgCrimson": 2.2,
+      "avgLuma": 60.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 24.1,
+          "crimsonIndex": 3.0,
+          "luminance": 68.7
+        },
+        {
+          "motionDelta": 29.0,
+          "crimsonIndex": 0.3,
+          "luminance": 67.4
+        },
+        {
+          "motionDelta": 23.5,
+          "crimsonIndex": 0.4,
+          "luminance": 52.0
+        },
+        {
+          "motionDelta": 19.2,
+          "crimsonIndex": 2.4,
+          "luminance": 63.4
+        },
+        {
+          "motionDelta": 27.5,
+          "crimsonIndex": 3.9,
+          "luminance": 54.8
+        },
+        {
+          "motionDelta": 28.1,
+          "crimsonIndex": 3.1,
+          "luminance": 58.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_125",
+      "game": "Skyrim",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Панорамный вид со скалы на закате",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 19.6,
+      "avgCrimson": 1.3,
+      "avgLuma": 78.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.7,
+          "crimsonIndex": 1.9,
+          "luminance": 78.0
+        },
+        {
+          "motionDelta": 22.9,
+          "crimsonIndex": 1.3,
+          "luminance": 67.6
+        },
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 1.6,
+          "luminance": 86.4
+        },
+        {
+          "motionDelta": 13.3,
+          "crimsonIndex": 0.3,
+          "luminance": 86.4
+        },
+        {
+          "motionDelta": 22.1,
+          "crimsonIndex": 1.5,
+          "luminance": 74.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_126",
+      "game": "Skyrim",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Трагический сюжетный диалог у костра",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 9.4,
+      "avgCrimson": 1.7,
+      "avgLuma": 28.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 6.9,
+          "crimsonIndex": 3.8,
+          "luminance": 28.9
+        },
+        {
+          "motionDelta": 13.6,
+          "crimsonIndex": 0.4,
+          "luminance": 21.7
+        },
+        {
+          "motionDelta": 10.3,
+          "crimsonIndex": 2.2,
+          "luminance": 30.2
+        },
+        {
+          "motionDelta": 7.0,
+          "crimsonIndex": 0.4,
+          "luminance": 31.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_127",
+      "game": "Baldur's Gate 3",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Охота на грифона (контракт на чудовище)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 72.0,
+      "avgCrimson": 31.6,
+      "avgLuma": 45.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 78.2,
+          "crimsonIndex": 22.4,
+          "luminance": 44.5
+        },
+        {
+          "motionDelta": 75.8,
+          "crimsonIndex": 48.1,
+          "luminance": 49.6
+        },
+        {
+          "motionDelta": 81.8,
+          "crimsonIndex": 30.7,
+          "luminance": 48.2
+        },
+        {
+          "motionDelta": 73.2,
+          "crimsonIndex": 28.1,
+          "luminance": 39.4
+        },
+        {
+          "motionDelta": 61.5,
+          "crimsonIndex": 27.3,
+          "luminance": 35.9
+        },
+        {
+          "motionDelta": 61.7,
+          "crimsonIndex": 32.8,
+          "luminance": 57.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_128",
+      "game": "Baldur's Gate 3",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Схватка с бандитами на тракте",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 54.3,
+      "avgCrimson": 24.6,
+      "avgLuma": 45.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 48.0,
+          "crimsonIndex": 17.9,
+          "luminance": 50.6
+        },
+        {
+          "motionDelta": 56.3,
+          "crimsonIndex": 16.7,
+          "luminance": 37.7
+        },
+        {
+          "motionDelta": 49.3,
+          "crimsonIndex": 34.8,
+          "luminance": 43.3
+        },
+        {
+          "motionDelta": 56.9,
+          "crimsonIndex": 31.3,
+          "luminance": 43.2
+        },
+        {
+          "motionDelta": 50.0,
+          "crimsonIndex": 31.6,
+          "luminance": 56.5
+        },
+        {
+          "motionDelta": 65.4,
+          "crimsonIndex": 15.3,
+          "luminance": 43.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_129",
+      "game": "Baldur's Gate 3",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Верховая езда по полям Велена",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 27.5,
+      "avgCrimson": 2.1,
+      "avgLuma": 61.3,
+      "telemetrySamples": [
+        {
+          "motionDelta": 25.7,
+          "crimsonIndex": 0.7,
+          "luminance": 56.9
+        },
+        {
+          "motionDelta": 23.1,
+          "crimsonIndex": 2.9,
+          "luminance": 64.0
+        },
+        {
+          "motionDelta": 33.5,
+          "crimsonIndex": 3.1,
+          "luminance": 54.8
+        },
+        {
+          "motionDelta": 22.5,
+          "crimsonIndex": 3.1,
+          "luminance": 56.0
+        },
+        {
+          "motionDelta": 32.9,
+          "crimsonIndex": 0.8,
+          "luminance": 74.9
+        }
+      ]
+    },
+    {
+      "id": "SEQ_130",
+      "game": "Baldur's Gate 3",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Панорамный вид со скалы на закате",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.2,
+      "avgCrimson": 1.0,
+      "avgLuma": 85.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 22.9,
+          "crimsonIndex": 1.1,
+          "luminance": 93.6
+        },
+        {
+          "motionDelta": 19.4,
+          "crimsonIndex": 1.4,
+          "luminance": 78.2
+        },
+        {
+          "motionDelta": 16.7,
+          "crimsonIndex": 1.4,
+          "luminance": 89.6
+        },
+        {
+          "motionDelta": 24.7,
+          "crimsonIndex": 0.8,
+          "luminance": 80.0
+        },
+        {
+          "motionDelta": 22.1,
+          "crimsonIndex": 0.5,
+          "luminance": 84.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_131",
+      "game": "Baldur's Gate 3",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Трагический сюжетный диалог у костра",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 13.1,
+      "avgCrimson": 1.6,
+      "avgLuma": 32.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 13.9,
+          "crimsonIndex": 0.3,
+          "luminance": 39.8
+        },
+        {
+          "motionDelta": 10.8,
+          "crimsonIndex": 1.6,
+          "luminance": 30.1
+        },
+        {
+          "motionDelta": 15.2,
+          "crimsonIndex": 2.8,
+          "luminance": 30.9
+        },
+        {
+          "motionDelta": 13.9,
+          "crimsonIndex": 1.4,
+          "luminance": 37.9
+        },
+        {
+          "motionDelta": 11.4,
+          "crimsonIndex": 2.6,
+          "luminance": 21.7
+        },
+        {
+          "motionDelta": 13.7,
+          "crimsonIndex": 2.6,
+          "luminance": 27.1
+        },
+        {
+          "motionDelta": 12.5,
+          "crimsonIndex": 0.2,
+          "luminance": 39.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_132",
+      "game": "Ghost of Tsushima",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Охота на грифона (контракт на чудовище)",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 72.6,
+      "avgCrimson": 35.5,
+      "avgLuma": 47.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 81.1,
+          "crimsonIndex": 33.9,
+          "luminance": 57.9
+        },
+        {
+          "motionDelta": 57.0,
+          "crimsonIndex": 25.5,
+          "luminance": 37.8
+        },
+        {
+          "motionDelta": 74.9,
+          "crimsonIndex": 42.1,
+          "luminance": 54.1
+        },
+        {
+          "motionDelta": 60.2,
+          "crimsonIndex": 35.5,
+          "luminance": 46.2
+        },
+        {
+          "motionDelta": 73.0,
+          "crimsonIndex": 46.9,
+          "luminance": 35.3
+        },
+        {
+          "motionDelta": 81.9,
+          "crimsonIndex": 39.4,
+          "luminance": 40.3
+        },
+        {
+          "motionDelta": 79.8,
+          "crimsonIndex": 25.1,
+          "luminance": 59.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_133",
+      "game": "Ghost of Tsushima",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Схватка с бандитами на тракте",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 51.5,
+      "avgCrimson": 21.4,
+      "avgLuma": 43.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 50.4,
+          "crimsonIndex": 20.2,
+          "luminance": 54.6
+        },
+        {
+          "motionDelta": 54.5,
+          "crimsonIndex": 20.4,
+          "luminance": 37.4
+        },
+        {
+          "motionDelta": 59.3,
+          "crimsonIndex": 22.9,
+          "luminance": 36.7
+        },
+        {
+          "motionDelta": 43.1,
+          "crimsonIndex": 29.1,
+          "luminance": 35.6
+        },
+        {
+          "motionDelta": 50.2,
+          "crimsonIndex": 14.6,
+          "luminance": 55.0
+        }
+      ]
+    },
+    {
+      "id": "SEQ_134",
+      "game": "Ghost of Tsushima",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Верховая езда по полям Велена",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 25.7,
+      "avgCrimson": 1.9,
+      "avgLuma": 61.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 26.3,
+          "crimsonIndex": 2.2,
+          "luminance": 54.9
+        },
+        {
+          "motionDelta": 24.8,
+          "crimsonIndex": 1.8,
+          "luminance": 68.9
+        },
+        {
+          "motionDelta": 28.1,
+          "crimsonIndex": 0.7,
+          "luminance": 64.7
+        },
+        {
+          "motionDelta": 24.3,
+          "crimsonIndex": 2.9,
+          "luminance": 71.5
+        },
+        {
+          "motionDelta": 25.2,
+          "crimsonIndex": 1.7,
+          "luminance": 45.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_135",
+      "game": "Ghost of Tsushima",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Панорамный вид со скалы на закате",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 16.3,
+      "avgCrimson": 1.1,
+      "avgLuma": 84.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 15.3,
+          "crimsonIndex": 1.5,
+          "luminance": 89.3
+        },
+        {
+          "motionDelta": 13.0,
+          "crimsonIndex": 0.2,
+          "luminance": 91.2
+        },
+        {
+          "motionDelta": 15.0,
+          "crimsonIndex": 0.7,
+          "luminance": 78.7
+        },
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 1.7,
+          "luminance": 80.8
+        },
+        {
+          "motionDelta": 22.2,
+          "crimsonIndex": 1.2,
+          "luminance": 83.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_136",
+      "game": "Ghost of Tsushima",
+      "genre": "OPEN_WORLD_RPG",
+      "scenarioName": "Трагический сюжетный диалог у костра",
+      "expectedVibe": "DRAMA",
+      "isBoss": false,
+      "isCutscene": true,
+      "avgMotion": 10.7,
+      "avgCrimson": 1.9,
+      "avgLuma": 26.1,
+      "telemetrySamples": [
+        {
+          "motionDelta": 9.5,
+          "crimsonIndex": 3.4,
+          "luminance": 32.3
+        },
+        {
+          "motionDelta": 14.1,
+          "crimsonIndex": 2.8,
+          "luminance": 25.9
+        },
+        {
+          "motionDelta": 12.1,
+          "crimsonIndex": 0.3,
+          "luminance": 22.7
+        },
+        {
+          "motionDelta": 7.2,
+          "crimsonIndex": 1.2,
+          "luminance": 23.7
+        }
+      ]
+    },
+    {
+      "id": "SEQ_137",
+      "game": "Hades II",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Зачистка комнаты от элитных монстров",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 63.7,
+      "avgCrimson": 28.1,
+      "avgLuma": 36.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 64.3,
+          "crimsonIndex": 27.5,
+          "luminance": 29.1
+        },
+        {
+          "motionDelta": 60.7,
+          "crimsonIndex": 20.6,
+          "luminance": 44.1
+        },
+        {
+          "motionDelta": 69.4,
+          "crimsonIndex": 34.4,
+          "luminance": 55.0
+        },
+        {
+          "motionDelta": 65.5,
+          "crimsonIndex": 29.7,
+          "luminance": 29.2
+        },
+        {
+          "motionDelta": 58.8,
+          "crimsonIndex": 28.5,
+          "luminance": 26.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_138",
+      "game": "Hades II",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Битва с Хроносом / Владыкой Подземелий",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 81.9,
+      "avgCrimson": 43.5,
+      "avgLuma": 37.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 92.7,
+          "crimsonIndex": 48.4,
+          "luminance": 29.9
+        },
+        {
+          "motionDelta": 78.0,
+          "crimsonIndex": 51.6,
+          "luminance": 41.3
+        },
+        {
+          "motionDelta": 78.6,
+          "crimsonIndex": 48.7,
+          "luminance": 42.8
+        },
+        {
+          "motionDelta": 79.5,
+          "crimsonIndex": 35.0,
+          "luminance": 39.1
+        },
+        {
+          "motionDelta": 88.7,
+          "crimsonIndex": 37.3,
+          "luminance": 25.8
+        },
+        {
+          "motionDelta": 73.8,
+          "crimsonIndex": 40.1,
+          "luminance": 44.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_139",
+      "game": "Hades II",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Выбор награды и разговор с богами",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 21.2,
+      "avgCrimson": 2.1,
+      "avgLuma": 40.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 0.5,
+          "luminance": 32.9
+        },
+        {
+          "motionDelta": 21.3,
+          "crimsonIndex": 3.3,
+          "luminance": 39.2
+        },
+        {
+          "motionDelta": 21.9,
+          "crimsonIndex": 0.2,
+          "luminance": 48.0
+        },
+        {
+          "motionDelta": 18.6,
+          "crimsonIndex": 4.0,
+          "luminance": 32.6
+        },
+        {
+          "motionDelta": 22.0,
+          "crimsonIndex": 3.0,
+          "luminance": 37.4
+        },
+        {
+          "motionDelta": 24.0,
+          "crimsonIndex": 1.8,
+          "luminance": 38.7
+        },
+        {
+          "motionDelta": 21.8,
+          "crimsonIndex": 1.8,
+          "luminance": 54.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_140",
+      "game": "Hades II",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Открытие врат на Олимп",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 24.3,
+      "avgCrimson": 1.1,
+      "avgLuma": 82.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 18.1,
+          "crimsonIndex": 1.5,
+          "luminance": 82.2
+        },
+        {
+          "motionDelta": 27.9,
+          "crimsonIndex": 1.2,
+          "luminance": 75.7
+        },
+        {
+          "motionDelta": 24.2,
+          "crimsonIndex": 1.6,
+          "luminance": 85.3
+        },
+        {
+          "motionDelta": 27.1,
+          "crimsonIndex": 1.1,
+          "luminance": 78.3
+        },
+        {
+          "motionDelta": 24.0,
+          "crimsonIndex": 0.3,
+          "luminance": 89.5
+        }
+      ]
+    },
+    {
+      "id": "SEQ_141",
+      "game": "Diablo IV",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Зачистка комнаты от элитных монстров",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 73.0,
+      "avgCrimson": 33.1,
+      "avgLuma": 41.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 58.1,
+          "crimsonIndex": 23.0,
+          "luminance": 50.7
+        },
+        {
+          "motionDelta": 77.6,
+          "crimsonIndex": 35.4,
+          "luminance": 27.9
+        },
+        {
+          "motionDelta": 77.0,
+          "crimsonIndex": 38.6,
+          "luminance": 52.6
+        },
+        {
+          "motionDelta": 77.8,
+          "crimsonIndex": 41.0,
+          "luminance": 28.8
+        },
+        {
+          "motionDelta": 74.3,
+          "crimsonIndex": 22.5,
+          "luminance": 46.3
+        },
+        {
+          "motionDelta": 73.2,
+          "crimsonIndex": 37.8,
+          "luminance": 45.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_142",
+      "game": "Diablo IV",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Битва с Хроносом / Владыкой Подземелий",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 82.7,
+      "avgCrimson": 48.2,
+      "avgLuma": 44.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 71.7,
+          "crimsonIndex": 54.6,
+          "luminance": 40.7
+        },
+        {
+          "motionDelta": 77.8,
+          "crimsonIndex": 31.2,
+          "luminance": 44.9
+        },
+        {
+          "motionDelta": 88.0,
+          "crimsonIndex": 44.9,
+          "luminance": 43.7
+        },
+        {
+          "motionDelta": 86.1,
+          "crimsonIndex": 64.8,
+          "luminance": 36.4
+        },
+        {
+          "motionDelta": 80.7,
+          "crimsonIndex": 52.4,
+          "luminance": 46.7
+        },
+        {
+          "motionDelta": 90.0,
+          "crimsonIndex": 31.9,
+          "luminance": 49.3
+        },
+        {
+          "motionDelta": 84.5,
+          "crimsonIndex": 57.3,
+          "luminance": 46.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_143",
+      "game": "Diablo IV",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Выбор награды и разговор с богами",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 14.8,
+      "avgCrimson": 2.9,
+      "avgLuma": 37.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 14.6,
+          "crimsonIndex": 1.7,
+          "luminance": 35.3
+        },
+        {
+          "motionDelta": 15.2,
+          "crimsonIndex": 3.3,
+          "luminance": 38.4
+        },
+        {
+          "motionDelta": 18.9,
+          "crimsonIndex": 2.3,
+          "luminance": 42.1
+        },
+        {
+          "motionDelta": 16.1,
+          "crimsonIndex": 2.7,
+          "luminance": 31.2
+        },
+        {
+          "motionDelta": 13.2,
+          "crimsonIndex": 3.1,
+          "luminance": 41.5
+        },
+        {
+          "motionDelta": 13.5,
+          "crimsonIndex": 3.4,
+          "luminance": 41.0
+        },
+        {
+          "motionDelta": 12.0,
+          "crimsonIndex": 3.8,
+          "luminance": 35.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_144",
+      "game": "Diablo IV",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Открытие врат на Олимп",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 22.9,
+      "avgCrimson": 0.9,
+      "avgLuma": 78.5,
+      "telemetrySamples": [
+        {
+          "motionDelta": 28.2,
+          "crimsonIndex": 0.6,
+          "luminance": 86.9
+        },
+        {
+          "motionDelta": 28.1,
+          "crimsonIndex": 0.2,
+          "luminance": 74.0
+        },
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 1.3,
+          "luminance": 81.2
+        },
+        {
+          "motionDelta": 15.8,
+          "crimsonIndex": 1.3,
+          "luminance": 83.1
+        },
+        {
+          "motionDelta": 26.3,
+          "crimsonIndex": 0.9,
+          "luminance": 67.3
+        }
+      ]
+    },
+    {
+      "id": "SEQ_145",
+      "game": "Path of Exile",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Зачистка комнаты от элитных монстров",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 59.4,
+      "avgCrimson": 30.8,
+      "avgLuma": 34.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 50.0,
+          "crimsonIndex": 29.3,
+          "luminance": 29.0
+        },
+        {
+          "motionDelta": 56.3,
+          "crimsonIndex": 35.4,
+          "luminance": 25.3
+        },
+        {
+          "motionDelta": 69.5,
+          "crimsonIndex": 39.5,
+          "luminance": 54.6
+        },
+        {
+          "motionDelta": 61.8,
+          "crimsonIndex": 19.0,
+          "luminance": 27.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_146",
+      "game": "Path of Exile",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Битва с Хроносом / Владыкой Подземелий",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 80.6,
+      "avgCrimson": 48.4,
+      "avgLuma": 36.4,
+      "telemetrySamples": [
+        {
+          "motionDelta": 70.3,
+          "crimsonIndex": 61.9,
+          "luminance": 27.6
+        },
+        {
+          "motionDelta": 77.6,
+          "crimsonIndex": 40.6,
+          "luminance": 34.6
+        },
+        {
+          "motionDelta": 89.1,
+          "crimsonIndex": 64.7,
+          "luminance": 41.0
+        },
+        {
+          "motionDelta": 85.6,
+          "crimsonIndex": 30.9,
+          "luminance": 39.1
+        },
+        {
+          "motionDelta": 83.9,
+          "crimsonIndex": 34.9,
+          "luminance": 33.8
+        },
+        {
+          "motionDelta": 73.5,
+          "crimsonIndex": 59.4,
+          "luminance": 48.0
+        },
+        {
+          "motionDelta": 84.0,
+          "crimsonIndex": 46.6,
+          "luminance": 30.4
+        }
+      ]
+    },
+    {
+      "id": "SEQ_147",
+      "game": "Path of Exile",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Выбор награды и разговор с богами",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 16.0,
+      "avgCrimson": 1.9,
+      "avgLuma": 42.9,
+      "telemetrySamples": [
+        {
+          "motionDelta": 13.7,
+          "crimsonIndex": 0.5,
+          "luminance": 48.3
+        },
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 1.7,
+          "luminance": 49.8
+        },
+        {
+          "motionDelta": 15.0,
+          "crimsonIndex": 2.6,
+          "luminance": 36.2
+        },
+        {
+          "motionDelta": 19.2,
+          "crimsonIndex": 2.9,
+          "luminance": 37.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_148",
+      "game": "Path of Exile",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Открытие врат на Олимп",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 24.8,
+      "avgCrimson": 0.8,
+      "avgLuma": 77.8,
+      "telemetrySamples": [
+        {
+          "motionDelta": 27.7,
+          "crimsonIndex": 1.3,
+          "luminance": 72.5
+        },
+        {
+          "motionDelta": 22.8,
+          "crimsonIndex": 1.0,
+          "luminance": 83.7
+        },
+        {
+          "motionDelta": 19.4,
+          "crimsonIndex": 0.1,
+          "luminance": 87.4
+        },
+        {
+          "motionDelta": 29.3,
+          "crimsonIndex": 1.0,
+          "luminance": 67.8
+        }
+      ]
+    },
+    {
+      "id": "SEQ_149",
+      "game": "Dead Cells",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Зачистка комнаты от элитных монстров",
+      "expectedVibe": "COMBAT",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 64.1,
+      "avgCrimson": 24.1,
+      "avgLuma": 41.7,
+      "telemetrySamples": [
+        {
+          "motionDelta": 67.9,
+          "crimsonIndex": 17.1,
+          "luminance": 51.7
+        },
+        {
+          "motionDelta": 50.3,
+          "crimsonIndex": 25.8,
+          "luminance": 34.5
+        },
+        {
+          "motionDelta": 60.8,
+          "crimsonIndex": 40.2,
+          "luminance": 37.6
+        },
+        {
+          "motionDelta": 65.3,
+          "crimsonIndex": 20.2,
+          "luminance": 39.1
+        },
+        {
+          "motionDelta": 77.6,
+          "crimsonIndex": 17.2,
+          "luminance": 42.6
+        },
+        {
+          "motionDelta": 50.4,
+          "crimsonIndex": 21.5,
+          "luminance": 52.7
+        },
+        {
+          "motionDelta": 76.6,
+          "crimsonIndex": 26.9,
+          "luminance": 33.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_150",
+      "game": "Dead Cells",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Битва с Хроносом / Владыкой Подземелий",
+      "expectedVibe": "BOSSFIGHT",
+      "isBoss": true,
+      "isCutscene": false,
+      "avgMotion": 77.3,
+      "avgCrimson": 46.8,
+      "avgLuma": 42.2,
+      "telemetrySamples": [
+        {
+          "motionDelta": 79.0,
+          "crimsonIndex": 44.9,
+          "luminance": 41.0
+        },
+        {
+          "motionDelta": 82.0,
+          "crimsonIndex": 34.4,
+          "luminance": 27.1
+        },
+        {
+          "motionDelta": 70.1,
+          "crimsonIndex": 66.7,
+          "luminance": 49.4
+        },
+        {
+          "motionDelta": 72.0,
+          "crimsonIndex": 41.7,
+          "luminance": 39.7
+        },
+        {
+          "motionDelta": 87.8,
+          "crimsonIndex": 55.3,
+          "luminance": 41.1
+        },
+        {
+          "motionDelta": 76.1,
+          "crimsonIndex": 46.4,
+          "luminance": 48.8
+        },
+        {
+          "motionDelta": 74.2,
+          "crimsonIndex": 38.3,
+          "luminance": 48.1
+        }
+      ]
+    },
+    {
+      "id": "SEQ_151",
+      "game": "Dead Cells",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Выбор награды и разговор с богами",
+      "expectedVibe": "EXPLORE",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 20.5,
+      "avgCrimson": 2.6,
+      "avgLuma": 38.6,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.4,
+          "crimsonIndex": 2.4,
+          "luminance": 37.7
+        },
+        {
+          "motionDelta": 20.9,
+          "crimsonIndex": 3.0,
+          "luminance": 33.0
+        },
+        {
+          "motionDelta": 20.5,
+          "crimsonIndex": 2.8,
+          "luminance": 34.1
+        },
+        {
+          "motionDelta": 23.4,
+          "crimsonIndex": 2.1,
+          "luminance": 49.6
+        }
+      ]
+    },
+    {
+      "id": "SEQ_152",
+      "game": "Dead Cells",
+      "genre": "ISOMETRIC_ROGUELIKE",
+      "scenarioName": "Открытие врат на Олимп",
+      "expectedVibe": "MAJESTIC",
+      "isBoss": false,
+      "isCutscene": false,
+      "avgMotion": 17.8,
+      "avgCrimson": 1.2,
+      "avgLuma": 78.0,
+      "telemetrySamples": [
+        {
+          "motionDelta": 17.5,
+          "crimsonIndex": 0.3,
+          "luminance": 84.5
+        },
+        {
+          "motionDelta": 19.0,
+          "crimsonIndex": 1.8,
+          "luminance": 84.3
+        },
+        {
+          "motionDelta": 15.4,
+          "crimsonIndex": 1.6,
+          "luminance": 71.8
+        },
+        {
+          "motionDelta": 16.0,
+          "crimsonIndex": 1.4,
+          "luminance": 79.4
+        },
+        {
+          "motionDelta": 16.2,
+          "crimsonIndex": 0.9,
+          "luminance": 74.0
+        },
+        {
+          "motionDelta": 22.5,
+          "crimsonIndex": 1.1,
+          "luminance": 74.2
+        }
+      ]
+    }
+  ]
+}

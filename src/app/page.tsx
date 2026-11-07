@@ -467,6 +467,8 @@ export default function GameVibeSpotifyApp() {
 
   const [isMiniHudMode, setIsMiniHudMode] = useState<boolean>(false);
   const [showNeuralLogs, setShowNeuralLogs] = useState<boolean>(false);
+  const [isPretraining, setIsPretraining] = useState<boolean>(false);
+  const [pretrainSuccessMsg, setPretrainSuccessMsg] = useState<string | null>(null);
   const [showImportPlaylistModal, setShowImportPlaylistModal] = useState<boolean>(false);
   const [importPlaylistCode, setImportPlaylistCode] = useState<string>('');
   const [playlistShareFeedback, setPlaylistShareFeedback] = useState<string | null>(null);
@@ -997,6 +999,35 @@ export default function GameVibeSpotifyApp() {
       telemetry.luminance,
     ]
   );
+
+  const handleExecutePretraining = useCallback(async () => {
+    if (isPretraining) return;
+    setIsPretraining(true);
+    setPretrainSuccessMsg(null);
+    try {
+      const res = await fetch('/api/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'batch_pretrain' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.neuralEvolution) {
+          setTelemetry((prev) => ({
+            ...prev,
+            neuralEvolution: data.neuralEvolution,
+          }));
+          setPretrainSuccessMsg(`🎉 Предобучение завершено! LVL ${data.neuralEvolution.level}, точность ${data.neuralEvolution.accuracy}% (+650 XP)`);
+          setShowNeuralLogs(true);
+          setTimeout(() => setPretrainSuccessMsg(null), 8000);
+        }
+      }
+    } catch {
+      // silent
+    } finally {
+      setIsPretraining(false);
+    }
+  }, [isPretraining]);
 
   /**
    * Vision Director: the Gemini scene model decides when the music no longer fits and
@@ -2664,13 +2695,33 @@ export default function GameVibeSpotifyApp() {
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-[#8C8482]">Точность:</span>
-                            <span className="text-[11px] font-bold text-[#4ADE80] font-mono">
-                              {telemetry.neuralEvolution.accuracy}%
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={handleExecutePretraining}
+                              disabled={isPretraining || telemetry.neuralEvolution.isGeminiActive}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#2D1A38] hover:bg-[#402450] border border-[#5E2B75] text-[10px] font-semibold text-[#E9C3FF] transition shadow-sm disabled:opacity-50"
+                              title="Предобучить локальную нейросеть на эталонном датасете (152 игровых сценария)"
+                            >
+                              <Sparkles className={`w-3 h-3 text-[#E9C3FF] ${isPretraining ? 'animate-spin' : ''}`} />
+                              <span>{isPretraining ? 'Обучение на 152 сессиях...' : '⚡ Предобучить на датасете (152 сессии)'}</span>
+                            </button>
+
+                            <div className="flex items-center gap-1.5 pl-1">
+                              <span className="text-[10px] text-[#8C8482]">Точность:</span>
+                              <span className="text-[11px] font-bold text-[#4ADE80] font-mono">
+                                {telemetry.neuralEvolution.accuracy}%
+                              </span>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Pretraining Success Toast Banner */}
+                        {pretrainSuccessMsg && (
+                          <div className="p-2 rounded bg-[#10241B] border border-[#184E32] text-[11px] text-[#4ADE80] font-medium flex items-center gap-2 shadow-inner">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#4ADE80] shrink-0" />
+                            <span>{pretrainSuccessMsg}</span>
+                          </div>
+                        )}
 
                         {/* XP Progress Bar (Free local offline mode) */}
                         {!telemetry.neuralEvolution.isGeminiActive && (
