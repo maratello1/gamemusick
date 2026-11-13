@@ -3,14 +3,23 @@ import fs from 'fs';
 import path from 'path';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { DirectorScene, TelemetrySnapshot, VibeStateId } from '@/types/vibe';
+import { DirectorScene, GsiStateSnapshot, TelemetrySnapshot, VibeStateId } from '@/types/vibe';
 import {
+  detectGameArchetype,
   tickNeuralEvolution,
   recordPlayerFeedback,
+  recordTrackSceneFeedback,
   getNeuralBrainState,
   executeBatchPretraining,
   isOnlineCompetitiveGame,
 } from '@/lib/neural-evolution';
+import {
+  classifyTelemetryToSceneVector,
+  legacyVibeToSceneTag,
+  mapSceneTagToLegacyVibe,
+  resolveSceneFromTextPrompt,
+  SCENE_TAXONOMY,
+} from '@/lib/scene-engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +30,7 @@ const SENSOR_EXE = path.join(process.cwd(), 'desktop', 'interactive_sensor.exe')
 const DIRECTOR_FILE = path.join(process.cwd(), 'data', 'scene-director.json');
 const DIRECTOR_PY = path.join(process.cwd(), 'desktop', 'local_director.py');
 const DIALOGUE_FILE = path.join(process.cwd(), 'data', 'live-dialogue.json');
+const GSI_FILE = path.join(process.cwd(), 'data', 'live-gsi.json');
 
 let lastSnapshot: TelemetrySnapshot = {
   timestamp: Date.now(),
@@ -162,23 +172,49 @@ export async function GET() {
       const proc = isInvalid ? 'Ожидание игры' : rawProc;
       const rawTitle = String(parsed.windowTitle || proc);
       const title = isInvalid || rawTitle === 'IDLE_STANDBY' ? 'Ожидание игры' : rawTitle;
-      const isStandby = proc === 'Ожидание игры';
+      const rawIsStandby = proc === 'Ожидание игры';
+      const isOnlineRaw = !rawIsStandby && (Boolean(parsed.isOnlineGame) || isOnlineCompetitiveGame(proc));
+
+      // Check Official Dota 2 / CS2 Game State Integration first so even in borderless/alt-tab
+      // or main menu GSI provides exact live match/lobby telemetry without false standby.
+      let gsiSnap: GsiStateSnapshot | null = null;
+      let gsiActive = false;
+      try {
+        if (fs.existsSync(GSI_FILE)) {
+          const gStat = fs.statSync(GSI_FILE);
+          if (now - gStat.mtimeMs < 12000) {
+            const parsedGsi = JSON.parse(fs.readFileSync(GSI_FILE, 'utf8')) as GsiStateSnapshot;
+            const procLower = proc.toLowerCase();
+            const matchesProc =
+              (parsedGsi.game === 'dota2' && procLower.includes('dota')) ||
+              (parsedGsi.game === 'cs2' && (procLower.includes('cs2') || procLower.includes('csgo')));
+            if (parsedGsi && (rawIsStandby || matchesProc || isOnlineRaw)) {
+              gsiSnap = parsedGsi;
+              gsiActive = true;
+            }
+          }
+        }
+      } catch {
+        // ignore stale or partial GSI file
+      }
+
+      const activeProc = rawIsStandby && gsiActive && gsiSnap ? gsiSnap.game : proc;
+      const activeTitle = rawIsStandby && gsiActive && gsiSnap ? gsiSnap.gameTitle : title;
+      const isStandby = rawIsStandby && !gsiActive;
 
       const motion = isStandby ? 10 : Math.max(8, Math.min(100, Number(parsed.motionDelta) || 14));
       const crimson = isStandby ? 0 : Math.max(0, Math.min(100, Number(parsed.redAlertRatio) || 0));
       const luma = Math.max(5, Math.min(100, Number(parsed.brightness) || 35));
+      const lumaVariance = isStandby ? 0 : Math.max(0, Math.min(100, Number(parsed.lumaVariance) || 18));
+      const cursorTravel = isStandby ? 0 : Math.max(0, Number(parsed.cursorTravel) || 0);
+      const attackApm = isStandby ? 0 : Math.max(0, Number(parsed.attackApm) || 0);
+      const moveApm = isStandby ? 0 : Math.max(0, Number(parsed.moveApm) || 0);
+      const sceneHint = typeof parsed.sceneHint === 'string' ? parsed.sceneHint : '';
 
-      const { vibe, intensity } = inferVibeFromMetrics(motion, crimson);
+      const preBrain = getNeuralBrainState();
+      const archetype = detectGameArchetype(activeProc, activeTitle);
 
-      const resolvedSceneKey = typeof parsed.sceneKey === 'string' ? parsed.sceneKey : '';
-      const rawLabel = typeof parsed.sceneLabel === 'string' ? parsed.sceneLabel : '';
-      let resolvedLabel = isStandby
-        ? 'Ожидание запуска игры · Фоновый эмбиент'
-        : SCENE_LABELS[rawLabel] ||
-          SCENE_LABELS[resolvedSceneKey] ||
-          (rawLabel.length > 0 ? rawLabel : 'Атмосферное исследование');
-
-      // 1. Neural OCR Dialogue Context reading (only when in actual game)
+      // 1. Neural OCR Dialogue Context reading (only when in actual non-GSI game)
       let dialogueText = '';
       let dialogueEmotion = '';
       let dialogueLabel = '';
@@ -214,71 +250,140 @@ export async function GET() {
         // ignore
       }
 
-      const inferredVibeFinal = isStandby
-        ? 'EXPLORE'
-        : isNeuralDialogueActive && (dialogueEmotion === 'DRAMA' || dialogueEmotion === 'MAJESTIC')
-        ? (dialogueEmotion as VibeStateId)
-        : (parsed.inferredVibe as VibeStateId) || vibe;
+      const isOnline = isOnlineRaw || gsiActive;
+      const isRespawnSpectating = gsiActive
+        ? Boolean(gsiSnap?.isRespawning)
+        : !isStandby && Boolean(parsed.isRespawnSpectating);
 
-      const sensorSaysCombat = parsed.inferredVibe === 'COMBAT' || parsed.inferredVibe === 'BOSSFIGHT';
-      const finalVibe: VibeStateId = isStandby
-        ? 'EXPLORE'
-        : director && !sensorSaysCombat
-        ? director.vibe
-        : inferredVibeFinal;
+      const {
+        sceneVector: classifiedVectorRaw,
+        inferredVibe: classifiedVibeRaw,
+        intensity: intensityRaw,
+      } = classifyTelemetryToSceneVector({
+        isStandby,
+        detectedProcess: activeProc,
+        windowTitle: activeTitle,
+        gameGenre: archetype.id,
+        isOnlineGame: isOnline,
+        motionDelta: motion,
+        crimsonIndex: crimson,
+        brightness: luma,
+        lumaVariance,
+        cursorTravel,
+        attackApm,
+        moveApm,
+        isCutscene: Boolean(parsed.isCutscene),
+        isNewLocation: Boolean(parsed.isNewLocation),
+        isRespawnSpectating,
+        sceneHint,
+        combatThreshold: preBrain.learnedThresholds.combatMotionThreshold,
+        bossSensitivity: preBrain.learnedThresholds.bossSensitivity,
+        stealthLumaThreshold: preBrain.learnedThresholds.stealthLumaThreshold,
+        dialogueText: isNeuralDialogueActive ? dialogueText : '',
+        dialogueEmotion,
+        director: director || null,
+      });
 
-      if (!isStandby && isNeuralDialogueActive && dialogueText) {
-        resolvedLabel = `🎬 ${dialogueLabel}: "${dialogueText.slice(0, 45)}..."`;
+      let classifiedVector = classifiedVectorRaw;
+      let classifiedVibe = classifiedVibeRaw;
+      let intensity = intensityRaw;
+
+      if (gsiActive && gsiSnap) {
+        const meta = SCENE_TAXONOMY[gsiSnap.sceneTag] || SCENE_TAXONOMY.explore_wander;
+        classifiedVector = {
+          sceneTag: gsiSnap.sceneTag,
+          sceneNameRu: gsiSnap.sceneNameRu,
+          energy: gsiSnap.energy,
+          tension: gsiSnap.tension,
+          valence: gsiSnap.valence,
+          pacing: gsiSnap.pacing,
+          musicBrief: meta.ostMoodKeywords,
+          confidence: 99,
+          source: 'gsi',
+        };
+        classifiedVibe = mapSceneTagToLegacyVibe(
+          gsiSnap.sceneTag,
+          gsiSnap.energy,
+          gsiSnap.tension,
+          gsiSnap.valence
+        );
+        intensity = Math.max(gsiSnap.energy, gsiSnap.tension);
       }
-      if (!isStandby && director && director.summary && director.process && !director.process.includes('Ожидание игры')) {
+
+      const keepManualOverride = now < manualOverrideUntil && lastSnapshot.sceneVector;
+      const finalSceneVector = keepManualOverride
+        ? lastSnapshot.sceneVector!
+        : classifiedVector;
+      const finalVibe: VibeStateId = keepManualOverride
+        ? lastSnapshot.inferredVibe
+        : classifiedVibe;
+
+      const resolvedSceneKey = typeof parsed.sceneKey === 'string' ? parsed.sceneKey : finalSceneVector.sceneTag.toUpperCase();
+      const rawLabel = typeof parsed.sceneLabel === 'string' ? parsed.sceneLabel : '';
+      let resolvedLabel = isStandby
+        ? 'Ожидание запуска игры · Фоновый эмбиент'
+        : finalSceneVector.sceneNameRu || SCENE_LABELS[rawLabel] || SCENE_LABELS[resolvedSceneKey] || 'Атмосферное исследование';
+
+      if (!isStandby && gsiActive && gsiSnap && !keepManualOverride) {
+        resolvedLabel = gsiSnap.sceneNameRu;
+      } else if (!isStandby && isNeuralDialogueActive && dialogueText && !keepManualOverride) {
+        resolvedLabel = `${dialogueLabel}: ${dialogueText.slice(0, 64).trim()}`;
+      } else if (!isStandby && director && director.summary && director.process && !director.process.includes('Ожидание игры') && !keepManualOverride) {
         resolvedLabel = director.summary;
       }
 
       const neuralEvolution = tickNeuralEvolution({
-        detectedProcess: proc,
-        windowTitle: title,
+        detectedProcess: activeProc,
+        windowTitle: activeTitle,
         motionDelta: motion,
         crimsonIndex: crimson,
         luminance: luma,
         currentVibe: finalVibe,
       });
 
-      const isOnline = !isStandby && (Boolean(parsed.isOnlineGame) || isOnlineCompetitiveGame(proc));
-      const isRespawnSpectating = !isStandby && Boolean(parsed.isRespawnSpectating);
-
       lastSnapshot = {
         timestamp: now,
-        activeWindowTitle: title,
-        detectedProcess: proc,
+        activeWindowTitle: activeTitle,
+        detectedProcess: activeProc,
         runningWindows: [
           {
-            processName: proc,
-            windowTitle: title,
+            processName: activeProc,
+            windowTitle: activeTitle,
             pid: 0,
           },
         ],
         motionDelta: motion,
         crimsonIndex: crimson,
         luminance: luma,
+        lumaVariance,
+        cursorTravel,
+        attackApm,
+        moveApm,
+        sceneHint,
         compositeIntensity: intensity,
         inferredVibe: finalVibe,
+        sceneVector: finalSceneVector,
         isOnlineGame: isOnline,
         isRespawnSpectating: isRespawnSpectating,
+        gsiActive,
+        gsiGame: gsiSnap?.game,
+        gsiPhase: gsiSnap?.phase,
+        gsiSummary: gsiSnap?.summary,
         isCutscene:
           !isStandby &&
           (Boolean(parsed.isCutscene) ||
             isNeuralDialogueActive ||
+            finalSceneVector.sceneTag === 'dialogue_story' ||
+            finalSceneVector.sceneTag === 'tragedy_drama' ||
             (director ? ['cutscene', 'dialogue', 'tragedy'].includes(director.sceneType) : false)),
-        isNewLocation: !isStandby && Boolean(parsed.isNewLocation),
+        isNewLocation: !isStandby && (Boolean(parsed.isNewLocation) || finalSceneVector.sceneTag === 'vista_wonder'),
         gameAudioDucked: !isStandby && Boolean(parsed.gameAudioDucked),
         sceneKey: isStandby ? '' : isNeuralDialogueActive ? `${dialogueEmotion}_DIALOGUE` : resolvedSceneKey,
         sceneEmotion: isStandby
           ? 'EXPLORE'
           : isNeuralDialogueActive
           ? dialogueEmotion
-          : typeof parsed.sceneEmotion === 'string'
-          ? parsed.sceneEmotion
-          : undefined,
+          : finalVibe,
         sceneLabel: resolvedLabel,
         dialogueText: isNeuralDialogueActive ? dialogueText : director?.onScreenText || undefined,
         dialogueEmotion: isNeuralDialogueActive ? dialogueEmotion : undefined,
@@ -315,6 +420,26 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (body.action === 'track_feedback') {
+      const updatedBrain = recordTrackSceneFeedback({
+        detectedProcess: String(body.detectedProcess || lastSnapshot.detectedProcess || ''),
+        windowTitle: String(body.windowTitle || lastSnapshot.activeWindowTitle || ''),
+        sceneTag: String(body.sceneTag || lastSnapshot.sceneVector?.sceneTag || 'explore_wander'),
+        sceneNameRu: String(body.sceneNameRu || lastSnapshot.sceneVector?.sceneNameRu || 'Исследование'),
+        trackId: String(body.trackId || ''),
+        trackTitle: String(body.trackTitle || ''),
+        isPositive: Boolean(body.isPositive),
+        energy: Number(body.energy ?? lastSnapshot.sceneVector?.energy ?? 30),
+        tension: Number(body.tension ?? lastSnapshot.sceneVector?.tension ?? 25),
+        motionDelta: Number(body.motionDelta ?? lastSnapshot.motionDelta ?? 20),
+      });
+      lastSnapshot.neuralEvolution = updatedBrain;
+      return NextResponse.json({
+        ok: true,
+        neuralEvolution: updatedBrain,
+      });
+    }
+
     const {
       motionDelta = lastSnapshot.motionDelta,
       crimsonIndex = lastSnapshot.crimsonIndex,
@@ -322,6 +447,8 @@ export async function POST(request: NextRequest) {
       activeWindowTitle = lastSnapshot.activeWindowTitle,
       detectedProcess = lastSnapshot.detectedProcess,
       forceVibe,
+      forceSceneTag,
+      forceScenePrompt,
       holdMs = 10000,
     } = body;
 
@@ -333,10 +460,39 @@ export async function POST(request: NextRequest) {
     );
     manualOverrideUntil = Date.now() + Number(holdMs || 10000);
 
-    const userChosen = (forceVibe || vibe) as VibeStateId;
+    let customVector = forceScenePrompt
+      ? resolveSceneFromTextPrompt(String(forceScenePrompt))
+      : undefined;
+
+    if (!customVector && forceSceneTag) {
+      const tagStr = String(forceSceneTag);
+      const { sceneVector: sv } = classifyTelemetryToSceneVector({
+        isStandby: false,
+        detectedProcess,
+        windowTitle: activeWindowTitle,
+        isOnlineGame: Boolean(lastSnapshot.isOnlineGame),
+        motionDelta,
+        crimsonIndex,
+        brightness: luminance,
+        combatThreshold: brainState.learnedThresholds.combatMotionThreshold,
+        bossSensitivity: brainState.learnedThresholds.bossSensitivity,
+        stealthLumaThreshold: brainState.learnedThresholds.stealthLumaThreshold,
+        sceneHint: tagStr.toUpperCase(),
+      });
+      customVector = { ...sv, sceneTag: tagStr, source: 'manual' };
+    }
+
+    const userChosen = customVector
+      ? mapSceneTagToLegacyVibe(
+          customVector.sceneTag,
+          customVector.energy,
+          customVector.tension,
+          customVector.valence
+        )
+      : ((forceVibe || vibe) as VibeStateId);
     let neuralEvolution = brainState;
 
-    if (forceVibe && forceVibe !== lastSnapshot.inferredVibe) {
+    if (userChosen !== lastSnapshot.inferredVibe) {
       neuralEvolution = recordPlayerFeedback({
         detectedProcess,
         windowTitle: activeWindowTitle,
@@ -348,6 +504,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const resolvedTag =
+      customVector?.sceneTag || legacyVibeToSceneTag(userChosen, Boolean(lastSnapshot.isOnlineGame));
+    const { sceneVector: fallbackVector } = classifyTelemetryToSceneVector({
+      isStandby: false,
+      detectedProcess,
+      windowTitle: activeWindowTitle,
+      isOnlineGame: Boolean(lastSnapshot.isOnlineGame),
+      motionDelta,
+      crimsonIndex,
+      brightness: luminance,
+      combatThreshold: brainState.learnedThresholds.combatMotionThreshold,
+      bossSensitivity: brainState.learnedThresholds.bossSensitivity,
+      stealthLumaThreshold: brainState.learnedThresholds.stealthLumaThreshold,
+      sceneHint: resolvedTag.toUpperCase(),
+    });
+
     lastSnapshot = {
       ...lastSnapshot,
       timestamp: Date.now(),
@@ -358,6 +530,8 @@ export async function POST(request: NextRequest) {
       luminance,
       compositeIntensity: intensity,
       inferredVibe: userChosen,
+      sceneVector: customVector || fallbackVector,
+      sceneLabel: (customVector || fallbackVector).sceneNameRu,
       neuralEvolution,
     };
 

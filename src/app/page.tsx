@@ -47,9 +47,20 @@ import {
   Minimize2,
   Maximize2,
   Copy,
+  ThumbsUp,
+  ThumbsDown,
+  Flame,
+  Wand2,
 } from 'lucide-react';
 import { FALLBACK_REAL_TRACKS, VIBE_STATES } from '@/lib/defaultData';
-import { DirectorScene, TelemetrySnapshot, TrackItem, VibeStateId } from '@/types/vibe';
+import {
+  CustomSceneRule,
+  DirectorScene,
+  SceneVector,
+  TelemetrySnapshot,
+  TrackItem,
+  VibeStateId,
+} from '@/types/vibe';
 import {
   AccountsStore,
   SCENE_BUCKET_CONFIGS,
@@ -57,6 +68,15 @@ import {
   ScenePlaylist,
   UserAccount,
 } from '@/types/account';
+import {
+  QUICK_SCENE_ORDER,
+  SCENE_TAXONOMY,
+  computeSceneDistance,
+  getSceneTaxonomy,
+  legacyVibeToSceneTag,
+  mapSceneTagToLegacyVibe,
+  resolveSceneFromTextPrompt,
+} from '@/lib/scene-engine';
 
 interface UserAccountProfile {
   username: string;
@@ -305,9 +325,17 @@ export default function GameVibeSpotifyApp() {
   const [localTracks, setLocalTracks] = useState<TrackItem[]>([]);
   const [scanningLocal, setScanningLocal] = useState<boolean>(false);
 
-  // Integrations & BYOK State (Spotify, Apple Music, Gemini Vision API)
+  // Integrations, GSI & Universal AI Vision State
   const [integrationsConfig, setIntegrationsConfig] = useState<{
     playbackEngine: 'youtube' | 'spotify' | 'apple';
+    aiProvider: 'none' | 'gemini' | 'ollama' | 'openrouter' | 'openai-compat';
+    aiBaseUrl: string;
+    aiApiKey: string;
+    aiMaskedKey: string;
+    aiHasKey: boolean;
+    aiModel: string;
+    aiIntervalSec: number;
+    aiIsValidated: boolean;
     geminiEnabled: boolean;
     geminiApiKey: string;
     geminiModel: string;
@@ -318,9 +346,17 @@ export default function GameVibeSpotifyApp() {
     appleDeveloperToken: string;
   }>({
     playbackEngine: 'youtube',
+    aiProvider: 'none',
+    aiBaseUrl: 'http://127.0.0.1:11434/v1',
+    aiApiKey: '',
+    aiMaskedKey: '',
+    aiHasKey: false,
+    aiModel: 'gemini-3.5-flash-lite',
+    aiIntervalSec: 12,
+    aiIsValidated: false,
     geminiEnabled: false,
     geminiApiKey: '',
-    geminiModel: 'gemini-3.5-flash',
+    geminiModel: 'gemini-3.5-flash-lite',
     geminiMaskedKey: '',
     geminiHasKey: false,
     geminiIsValidated: false,
@@ -331,17 +367,104 @@ export default function GameVibeSpotifyApp() {
   const [testingGemini, setTestingGemini] = useState<boolean>(false);
   const [geminiStatusMsg, setGeminiStatusMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [savingIntegrations, setSavingIntegrations] = useState<boolean>(false);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
+
+  const [gsiStatus, setGsiStatus] = useState<{
+    gsiActive: boolean;
+    gsi: { game?: string; phase?: string; sceneTag?: string; summary?: string } | null;
+    steam: {
+      steamPath: string | null;
+      dota2Dir: string | null;
+      cs2Dir: string | null;
+      dota2Installed: boolean;
+      cs2Installed: boolean;
+      cfgFileName?: string;
+    } | null;
+    cfgSamples: { dota2: string; cs2: string };
+  } | null>(null);
+  const [installingGsi, setInstallingGsi] = useState<boolean>(false);
+  const [gsiActionMsg, setGsiActionMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [activeGsiManualTab, setActiveGsiManualTab] = useState<'none' | 'dota2' | 'cs2'>('none');
+  const [copiedGsiCfg, setCopiedGsiCfg] = useState<string>('');
+
+  const loadGsiStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/gsi');
+      if (res.ok) {
+        const data = await res.json();
+        setGsiStatus({
+          gsiActive: Boolean(data.gsiActive),
+          gsi: data.gsi || null,
+          steam: data.steam || null,
+          cfgSamples: data.cfgSamples || { dota2: '', cs2: '' },
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleInstallGsiCfg = async () => {
+    setInstallingGsi(true);
+    setGsiActionMsg(null);
+    try {
+      const res = await fetch('/api/gsi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'install_cfg' }),
+      });
+      const data = await res.json();
+      await loadGsiStatus();
+      if (data.installed?.length > 0) {
+        const names = data.installed.map((i: { game: string }) => i.game).join(', ');
+        setGsiActionMsg({
+          ok: true,
+          text: `Установлен конфиг GSI для: ${names}. Перезапустите игру (если была открыта), чтобы Valve начал слать телеметрию.`,
+        });
+      } else {
+        setGsiActionMsg({
+          ok: false,
+          text: 'Папки Dota 2 или CS2 в Steam не найдены автоматически — скопируйте .cfg вручную ниже.',
+        });
+        setActiveGsiManualTab('dota2');
+      }
+    } catch {
+      setGsiActionMsg({ ok: false, text: 'Ошибка установки GSI-конфига.' });
+    } finally {
+      setInstallingGsi(false);
+    }
+  };
+
+  const handleCopyGsiCfg = async (game: 'dota2' | 'cs2') => {
+    const sample = gsiStatus?.cfgSamples?.[game] || '';
+    if (!sample) return;
+    try {
+      await navigator.clipboard.writeText(sample);
+      setCopiedGsiCfg(game);
+      setTimeout(() => setCopiedGsiCfg(''), 2500);
+    } catch {
+      // ignore clipboard errors
+    }
+  };
 
   const loadIntegrations = useCallback(async () => {
     try {
       const res = await fetch('/api/integrations');
       if (res.ok) {
         const data = await res.json();
+        const ai = data.aiVision || {};
         setIntegrationsConfig((prev) => ({
           ...prev,
           playbackEngine: data.playbackEngine || 'youtube',
+          aiProvider: ai.provider || (data.gemini?.enabled ? 'gemini' : 'none'),
+          aiBaseUrl: ai.baseUrl || prev.aiBaseUrl || 'http://127.0.0.1:11434/v1',
+          aiMaskedKey: ai.maskedKey || data.gemini?.maskedKey || '',
+          aiHasKey: Boolean(ai.hasKey || data.gemini?.hasKey),
+          aiModel: ai.model || data.gemini?.model || 'gemini-3.5-flash-lite',
+          aiIntervalSec: Number(ai.intervalSec || data.gemini?.intervalSec || 12),
+          aiIsValidated: Boolean(ai.isValidated || data.gemini?.isValidated),
           geminiEnabled: Boolean(data.gemini?.enabled),
-          geminiModel: data.gemini?.model || 'gemini-3.5-flash',
+          geminiModel: data.gemini?.model || 'gemini-3.5-flash-lite',
           geminiMaskedKey: data.gemini?.maskedKey || '',
           geminiHasKey: Boolean(data.gemini?.hasKey),
           geminiIsValidated: Boolean(data.gemini?.isValidated),
@@ -357,13 +480,24 @@ export default function GameVibeSpotifyApp() {
   const handleSaveIntegrations = async (updates?: any) => {
     setSavingIntegrations(true);
     try {
+      const nextProvider = updates?.aiProvider ?? integrationsConfig.aiProvider;
+      const nextModel = updates?.aiModel ?? (nextProvider === 'gemini' ? (updates?.geminiModel ?? integrationsConfig.geminiModel) : integrationsConfig.aiModel);
+      const nextKey = updates?.aiApiKey !== undefined ? updates.aiApiKey : (updates?.geminiApiKey !== undefined ? updates.geminiApiKey : (integrationsConfig.aiApiKey || integrationsConfig.geminiApiKey));
       const payload = {
         playbackEngine: updates?.playbackEngine || integrationsConfig.playbackEngine,
+        aiVision: {
+          provider: nextProvider,
+          baseUrl: updates?.aiBaseUrl !== undefined ? updates.aiBaseUrl : integrationsConfig.aiBaseUrl,
+          apiKey: nextKey,
+          model: nextModel,
+          intervalSec: updates?.aiIntervalSec ?? integrationsConfig.aiIntervalSec ?? 12,
+          isValidated: updates?.aiIsValidated !== undefined ? updates.aiIsValidated : integrationsConfig.aiIsValidated,
+        },
         gemini: {
-          enabled: updates?.geminiEnabled !== undefined ? updates.geminiEnabled : integrationsConfig.geminiEnabled,
-          apiKey: updates?.geminiApiKey !== undefined ? updates.geminiApiKey : integrationsConfig.geminiApiKey,
-          model: updates?.geminiModel || integrationsConfig.geminiModel,
-          intervalSec: 10,
+          enabled: nextProvider === 'gemini',
+          apiKey: nextProvider === 'gemini' ? nextKey : '',
+          model: nextProvider === 'gemini' ? nextModel : integrationsConfig.geminiModel,
+          intervalSec: updates?.aiIntervalSec ?? 12,
         },
         spotify: {
           clientId: updates?.spotifyClientId !== undefined ? updates.spotifyClientId : integrationsConfig.spotifyClientId,
@@ -379,7 +513,7 @@ export default function GameVibeSpotifyApp() {
       });
       if (res.ok) {
         await loadIntegrations();
-        setGeminiStatusMsg({ ok: true, text: 'Настройки успешно сохранены!' });
+        setGeminiStatusMsg({ ok: true, text: 'Настройки ИИ-режиссёра сохранены!' });
       }
     } catch {
       setGeminiStatusMsg({ ok: false, text: 'Ошибка сохранения настроек' });
@@ -389,10 +523,16 @@ export default function GameVibeSpotifyApp() {
     }
   };
 
-  const handleTestGeminiKey = async () => {
-    const keyToTest = integrationsConfig.geminiApiKey.trim();
-    if (!keyToTest && !integrationsConfig.geminiHasKey) {
-      setGeminiStatusMsg({ ok: false, text: 'Введите API-ключ Gemini' });
+  const handleTestAiEndpoint = async () => {
+    const prov = integrationsConfig.aiProvider;
+    const keyToTest = (integrationsConfig.aiApiKey || integrationsConfig.geminiApiKey).trim();
+    const baseToTest = integrationsConfig.aiBaseUrl.trim();
+    if (prov === 'gemini' && !keyToTest && !integrationsConfig.aiHasKey && !integrationsConfig.geminiHasKey) {
+      setGeminiStatusMsg({ ok: false, text: 'Введите API-ключ Gemini из Google AI Studio' });
+      return;
+    }
+    if ((prov === 'openrouter' || prov === 'openai-compat') && !baseToTest) {
+      setGeminiStatusMsg({ ok: false, text: 'Укажите Base URL провайдера' });
       return;
     }
     setTestingGemini(true);
@@ -401,14 +541,35 @@ export default function GameVibeSpotifyApp() {
       const res = await fetch('/api/integrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ testGeminiKey: true, geminiApiKey: keyToTest }),
+        body: JSON.stringify(
+          prov === 'gemini'
+            ? { testGeminiKey: true, geminiApiKey: keyToTest }
+            : {
+                testAiEndpoint: true,
+                provider: prov,
+                baseUrl: baseToTest,
+                apiKey: keyToTest,
+              }
+        ),
       });
       const data = await res.json();
       if (res.ok && data.ok) {
-        setGeminiStatusMsg({ ok: true, text: '✓ API-ключ успешно проверен и подключен!' });
-        await handleSaveIntegrations({ geminiApiKey: keyToTest, geminiEnabled: true });
+        if (Array.isArray(data.models) && data.models.length > 0) {
+          setOllamaModels(data.models);
+        }
+        setGeminiStatusMsg({
+          ok: true,
+          text: `✓ ${data.message || 'Подключение проверено и активировано!'}`,
+        });
+        await handleSaveIntegrations({
+          aiProvider: prov,
+          aiApiKey: keyToTest,
+          aiBaseUrl: baseToTest,
+          aiModel: integrationsConfig.aiModel,
+          aiIsValidated: true,
+        });
       } else {
-        setGeminiStatusMsg({ ok: false, text: `Ошибка проверки: ${data.error || 'Неверный ключ'}` });
+        setGeminiStatusMsg({ ok: false, text: `Ошибка проверки: ${data.error || 'Сервер недоступен'}` });
       }
     } catch (e: any) {
       setGeminiStatusMsg({ ok: false, text: `Сетевая ошибка: ${e?.message || 'Не удалось связаться с сервером'}` });
@@ -437,6 +598,22 @@ export default function GameVibeSpotifyApp() {
   const pendingVideoIdRef = useRef<string>('');
   const skipTrackRef = useRef<(dir?: 1 | -1) => void>(() => {});
   const activeVibeRef = useRef<VibeStateId>('EXPLORE');
+  const activeSceneTagRef = useRef<string>('standby');
+  const [activeSceneTag, setActiveSceneTag] = useState<string>('standby');
+  const lastSwitchedVectorRef = useRef<SceneVector | null>(null);
+  const semanticDeckCacheRef = useRef<Record<string, TrackItem[]>>({});
+  const semanticFetchBusyRef = useRef<boolean>(false);
+  const excludedTrackIdsRef = useRef<string[]>([]);
+  const [customSceneInput, setCustomSceneInput] = useState<string>('');
+  const [trackFeedbackStatus, setTrackFeedbackStatus] = useState<{
+    trackId: string;
+    type: 'up' | 'down';
+  } | null>(null);
+  const [newCustomSceneName, setNewCustomSceneName] = useState<string>('');
+  const [newCustomSceneBrief, setNewCustomSceneBrief] = useState<string>('');
+  const [newCustomSceneEnergy, setNewCustomSceneEnergy] = useState<number>(45);
+  const [newCustomSceneTension, setNewCustomSceneTension] = useState<number>(60);
+  const [selectedCustomSceneId, setSelectedCustomSceneId] = useState<string | null>(null);
   const activeMacroModeRef = useRef<'EXPLORE' | 'COMBAT'>('EXPLORE');
   const currentTrackStartTimeRef = useRef<number>(Date.now());
   const lastAutoSkipTimeRef = useRef<number>(0);
@@ -679,13 +856,26 @@ export default function GameVibeSpotifyApp() {
   const handleToggleAudioMode = async (newMode: 'game-vibe' | 'custom') => {
     setAudioMode(newMode);
     audioModeRef.current = newMode;
+    semanticDeckCacheRef.current = {};
+    fetch('/api/app-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audioMode: newMode }),
+    }).catch(() => {});
     setLoadingStream(true);
     await preloadAllDecks(accountProfile, newMode);
-    const newDeck = decksRef.current[activeVibeRef.current] || [];
-    if (newDeck.length > 0) {
-      setLiveStreamTracks(newDeck);
-      executePlayTrack(newDeck[0]);
-    }
+    const activeVec = telemetry.sceneVector || {
+      sceneTag: activeSceneTagRef.current || 'explore_wander',
+      sceneNameRu: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').nameRu,
+      energy: 30,
+      tension: 25,
+      valence: 10,
+      pacing: 'steady',
+      musicBrief: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').ostMoodKeywords,
+      confidence: 85,
+      source: 'manual',
+    };
+    await switchToSceneVector(activeVec, { forceSwitch: true, forceFetch: true, modeOverride: newMode });
     setLoadingStream(false);
   };
 
@@ -722,11 +912,14 @@ export default function GameVibeSpotifyApp() {
         }
       }
 
+      const learnedCombatThresh =
+        telemetry.neuralEvolution?.learnedThresholds?.combatMotionThreshold ??
+        Math.max(24, 72 - sensitivityRef.current);
       const isOnlineCombat =
         Boolean(telemetry?.isOnlineGame) &&
         (activeVibeRef.current === 'COMBAT' ||
           activeVibeRef.current === 'BOSSFIGHT' ||
-          (telemetry?.motionDelta ?? 0) >= 44);
+          (telemetry?.motionDelta ?? 0) >= learnedCombatThresh);
       const isClutchDucked =
         competitiveFootstepsDuckingRef.current && isOnlineCombat;
 
@@ -868,21 +1061,55 @@ export default function GameVibeSpotifyApp() {
   );
 
   /**
-   * Smooth Intelligent Scene Switcher:
-   * Transitions between narrative/game scenes (Explore, Majestic Vista, Tragic Drama, Combat, Boss, Stealth)
-   * with musical crossfade, explore timecode resumption, and strict hysteresis so songs play stably.
+   * Multi-Dimensional Semantic Scene Switcher (v3.0):
+   * Routes ANY game scene vector (energy, tension, valence, sceneTag, musicBrief) through:
+   * 1) Resume bookmark for calm returns
+   * 2) User flexible custom scene rules / bucket playlists
+   * 3) Dynamic live semantic deck cache / /api/ytmusic synthesis (custom artists or game OST)
    */
-  const switchToSceneSmoothly = useCallback(
-    async (targetVibe: VibeStateId) => {
-      if (activeVibeRef.current === targetVibe) return;
+  const switchToSceneVector = useCallback(
+    async (
+      vector: SceneVector,
+      opts?: {
+        forceSwitch?: boolean;
+        forceFetch?: boolean;
+        modeOverride?: 'game-vibe' | 'custom';
+      }
+    ) => {
+      const prevVec = lastSwitchedVectorRef.current;
+      const dist = prevVec ? computeSceneDistance(prevVec, vector) : 100;
+      if (!opts?.forceSwitch && prevVec && dist < 22 && activeSceneTagRef.current === vector.sceneTag) {
+        return;
+      }
+
+      const targetVibe = mapSceneTagToLegacyVibe(
+        vector.sceneTag,
+        vector.energy,
+        vector.tension,
+        vector.valence
+      );
+      activeSceneTagRef.current = vector.sceneTag;
+      setActiveSceneTag(vector.sceneTag);
+      lastSwitchedVectorRef.current = vector;
+
       activeVibeRef.current = targetVibe;
       setActiveVibe(targetVibe);
       activeMacroModeRef.current =
-        targetVibe === 'COMBAT' || targetVibe === 'BOSSFIGHT' ? 'COMBAT' : 'EXPLORE';
+        vector.energy >= 62 || targetVibe === 'COMBAT' || targetVibe === 'BOSSFIGHT'
+          ? 'COMBAT'
+          : 'EXPLORE';
 
-      // 0. Check if returning to EXPLORE and we have a saved bookmark from before combat/cutscene
+      const isCalmScene =
+        vector.energy < 42 &&
+        vector.tension < 55 &&
+        (vector.sceneTag === 'explore_wander' ||
+          vector.sceneTag === 'cozy_hub' ||
+          vector.sceneTag === 'menu_lobby');
+
+      // 0. Bookmark resume when returning from combat/cutscene into calm exploration
       if (
-        targetVibe === 'EXPLORE' &&
+        !opts?.forceSwitch &&
+        isCalmScene &&
         resumeExplorePositionRef.current &&
         savedExploreBookmarkRef.current &&
         Date.now() - savedExploreBookmarkRef.current.savedAt < 15 * 60 * 1000
@@ -893,7 +1120,7 @@ export default function GameVibeSpotifyApp() {
         const ss = String(bm.timeSec % 60).padStart(2, '0');
         setLastResumedTimecode(`${mm}:${ss}`);
         setResolvedMoodQuery(
-          `⏪ Продолжение с ${mm}:${ss} · ${bm.track.artist} — ${bm.track.title}`
+          `Продолжение с ${mm}:${ss} · ${bm.track.artist} — ${bm.track.title}`
         );
         executePlayTrack(bm.track, { resumeSec: bm.timeSec });
         return;
@@ -901,48 +1128,61 @@ export default function GameVibeSpotifyApp() {
 
       setLastResumedTimecode(null);
 
-      // 1. Check custom user scene playlist if enabled
+      // 1. Check Custom User ScenePlaylist (Flexible CustomSceneRule first, then buckets)
       if (
         useCustomPlaylistInAutopilotRef.current &&
         activeScenePlaylistRef.current
       ) {
         const pl = activeScenePlaylistRef.current;
+        const briefLower = `${vector.sceneTag} ${vector.sceneNameRu} ${vector.musicBrief}`.toLowerCase();
+
+        // Try matching unlimited user-defined scene rules
+        let matchedRule: CustomSceneRule | undefined;
+        let bestScore = Infinity;
+        for (const rule of pl.customScenes || []) {
+          if (!rule.tracks || rule.tracks.length === 0) continue;
+          const kwMatch = (rule.keywords || []).some((kw) => kw && briefLower.includes(kw.toLowerCase()));
+          const vecDist =
+            Math.abs(rule.targetEnergy - vector.energy) * 0.5 +
+            Math.abs(rule.targetTension - vector.tension) * 0.4 +
+            Math.abs(rule.targetValence - vector.valence) * 0.1;
+          const totalScore = kwMatch ? vecDist * 0.35 : vecDist;
+          if ((kwMatch || vecDist <= 30) && totalScore < bestScore) {
+            bestScore = totalScore;
+            matchedRule = rule;
+          }
+        }
+
         const bucketId: SceneBucketId =
           targetVibe === 'VICTORY' ? 'MAJESTIC' : (targetVibe as SceneBucketId);
 
-        let pool = pl.scenes?.[bucketId] || [];
-
-        // Intelligent fallbacks if this bucket is empty
+        let pool = matchedRule?.tracks || pl.scenes?.[bucketId] || [];
         if (pool.length === 0) {
           if (bucketId === 'BOSSFIGHT') pool = pl.scenes?.COMBAT || [];
-          else if (
-            bucketId === 'MAJESTIC' ||
-            bucketId === 'DRAMA' ||
-            bucketId === 'STEALTH'
-          ) {
+          else if (bucketId === 'MAJESTIC' || bucketId === 'DRAMA' || bucketId === 'STEALTH') {
             pool = pl.scenes?.EXPLORE || [];
           }
         }
         if (pool.length === 0) {
-          const allTracks = Object.values(pl.scenes || {}).flat();
-          if (allTracks.length > 0) pool = allTracks;
+          pool = Object.values(pl.scenes || {}).flat();
         }
 
         if (pool.length > 0) {
           const candidates = pool.filter(
-            (t) => !recentlyPlayedIdsRef.current.includes(t.id)
+            (t) =>
+              !recentlyPlayedIdsRef.current.includes(t.id) &&
+              !excludedTrackIdsRef.current.includes(t.id)
           );
           const finalPool = candidates.length > 0 ? candidates : pool;
           const chosen = finalPool[Math.floor(Math.random() * finalPool.length)];
-
           recentlyPlayedIdsRef.current = [
             chosen.id,
             ...recentlyPlayedIdsRef.current.filter((id) => id !== chosen.id),
           ].slice(0, 50);
 
-          const bucketMeta = SCENE_BUCKET_CONFIGS[bucketId];
+          const ruleLabel = matchedRule ? matchedRule.name : SCENE_BUCKET_CONFIGS[bucketId]?.shortLabel || bucketId;
           setResolvedMoodQuery(
-            `🎭 Своя подборка (${pl.name}) · [${bucketMeta?.shortLabel || bucketId}]: ${chosen.artist} — ${chosen.title}`
+            `Своя подборка (${pl.name}) · [${ruleLabel}]: ${chosen.artist} — ${chosen.title}`
           );
           setLiveStreamTracks(pool);
           executePlayTrack(chosen);
@@ -950,33 +1190,128 @@ export default function GameVibeSpotifyApp() {
         }
       }
 
-      // 2. Select authentic procedural track with 50-track anti-repeat memory (zero duplicate song loops!)
-      const deck = decksRef.current[targetVibe] || [];
+      // 2. Semantic Dynamic Cache + Live /api/ytmusic Synthesis
+      const activeMode = opts?.modeOverride || audioModeRef.current;
+      const activeGame = telemetry.detectedProcess || '';
+      const tensionBand = Math.round(vector.tension / 25);
+      const cacheKey = `${activeMode}::${activeGame}::${vector.sceneTag}::${tensionBand}`;
+
+      let deck = !opts?.forceFetch ? semanticDeckCacheRef.current[cacheKey] || [] : [];
+
+      if ((deck.length <= 2 || opts?.forceFetch) && !semanticFetchBusyRef.current) {
+        semanticFetchBusyRef.current = true;
+        try {
+          const prof = accountProfile;
+          const genresList = prof?.favoriteGenres || draftGenres;
+          const customExtra = (prof?.customArtistsText || draftCustomArtists)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const artistsList = [...(prof?.favoriteArtists || draftArtists), ...customExtra];
+
+          const params = new URLSearchParams({
+            mode: 'autopilot',
+            audioMode: activeMode,
+            vibe: targetVibe,
+            sceneTag: String(vector.sceneTag),
+            energy: String(vector.energy),
+            tension: String(vector.tension),
+            valence: String(vector.valence),
+            musicBrief: vector.musicBrief,
+            genres: genresList.join(','),
+            artists: artistsList.join(','),
+            lang: prof?.languagePref || draftLanguagePref,
+            vocal: prof?.vocalPref || draftVocalPref,
+            game: activeGame,
+            excludeIds: excludedTrackIdsRef.current.slice(0, 30).join(','),
+          });
+          const res = await fetch(`/api/ytmusic?${params.toString()}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+              deck = data.tracks;
+              semanticDeckCacheRef.current[cacheKey] = deck;
+            }
+          }
+        } catch {
+          // Fallback to legacy bucket deck below
+        } finally {
+          semanticFetchBusyRef.current = false;
+        }
+      }
+
+      if (deck.length === 0) {
+        deck = decksRef.current[targetVibe] || [];
+      }
+
       if (deck.length > 0) {
-        // Exclude tracks that played recently (up to 50 tracks)
-        const candidates = deck.filter((t) => !recentlyPlayedIdsRef.current.includes(t.id));
-        const pool = candidates.length > 0 ? candidates : deck.filter((t) => t.id !== currentTrackRef.current?.id);
+        const candidates = deck.filter(
+          (t) =>
+            !recentlyPlayedIdsRef.current.includes(t.id) &&
+            !excludedTrackIdsRef.current.includes(t.id)
+        );
+        const pool =
+          candidates.length > 0
+            ? candidates
+            : deck.filter((t) => t.id !== currentTrackRef.current?.id);
         const finalPool = pool.length > 0 ? pool : deck;
         const chosen = finalPool[Math.floor(Math.random() * finalPool.length)];
 
-        // Update anti-repeat history queue (remembers 50 songs)
-        recentlyPlayedIdsRef.current = [chosen.id, ...recentlyPlayedIdsRef.current.filter((id) => id !== chosen.id)].slice(0, 50);
-
-        // If candidates pool is running low, proactively fetch fresh procedural tracks in the background
-        if (candidates.length <= 2) {
-          preloadAllDecks(accountProfile, audioModeRef.current, telemetry.detectedProcess);
-        }
+        recentlyPlayedIdsRef.current = [
+          chosen.id,
+          ...recentlyPlayedIdsRef.current.filter((id) => id !== chosen.id),
+        ].slice(0, 50);
 
         setLiveStreamTracks(deck);
         setResolvedMoodQuery(
-          audioModeRef.current === 'game-vibe'
-            ? `Вайб игры: ${chosen.artist} — ${chosen.title}`
-            : `Мои вкусы: ${chosen.artist} — ${chosen.title}`
+          `${vector.sceneNameRu} · ${activeMode === 'game-vibe' ? 'Сцена ИИ' : 'Мои артисты'}: ${chosen.artist} — ${chosen.title}`
         );
         executePlayTrack(chosen);
       }
     },
-    [useCustomPlaylistInAutopilot, selectedPlaylistId, userPlaylists, executePlayTrack]
+    [
+      accountProfile,
+      draftArtists,
+      draftCustomArtists,
+      draftGenres,
+      draftLanguagePref,
+      draftVocalPref,
+      executePlayTrack,
+      telemetry.detectedProcess,
+    ]
+  );
+
+  const switchToSceneVectorRef = useRef<
+    (v: SceneVector, opts?: { forceSwitch?: boolean; forceFetch?: boolean }) => Promise<void>
+  >(async () => {});
+  useEffect(() => {
+    switchToSceneVectorRef.current = switchToSceneVector;
+  }, [switchToSceneVector]);
+
+  /**
+   * Backwards-compatible wrapper for legacy 6-vibe triggers & hotkeys (Alt+1..5)
+   */
+  const switchToSceneSmoothly = useCallback(
+    async (targetVibe: VibeStateId) => {
+      const tag = legacyVibeToSceneTag(targetVibe, Boolean(telemetry?.isOnlineGame));
+      const tax = getSceneTaxonomy(tag);
+      await switchToSceneVector(
+        {
+          sceneTag: tag,
+          sceneNameRu: tax.nameRu,
+          energy: tax.energy,
+          tension: tax.tension,
+          valence: tax.valence,
+          pacing: tax.pacing,
+          musicBrief: tax.ostMoodKeywords,
+          confidence: 90,
+          source: 'manual',
+          accentHex: tax.accentHex,
+        },
+        { forceSwitch: true }
+      );
+    },
+    [switchToSceneVector, telemetry?.isOnlineGame]
   );
 
   /**
@@ -1151,8 +1486,9 @@ export default function GameVibeSpotifyApp() {
   useEffect(() => {
     preloadAllDecks();
     loadIntegrations();
+    loadGsiStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadIntegrations]);
+  }, [loadIntegrations, loadGsiStatus]);
 
   // Autonomous real-time game screen & input telemetry loop (every 800ms)
   useEffect(() => {
@@ -1245,10 +1581,31 @@ export default function GameVibeSpotifyApp() {
             return;
           }
 
+          const learnedCombatThresh =
+            data.neuralEvolution?.learnedThresholds?.combatMotionThreshold ??
+            Math.max(24, 72 - sensitivityRef.current);
+          const sv: SceneVector = data.sceneVector || {
+            sceneTag: legacyVibeToSceneTag(targetVibe, Boolean(data.isOnlineGame)),
+            sceneNameRu: getSceneTaxonomy(legacyVibeToSceneTag(targetVibe, Boolean(data.isOnlineGame))).nameRu,
+            energy: data.motionDelta,
+            tension: Math.round(data.motionDelta * 0.7),
+            valence: 0,
+            pacing: 'steady',
+            musicBrief: data.director?.musicStyle || getSceneTaxonomy(legacyVibeToSceneTag(targetVibe, Boolean(data.isOnlineGame))).ostMoodKeywords,
+            confidence: 80,
+            source: 'sensor',
+          };
+
+          if (sv.sceneTag !== activeSceneTagRef.current) {
+            activeSceneTagRef.current = sv.sceneTag;
+            setActiveSceneTag(sv.sceneTag);
+          }
+
           const isActivelyFighting =
             targetVibe === 'COMBAT' ||
             targetVibe === 'BOSSFIGHT' ||
-            data.motionDelta >= 48;
+            sv.energy >= learnedCombatThresh ||
+            data.motionDelta >= learnedCombatThresh;
 
           if (isActivelyFighting) {
             lastCombatSpikeRef.current = now;
@@ -1259,45 +1616,47 @@ export default function GameVibeSpotifyApp() {
             isActivelyFighting || now - lastCombatSpikeRef.current < 14000;
 
           if (inCombatSession) {
-            // Player is in battle or Boss Fight!
-            if (targetVibe === 'BOSSFIGHT' && currentVibe !== 'BOSSFIGHT') {
-              // Only switch from regular combat to boss theme if combat theme played at least 35s or was peaceful
-              if (trackPlayDurationSec >= 35 || currentVibe === 'EXPLORE') {
-                switchToSceneSmoothly('BOSSFIGHT');
+            // Player is in battle, chase, teamfight, or Boss Fight!
+            if (
+              (targetVibe === 'BOSSFIGHT' || sv.sceneTag === 'boss_climax') &&
+              currentVibe !== 'BOSSFIGHT'
+            ) {
+              if (trackPlayDurationSec >= 25 || currentVibe === 'EXPLORE' || !isPlayingRef.current) {
+                void switchToSceneVectorRef.current(sv, { forceSwitch: true });
               }
             } else if (currentVibe !== 'COMBAT' && currentVibe !== 'BOSSFIGHT') {
-              // Entering battle from peaceful exploration
-              if (trackPlayDurationSec >= 25 || !isPlayingRef.current) {
-                switchToSceneSmoothly('COMBAT');
+              if (trackPlayDurationSec >= 12 || !isPlayingRef.current) {
+                void switchToSceneVectorRef.current(sv, { forceSwitch: true });
               }
+            } else if (sv.sceneTag !== activeSceneTagRef.current && trackPlayDurationSec >= 18) {
+              // Transition between skirmish <-> chase_escape <-> teamfight_clash smoothly
+              void switchToSceneVectorRef.current(sv);
             }
-            // CRITICAL: While in battle, keep the current battle song playing without skipping!
           } else {
-            // PEACEFUL, CUTSCENE, OR NEW LOCATION DISCOVERY
+            // NON-COMBAT SEMANTIC SCENES (Menu, Cozy Hub, Horror Dread, Stealth, Dialogue, Drama, Vista, Wander)
+            const prevVec = lastSwitchedVectorRef.current;
+            const semanticDist = prevVec ? computeSceneDistance(prevVec, sv) : 100;
+            const semanticChanged = sv.sceneTag !== activeSceneTagRef.current && semanticDist >= 22;
+
             if (currentVibe === 'COMBAT' || currentVibe === 'BOSSFIGHT') {
-              // Returning from battle to peace:
-              // Only switch back once the battle song has played for at least 45 seconds!
-              if (trackPlayDurationSec >= 45) {
-                switchToSceneSmoothly(targetVibe);
+              if (trackPlayDurationSec >= 30 || !isPlayingRef.current) {
+                void switchToSceneVectorRef.current(sv, { forceSwitch: true });
               }
             } else if (data.isCutscene) {
               cutsceneStreakRef.current += 1;
-              // Cutscene dialogue (OCR or sustained letterbox): transition after 12s of previous song
-              const minCutsceneDuration = data.dialogueText ? 10 : 16;
-              if (currentVibe !== targetVibe && trackPlayDurationSec >= minCutsceneDuration) {
-                switchToSceneSmoothly(targetVibe);
+              const minCutsceneDuration = data.dialogueText ? 8 : 14;
+              if ((semanticChanged || currentVibe !== targetVibe) && trackPlayDurationSec >= minCutsceneDuration) {
+                void switchToSceneVectorRef.current(sv);
               }
             } else if (data.isNewLocation) {
               cutsceneStreakRef.current = 0;
-              // Entering new location (panoramic vista or grim dungeon): adapt music after 12s
-              if (currentVibe !== targetVibe && trackPlayDurationSec >= 12) {
-                switchToSceneSmoothly(targetVibe);
+              if ((semanticChanged || currentVibe !== targetVibe) && trackPlayDurationSec >= 10) {
+                void switchToSceneVectorRef.current(sv);
               }
             } else {
               cutsceneStreakRef.current = 0;
-              if (currentVibe !== targetVibe && trackPlayDurationSec >= 60) {
-                // Regular subtle roaming scene shift
-                switchToSceneSmoothly(targetVibe);
+              if ((semanticChanged || currentVibe !== targetVibe) && trackPlayDurationSec >= 18) {
+                void switchToSceneVectorRef.current(sv);
               }
             }
           }
@@ -1308,7 +1667,7 @@ export default function GameVibeSpotifyApp() {
     }, 800);
 
     return () => clearInterval(interval);
-  }, [switchToSceneSmoothly]);
+  }, []);
 
   // YouTube IFrame API bootstrap & background player initialization
   useEffect(() => {
@@ -1424,11 +1783,14 @@ export default function GameVibeSpotifyApp() {
   useEffect(() => {
     const baseVol = isMuted ? 0 : volume;
     const isOnline = Boolean(telemetry?.isOnlineGame);
+    const learnedCombatThresh =
+      telemetry?.neuralEvolution?.learnedThresholds?.combatMotionThreshold ??
+      Math.max(24, 72 - sensitivityRef.current);
     const isEsportsCombat =
       isOnline &&
       (activeVibe === 'COMBAT' ||
         activeVibe === 'BOSSFIGHT' ||
-        (telemetry?.motionDelta ?? 0) >= 44);
+        (telemetry?.motionDelta ?? 0) >= learnedCombatThresh);
     const isClutchDucked = competitiveFootstepsDucking && isEsportsCombat;
 
     const effectiveVol =
@@ -1780,6 +2142,221 @@ export default function GameVibeSpotifyApp() {
           accountId: activeAccount.id,
           playlistId: plId,
           scene,
+          trackId,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.playlist) {
+          setActiveScenePlaylist(data.playlist);
+          activeScenePlaylistRef.current = data.playlist;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleTrackSceneFeedback = async (isPositive: boolean) => {
+    const track = currentTrackRef.current;
+    if (!track) return;
+    const vec = telemetry.sceneVector || {
+      sceneTag: activeSceneTagRef.current || 'explore_wander',
+      sceneNameRu: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').nameRu,
+      energy: 35,
+      tension: 30,
+      valence: 0,
+      pacing: 'steady' as const,
+      musicBrief: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').ostMoodKeywords,
+      confidence: 80,
+      source: 'manual' as const,
+    };
+
+    setTrackFeedbackStatus({ trackId: track.id, type: isPositive ? 'up' : 'down' });
+    setTimeout(() => setTrackFeedbackStatus(null), 3500);
+
+    if (!isPositive) {
+      excludedTrackIdsRef.current = [
+        track.id,
+        ...(track.videoId ? [track.videoId] : []),
+        ...excludedTrackIdsRef.current,
+      ].slice(0, 80);
+    }
+
+    try {
+      const res = await fetch('/api/telemetry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'track_feedback',
+          isPositive,
+          detectedProcess: telemetry.detectedProcess,
+          windowTitle: telemetry.activeWindowTitle,
+          sceneTag: vec.sceneTag,
+          sceneNameRu: vec.sceneNameRu,
+          trackId: track.id,
+          trackTitle: `${track.artist} — ${track.title}`,
+          energy: vec.energy,
+          tension: vec.tension,
+          motionDelta: telemetry.motionDelta,
+        }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.neuralEvolution) {
+          setTelemetry((prev) => ({ ...prev, neuralEvolution: d.neuralEvolution }));
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    if (!isPositive) {
+      await switchToSceneVector(vec, { forceSwitch: true, forceFetch: true });
+    }
+  };
+
+  const handleActivateSceneTag = async (tag: string) => {
+    const tax = getSceneTaxonomy(tag);
+    const vec: SceneVector = {
+      sceneTag: tag,
+      sceneNameRu: tax.nameRu,
+      energy: tax.energy,
+      tension: tax.tension,
+      valence: tax.valence,
+      pacing: tax.pacing,
+      musicBrief: tax.ostMoodKeywords,
+      confidence: 95,
+      source: 'manual',
+      accentHex: tax.accentHex,
+    };
+    await switchToSceneVector(vec, { forceSwitch: true });
+    fetch('/api/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        forceSceneTag: tag,
+        holdMs: 30000,
+      }),
+    }).catch(() => {});
+  };
+
+  const handleApplyCustomScenePrompt = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const prompt = customSceneInput.trim();
+    if (!prompt) return;
+    const vec = resolveSceneFromTextPrompt(prompt);
+    await switchToSceneVector(vec, { forceSwitch: true, forceFetch: true });
+    fetch('/api/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        forceScenePrompt: prompt,
+        holdMs: 45000,
+      }),
+    }).catch(() => {});
+  };
+
+  const handleAddCustomSceneRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newCustomSceneName.trim();
+    if (!name || !activeAccount || !activeScenePlaylist) return;
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ADD_CUSTOM_SCENE',
+          accountId: activeAccount.id,
+          playlistId: activeScenePlaylist.id,
+          name,
+          musicBrief: newCustomSceneBrief.trim() || name,
+          targetEnergy: newCustomSceneEnergy,
+          targetTension: newCustomSceneTension,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.playlist) {
+          setActiveScenePlaylist(data.playlist);
+          activeScenePlaylistRef.current = data.playlist;
+        }
+        if (data.customScene?.id) {
+          setSelectedCustomSceneId(data.customScene.id);
+        }
+        setNewCustomSceneName('');
+        setNewCustomSceneBrief('');
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleAddTrackToCustomScene = async (customSceneId: string, track: TrackItem) => {
+    if (!activeAccount || !activeScenePlaylist) return;
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'ADD_TRACK_TO_CUSTOM_SCENE',
+          accountId: activeAccount.id,
+          playlistId: activeScenePlaylist.id,
+          customSceneId,
+          track,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.playlist) {
+          setActiveScenePlaylist(data.playlist);
+          activeScenePlaylistRef.current = data.playlist;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleRemoveCustomSceneRule = async (customSceneId: string) => {
+    if (!activeAccount || !activeScenePlaylist) return;
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'REMOVE_CUSTOM_SCENE',
+          accountId: activeAccount.id,
+          playlistId: activeScenePlaylist.id,
+          customSceneId,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.playlist) {
+          setActiveScenePlaylist(data.playlist);
+          activeScenePlaylistRef.current = data.playlist;
+        }
+        if (selectedCustomSceneId === customSceneId) {
+          setSelectedCustomSceneId(null);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleRemoveTrackFromCustomScene = async (customSceneId: string, trackId: string) => {
+    if (!activeAccount || !activeScenePlaylist) return;
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'REMOVE_TRACK_FROM_CUSTOM_SCENE',
+          accountId: activeAccount.id,
+          playlistId: activeScenePlaylist.id,
+          customSceneId,
           trackId,
         }),
       });
@@ -2181,7 +2758,7 @@ export default function GameVibeSpotifyApp() {
             className="w-4 h-4 rounded-sm shrink-0"
           />
           <span className="text-[11px] font-bold tracking-wider uppercase text-[#EDE9E8] whitespace-nowrap">
-            GameMusick Desktop <span className="text-[#E5384F] font-mono">v2.0</span>
+            GameMusick Desktop <span className="text-[#E5384F] font-mono">v3.0</span>
           </span>
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#121014] border border-[#241F25] text-[10px] text-[#A8A0A4] truncate max-w-[260px]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
@@ -2191,6 +2768,12 @@ export default function GameVibeSpotifyApp() {
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FF6A00]/15 border border-[#FF6A00]/40 text-[10px] font-semibold text-[#FF6A00] tracking-wide shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF6A00] animate-pulse shrink-0" />
               <span>КИБЕРСПОРТ / ОНЛАЙН</span>
+            </span>
+          )}
+          {telemetry.gsiActive && telemetry.gsiGame && (
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0E241C] border border-[#10B981]/45 text-[10px] font-semibold text-[#34D399] tracking-wide shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
+              <span>GSI · {telemetry.gsiGame === 'cs2' ? 'CS2' : 'Dota 2'}</span>
             </span>
           )}
           <span className="hidden md:inline text-[10px] font-mono text-[#6E666A] whitespace-nowrap">
@@ -2548,11 +3131,37 @@ export default function GameVibeSpotifyApp() {
               </div>
 
               <div className="bg-[#0B0A0C] border border-[#1E1B1D] rounded-md p-2.5 space-y-2.5">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#8C8482]">Сцена в игре:</span>
-                  <span className="font-semibold text-[#D47A8D]">
-                    {telemetry.sceneLabel || currentSceneMeta.shortLabel}
+                <div className="space-y-1">
+                  <span className="text-[11px] text-[#8C8482] block">Сцена в игре:</span>
+                  <span className="text-xs font-semibold text-[#D47A8D] leading-snug block whitespace-normal break-words">
+                    {telemetry.sceneVector?.sceneNameRu || telemetry.sceneLabel || currentSceneMeta.shortLabel}
                   </span>
+                </div>
+
+                {/* Multi-Dimensional Scene Vector Telemetry Bars */}
+                <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                  <div className="bg-[#131114] border border-[#221E23] rounded px-1.5 py-1">
+                    <div className="text-[9px] uppercase tracking-wider text-[#8C8482]">Энергия</div>
+                    <div className="text-[11px] font-mono font-semibold text-[#FF6A00]">
+                      {telemetry.sceneVector?.energy ?? telemetry.motionDelta}%
+                    </div>
+                  </div>
+                  <div className="bg-[#131114] border border-[#221E23] rounded px-1.5 py-1">
+                    <div className="text-[9px] uppercase tracking-wider text-[#8C8482]">Накал</div>
+                    <div className="text-[11px] font-mono font-semibold text-[#D47A8D]">
+                      {telemetry.sceneVector?.tension ?? Math.round(telemetry.motionDelta * 0.7)}%
+                    </div>
+                  </div>
+                  <div className="bg-[#131114] border border-[#221E23] rounded px-1.5 py-1">
+                    <div className="text-[9px] uppercase tracking-wider text-[#8C8482]">Тон</div>
+                    <div className="text-[11px] font-mono font-semibold text-[#EDE9E8]">
+                      {(telemetry.sceneVector?.valence ?? 0) >= 25
+                        ? 'Светлый'
+                        : (telemetry.sceneVector?.valence ?? 0) <= -30
+                        ? 'Мрачный'
+                        : 'Ровный'}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
@@ -2729,7 +3338,7 @@ export default function GameVibeSpotifyApp() {
             {activeSection === 'autopilot' && (
               <>
                 <div
-                  className="px-5 sm:px-6 py-5 sm:py-6 flex flex-col sm:flex-row items-start sm:items-end gap-5 border-b border-[#1E1B1D]"
+                  className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start gap-4 sm:gap-5 border-b border-[#1E1B1D]"
                   style={{
                     background:
                       'linear-gradient(180deg, rgba(88, 22, 37, 0.55) 0%, rgba(32, 14, 19, 0.45) 65%, rgba(17, 16, 18, 1) 100%)',
@@ -2738,266 +3347,89 @@ export default function GameVibeSpotifyApp() {
                   <img
                     src={currentTrack?.thumbnail || FALLBACK_REAL_TRACKS[0].thumbnail}
                     alt={currentTrack?.title || 'Cover'}
-                    className="w-24 h-24 sm:w-36 sm:h-36 rounded-md object-cover shadow-2xl border border-white/10 shrink-0"
+                    onError={(e) => {
+                      const img = e.currentTarget;
+                      if (!img.dataset.fallbackApplied) {
+                        img.dataset.fallbackApplied = '1';
+                        img.src = '/logo-icon.svg';
+                      }
+                    }}
+                    className="w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-md object-cover shadow-2xl border border-white/10 shrink-0"
                   />
 
-                  <div className="space-y-2.5 min-w-0 flex-1">
+                  <div className="space-y-2.5 min-w-0 flex-1 w-full">
                     {/* Audio Mode Switcher: Game Vibe & Ambient vs User Profile */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <div className="inline-flex items-center p-0.5 rounded-lg bg-[#141215] border border-[#2E282D]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <div className="w-full sm:w-auto grid grid-cols-2 sm:inline-flex items-stretch sm:items-center p-0.5 rounded-lg bg-[#141215] border border-[#2E282D] gap-0.5">
                         <button
                           onClick={() => handleToggleAudioMode('game-vibe')}
-                          className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition ${
+                          className={`px-2.5 sm:px-3 py-1.5 min-h-[38px] rounded-md text-[11px] sm:text-xs font-medium flex items-center justify-center sm:justify-start gap-1.5 transition ${
                             audioMode === 'game-vibe'
                               ? 'bg-[#6E1D2F] text-white shadow-md'
                               : 'text-[#8C8482] hover:text-[#EDE9E8]'
                           }`}
                         >
-                          <span>🏰 Вайб игры & Эмбиент</span>
-                          <span className="text-[10px] opacity-75 font-mono">Процедурный</span>
+                          <span className="whitespace-normal leading-tight text-center sm:text-left">🏰 Вайб игры & Эмбиент</span>
+                          <span className="hidden sm:inline text-[10px] opacity-75 font-mono">Процедурный</span>
                         </button>
 
                         <button
                           onClick={() => handleToggleAudioMode('custom')}
-                          className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition ${
+                          className={`px-2.5 sm:px-3 py-1.5 min-h-[38px] rounded-md text-[11px] sm:text-xs font-medium flex items-center justify-center sm:justify-start gap-1.5 transition ${
                             audioMode === 'custom'
                               ? 'bg-[#6E1D2F] text-white shadow-md'
                               : 'text-[#8C8482] hover:text-[#EDE9E8]'
                           }`}
                         >
-                          <span>🎧 Мои артисты</span>
-                          <span className="text-[10px] opacity-75 font-mono">Профиль</span>
+                          <span className="whitespace-normal leading-tight text-center sm:text-left">🎧 Мои артисты</span>
+                          <span className="hidden sm:inline text-[10px] opacity-75 font-mono">Профиль</span>
                         </button>
                       </div>
 
-                      <span className="text-[11px] text-[#8C8482]">
+                      <span className="text-[11px] text-[#9E9694]">
                         {audioMode === 'game-vibe'
                           ? `Живой процедурный поток под ${telemetry.detectedProcess} (без фиксированных списков)`
                           : 'Играют твои персональные сохраненные вкусы'}
                       </span>
                     </div>
 
-                    {/* Vision Director: what the AI sees right now */}
-                    {telemetry.director && (
-                      <div className="p-2.5 rounded-md bg-[#161317] border border-[#2E282D] text-xs text-[#EDE9E8] space-y-1">
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-wider font-semibold text-[#D47A8D]">
-                          <span>🧠 ИИ видит</span>
-                          <span className="text-[#8C8482]">·</span>
-                          <span>{telemetry.director.sceneType}</span>
-                          <span className="text-[#8C8482]">·</span>
-                          <span>{telemetry.director.mood}</span>
-                          <span className="text-[#8C8482]">·</span>
-                          <span>напряжение {telemetry.director.tension}/10</span>
-                        </div>
-                        <p className="break-words leading-relaxed">{telemetry.director.summary}</p>
-                        {telemetry.director.location && (
-                          <p className="text-[11px] text-[#8C8482] break-words">📍 {telemetry.director.location}</p>
-                        )}
+                    {/* Track Identity & Primary Hero Header */}
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-semibold text-[#D47A8D] flex-wrap">
+                        <span>
+                          {telemetry.isCutscene
+                            ? '🎬 КАТСЦЕНА В ИГРЕ'
+                            : telemetry.isNewLocation
+                            ? '📍 НОВАЯ ЛОКАЦИЯ'
+                            : '⚡ АВТОНОМНЫЙ ПОТОК'} · {(telemetry.sceneLabel || currentSceneMeta.label).toUpperCase()}
+                        </span>
                       </div>
-                    )}
 
-                    {/* Live Neural Subtitle Detection Notification */}
-                    {telemetry.dialogueText && (
-                      <div className="p-2.5 rounded-md bg-[#251218] border border-[#6E1D2F] text-xs text-[#EDE9E8] flex items-start gap-2 shadow-inner">
-                        <div className="w-2 h-2 rounded-full bg-[#E53935] animate-ping shrink-0 mt-1" />
-                        <div className="min-w-0">
-                          <span className="font-semibold text-[#D47A8D] uppercase tracking-wider text-[10px] block">
-                            🎬 Нейросеть распознала реплику в игре ({telemetry.dialogueLabel || 'Сюжет'}):
-                          </span>
-                          <span className="italic text-[#EDE9E8] break-words">"{telemetry.dialogueText}"</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Continuous Neural Evolution & Adaptive Learning Panel */}
-                    {telemetry.neuralEvolution && (
-                      <div className="p-3.5 rounded-lg bg-[#141115] border border-[#2B2329] text-xs text-[#EDE9E8] space-y-3 shadow-lg">
-                        {/* Header bar */}
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {telemetry.neuralEvolution.isGeminiActive ? (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#3A1E4A] text-[#E0A8FF] font-semibold text-[10px] uppercase tracking-wider border border-[#5E2B7A]">
-                                <Sparkles className="w-3.5 h-3.5 text-[#E0A8FF]" />
-                                <span>Gemini Vision API активен</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#10241B] text-[#4ADE80] font-semibold text-[10px] uppercase tracking-wider border border-[#184E32]">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80] animate-ping" />
-                                <Cpu className="w-3.5 h-3.5 text-[#4ADE80]" />
-                                <span>Локальная нейросеть · Онлайн-обучение</span>
-                              </div>
-                            )}
-                            <span className="px-2 py-0.5 rounded bg-[#201822] text-[#D47A8D] font-mono text-[10px] font-bold border border-[#3A283C]">
-                              LVL {telemetry.neuralEvolution.level}
-                            </span>
-                            <span className="text-[10px] text-[#8C8482] font-mono">
-                              Эпоха #{telemetry.neuralEvolution.totalEpochs}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={handleExecutePretraining}
-                              disabled={isPretraining || telemetry.neuralEvolution.isGeminiActive}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#2D1A38] hover:bg-[#402450] border border-[#5E2B75] text-[10px] font-semibold text-[#E9C3FF] transition shadow-sm disabled:opacity-50"
-                              title="Предобучить локальную нейросеть на эталонном датасете (152 игровых сценария)"
-                            >
-                              <Sparkles className={`w-3 h-3 text-[#E9C3FF] ${isPretraining ? 'animate-spin' : ''}`} />
-                              <span>{isPretraining ? 'Обучение на 152 сессиях...' : '⚡ Предобучить на датасете (152 сессии)'}</span>
-                            </button>
-
-                            <div className="flex items-center gap-1.5 pl-1">
-                              <span className="text-[10px] text-[#8C8482]">Точность:</span>
-                              <span className="text-[11px] font-bold text-[#4ADE80] font-mono">
-                                {telemetry.neuralEvolution.accuracy}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Pretraining Success Toast Banner */}
-                        {pretrainSuccessMsg && (
-                          <div className="p-2 rounded bg-[#10241B] border border-[#184E32] text-[11px] text-[#4ADE80] font-medium flex items-center gap-2 shadow-inner">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-[#4ADE80] shrink-0" />
-                            <span>{pretrainSuccessMsg}</span>
-                          </div>
-                        )}
-
-                        {/* XP Progress Bar (Free local offline mode) */}
-                        {!telemetry.neuralEvolution.isGeminiActive && (
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between text-[10px] text-[#8C8482]">
-                              <span className="flex items-center gap-1 text-[#EDE9E8] font-medium">
-                                <Zap className="w-3 h-3 text-[#FBBF24]" />
-                                <span>Прогресс адаптации нейросети (XP)</span>
-                              </span>
-                              <span className="font-mono text-[#D47A8D]">
-                                {telemetry.neuralEvolution.xp} / {telemetry.neuralEvolution.xpToNextLevel} XP
-                              </span>
-                            </div>
-                            <div className="w-full h-1.5 bg-[#201B22] rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-[#D47A8D] via-[#FF6A00] to-[#4ADE80] transition-all duration-500 rounded-full"
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    Math.round(
-                                      (telemetry.neuralEvolution.xp / telemetry.neuralEvolution.xpToNextLevel) * 100
-                                    )
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3-Card Metrics Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
-                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
-                              Профиль игры
-                            </div>
-                            <div className="text-xs font-semibold text-[#EDE9E8] truncate mt-0.5">
-                              {telemetry.detectedProcess && telemetry.detectedProcess !== 'Ожидание игры'
-                                ? (telemetry.neuralEvolution.activeGame || telemetry.detectedProcess)
-                                : 'Ожидание запуска игры'}
-                            </div>
-                            <div className="text-[10px] text-[#4ADE80] mt-0.5">
-                              {telemetry.detectedProcess && telemetry.detectedProcess !== 'Ожидание игры'
-                                ? `✓ Адаптаций: ${telemetry.neuralEvolution.gameAdaptationsCount}`
-                                : '✓ Готов к адаптации'}
-                            </div>
-                          </div>
-
-                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
-                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
-                              Порог боя (Combat)
-                            </div>
-                            <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
-                              {telemetry.neuralEvolution.learnedThresholds.combatMotionThreshold}% динамики
-                            </div>
-                            <div className="text-[10px] text-[#8C8482] mt-0.5">
-                              Автокалибровка темпа
-                            </div>
-                          </div>
-
-                          <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
-                            <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">
-                              Порог скрытности
-                            </div>
-                            <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
-                              {telemetry.neuralEvolution.learnedThresholds.stealthLumaThreshold}% яркости
-                            </div>
-                            <div className="text-[10px] text-[#8C8482] mt-0.5">
-                              Подстройка под стелс
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Expandable Learning Logs & Reinforcement feedback */}
-                        <div className="pt-1 border-t border-[#221C24] space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[#8C8482]">
-                              {telemetry.neuralEvolution.isGeminiActive
-                                ? 'Облачный ИИ анализирует кадры каждые 4 сек.'
-                                : '💡 Нажимай сцены внизу — нейросеть обучается и запоминает твои вкусы (+30 XP)'}
-                            </span>
-                            <button
-                              onClick={() => setShowNeuralLogs((prev) => !prev)}
-                              className="text-[10px] font-medium text-[#D47A8D] hover:text-[#EDE9E8] inline-flex items-center gap-1 transition"
-                            >
-                              <span>{showNeuralLogs ? 'Скрыть лог' : 'Журнал обучения'}</span>
-                              {showNeuralLogs ? (
-                                <ChevronUp className="w-3 h-3" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-
-                          {showNeuralLogs && (
-                            <div className="p-2.5 rounded bg-[#0D0B0E] border border-[#251F27] font-mono text-[11px] text-[#A69EA4] space-y-1.5 max-h-36 overflow-y-auto">
-                              {telemetry.neuralEvolution.recentLearnings?.map((log, idx) => (
-                                <div key={idx} className="flex items-start gap-1.5 leading-snug">
-                                  <span className="text-[#4ADE80] shrink-0">›</span>
-                                  <span className="text-[#EDE9E8]">{log}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-semibold text-[#D47A8D]">
-                      <span>
-                        {telemetry.isCutscene
-                          ? '🎬 КАТСЦЕНА В ИГРЕ'
-                          : telemetry.isNewLocation
-                          ? '📍 НОВАЯ ЛОКАЦИЯ'
-                          : '⚡ АВТОНОМНЫЙ ПОТОК'} · {(telemetry.sceneLabel || currentSceneMeta.label).toUpperCase()}
-                      </span>
+                      <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-[#EDE9E8] break-words leading-snug">
+                        {currentTrack?.title} — {currentTrack?.artist}
+                      </h1>
                     </div>
 
-                    <h1 className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight text-[#EDE9E8] break-words leading-tight">
-                      {currentTrack?.title} — {currentTrack?.artist}
-                    </h1>
-
-                    <p className="text-xs text-[#9E9694] max-w-2xl leading-relaxed">
-                      {audioMode === 'game-vibe'
-                        ? `Программа считывает сюжет, катсцены и бои в ${telemetry.detectedProcess} и ставит вайбовый атмосферный эмбиент и оригинальный саундтрек под стиль игры.`
-                        : `Программа ставит оригинальные треки твоих любимых артистов под моменты геймплея.`}
-                    </p>
-
-                    <div className="pt-1 flex flex-wrap items-center gap-2">
+                    {/* Primary Buttons + Compact Director & Neural Cards Grid */}
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={async () => {
                           setLoadingStream(true);
-                          await preloadAllDecks(accountProfile);
-                          switchToSceneSmoothly(activeVibeRef.current);
+                          const vec = telemetry.sceneVector || {
+                            sceneTag: activeSceneTagRef.current || 'explore_wander',
+                            sceneNameRu: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').nameRu,
+                            energy: 35,
+                            tension: 25,
+                            valence: 10,
+                            pacing: 'steady',
+                            musicBrief: getSceneTaxonomy(activeSceneTagRef.current || 'explore_wander').ostMoodKeywords,
+                            confidence: 85,
+                            source: 'manual',
+                          };
+                          await switchToSceneVector(vec, { forceSwitch: true, forceFetch: true });
                           setLoadingStream(false);
                         }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#6E1D2F] hover:bg-[#822238] text-xs font-medium text-white transition"
+                        className="inline-flex items-center gap-1.5 px-3.5 min-h-[38px] py-1.5 rounded bg-[#6E1D2F] hover:bg-[#822238] text-xs font-medium text-white transition"
                       >
                         <RefreshCw
                           className={`w-3.5 h-3.5 ${loadingStream ? 'animate-spin' : ''}`}
@@ -3007,15 +3439,218 @@ export default function GameVibeSpotifyApp() {
 
                       <button
                         onClick={() => setActiveSection('account')}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-[#181518] hover:bg-[#221D22] border border-[#2E272B] text-xs text-[#EDE9E8] transition"
+                        className="inline-flex items-center gap-1.5 px-3.5 min-h-[38px] py-1.5 rounded bg-[#181518] hover:bg-[#221D22] border border-[#2E272B] text-xs text-[#EDE9E8] transition"
                       >
                         <User className="w-3.5 h-3.5 text-[#B84A62]" />
                         <span>Настроить жанры и предпочтения аккаунта</span>
                       </button>
                     </div>
 
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                      {/* Semantic Vision Director: Continuous Scene Vector & Context */}
+                      {telemetry.director && (
+                        <div className="p-2.5 rounded-md bg-[#161317] border border-[#2E282D] text-xs text-[#EDE9E8] space-y-1">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] uppercase tracking-wider font-semibold text-[#D47A8D]">
+                            <span>ИИ анализирует сцену</span>
+                            <span className="text-[#8C8482]">·</span>
+                            <span>{telemetry.sceneVector?.sceneNameRu || telemetry.director.sceneType}</span>
+                            <span className="text-[#8C8482]">·</span>
+                            <span>Энергия {telemetry.sceneVector?.energy ?? 30}%</span>
+                            <span className="text-[#8C8482]">·</span>
+                            <span>Напряжение {telemetry.sceneVector?.tension ?? telemetry.director.tension}%</span>
+                          </div>
+                          <p className="break-words leading-snug text-[#EDE9E8]">{telemetry.director.summary}</p>
+                          {telemetry.director.location && (
+                            <p className="text-[11px] text-[#8C8482] break-words">📍 {telemetry.director.location}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Compact Continuous Neural Evolution Strip */}
+                      {telemetry.neuralEvolution && (
+                        <div className="p-2.5 rounded-md bg-[#141115] border border-[#2B2329] text-xs text-[#EDE9E8] space-y-1.5 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {telemetry.neuralEvolution.isGeminiActive ? (
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#3A1E4A] text-[#E0A8FF] font-semibold text-[10px] uppercase tracking-wider border border-[#5E2B7A]">
+                                  <Sparkles className="w-3 h-3 text-[#E0A8FF]" />
+                                  <span>Gemini Vision API</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#10241B] text-[#4ADE80] font-semibold text-[10px] uppercase tracking-wider border border-[#184E32]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80] animate-ping" />
+                                  <Cpu className="w-3 h-3 text-[#4ADE80]" />
+                                  <span>Локальная нейросеть</span>
+                                </div>
+                              )}
+                              <span className="px-1.5 py-0.5 rounded bg-[#201822] text-[#D47A8D] font-mono text-[10px] font-bold border border-[#3A283C]">
+                                LVL {telemetry.neuralEvolution.level}
+                              </span>
+                              <span className="text-[10px] text-[#8C8482] font-mono">
+                                #{telemetry.neuralEvolution.totalEpochs} · {telemetry.neuralEvolution.accuracy}%
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={handleExecutePretraining}
+                                disabled={isPretraining || telemetry.neuralEvolution.isGeminiActive}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#2D1A38] hover:bg-[#402450] border border-[#5E2B75] text-[10px] font-semibold text-[#E9C3FF] transition disabled:opacity-50"
+                                title="Предобучить локальную нейросеть на эталонном датасете (152 игровых сценария)"
+                              >
+                                <Sparkles className={`w-3 h-3 text-[#E9C3FF] ${isPretraining ? 'animate-spin' : ''}`} />
+                                <span>{isPretraining ? 'Обучение...' : '⚡ 152 сессии'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => setShowNeuralLogs((prev) => !prev)}
+                                className="px-2 py-1 rounded bg-[#1B171D] hover:bg-[#241E26] border border-[#2E2630] text-[10px] font-medium text-[#D47A8D] hover:text-[#EDE9E8] inline-flex items-center gap-1 transition"
+                              >
+                                <span>{showNeuralLogs ? 'Скрыть' : 'Пороги и лог'}</span>
+                                {showNeuralLogs ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {!telemetry.neuralEvolution.isGeminiActive && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[10px] text-[#9E9694]">
+                                <span className="font-mono">
+                                  Бой {telemetry.neuralEvolution.learnedThresholds.combatMotionThreshold}% · Стелс {telemetry.neuralEvolution.learnedThresholds.stealthLumaThreshold}% · Адаптаций: {telemetry.neuralEvolution.gameAdaptationsCount}
+                                </span>
+                                <span className="font-mono text-[#D47A8D]">
+                                  {telemetry.neuralEvolution.xp}/{telemetry.neuralEvolution.xpToNextLevel} XP
+                                </span>
+                              </div>
+                              <div className="w-full h-1 bg-[#201B22] rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-[#D47A8D] via-[#FF6A00] to-[#4ADE80] transition-all duration-500 rounded-full"
+                                  style={{
+                                    width: `${Math.min(
+                                      100,
+                                      Math.round(
+                                        (telemetry.neuralEvolution.xp / telemetry.neuralEvolution.xpToNextLevel) * 100
+                                      )
+                                    )}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {pretrainSuccessMsg && (
+                            <div className="p-1.5 rounded bg-[#10241B] border border-[#184E32] text-[10px] text-[#4ADE80] font-medium flex items-center gap-1.5">
+                              <CheckCircle2 className="w-3 h-3 text-[#4ADE80] shrink-0" />
+                              <span>{pretrainSuccessMsg}</span>
+                            </div>
+                          )}
+
+                          {showNeuralLogs && (
+                            <div className="pt-1.5 border-t border-[#221C24] space-y-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                                <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                                  <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">Профиль игры</div>
+                                  <div className="text-xs font-semibold text-[#EDE9E8] mt-0.5 break-words">
+                                    {telemetry.detectedProcess && telemetry.detectedProcess !== 'Ожидание игры'
+                                      ? (telemetry.neuralEvolution.activeGame || telemetry.detectedProcess)
+                                      : 'Ожидание запуска игры'}
+                                  </div>
+                                </div>
+                                <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                                  <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">Порог боя (Combat)</div>
+                                  <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
+                                    {telemetry.neuralEvolution.learnedThresholds.combatMotionThreshold}% динамики
+                                  </div>
+                                </div>
+                                <div className="p-2 rounded bg-[#1A161C] border border-[#282129]">
+                                  <div className="text-[10px] text-[#8C8482] uppercase tracking-wider font-semibold">Порог скрытности</div>
+                                  <div className="text-xs font-semibold text-[#EDE9E8] font-mono mt-0.5">
+                                    {telemetry.neuralEvolution.learnedThresholds.stealthLumaThreshold}% яркости
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="p-2 rounded bg-[#0D0B0E] border border-[#251F27] font-mono text-[10px] text-[#A69EA4] space-y-1 max-h-28 overflow-y-auto">
+                                {telemetry.neuralEvolution.recentLearnings?.map((log, idx) => (
+                                  <div key={idx} className="flex items-start gap-1.5 leading-snug">
+                                    <span className="text-[#4ADE80] shrink-0">›</span>
+                                    <span className="text-[#EDE9E8]">{log}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Live Neural Subtitle Detection Notification */}
+                    {telemetry.dialogueText && (
+                      <div className="p-2 rounded-md bg-[#251218] border border-[#6E1D2F] text-xs text-[#EDE9E8] flex items-start gap-2 shadow-inner">
+                        <div className="w-2 h-2 rounded-full bg-[#E53935] animate-ping shrink-0 mt-1" />
+                        <div className="min-w-0">
+                          <span className="font-semibold text-[#D47A8D] uppercase tracking-wider text-[10px] block">
+                            🎬 Реплика в игре ({telemetry.dialogueLabel || 'Сюжет'}):
+                          </span>
+                          <span className="italic text-[#EDE9E8] break-words">"{telemetry.dialogueText}"</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Semantic Quick Scenes + Custom Free-Text Scene Prompt (Breaks 6-mood cap) */}
+                    <div className="pt-1 space-y-1.5 border-t border-[#261E24]/70">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {QUICK_SCENE_ORDER.map((tagId) => {
+                          const meta = SCENE_TAXONOMY[tagId];
+                          const isCurrentTag = activeSceneTag === tagId;
+                          return (
+                            <button
+                              key={tagId}
+                              type="button"
+                              onClick={() => handleActivateSceneTag(tagId)}
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-md text-[11px] font-medium border transition ${
+                                isCurrentTag
+                                  ? 'bg-[#6E1D2F] border-[#B84A62] text-white shadow'
+                                  : 'bg-[#141215] border-[#262226] text-[#B8B0AE] hover:text-[#EDE9E8] hover:border-[#3A3238]'
+                              }`}
+                              title={meta.descriptionRu}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{ backgroundColor: meta.accentHex }}
+                              />
+                              <span className="whitespace-normal">{meta.shortRu}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <form onSubmit={handleApplyCustomScenePrompt} className="flex flex-wrap items-center gap-2">
+                        <div className="relative flex-1 min-w-[200px]">
+                          <Wand2 className="w-3.5 h-3.5 text-[#FF6A00] absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={customSceneInput}
+                            onChange={(e) => setCustomSceneInput(e.target.value)}
+                            placeholder="Опиши любую свою сцену (напр.: ночной нуар под дождем / погоня в метро)..."
+                            className="w-full pl-8 pr-3 py-1.5 min-h-[38px] rounded-md bg-[#121013] border border-[#2E272C] focus:border-[#FF6A00] text-xs text-[#EDE9E8] outline-none transition"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={!customSceneInput.trim()}
+                          className="px-3.5 py-1.5 min-h-[38px] rounded-md bg-[#FF6A00] hover:bg-[#FF7E24] disabled:opacity-45 text-black font-semibold text-xs transition shrink-0"
+                        >
+                          Задать сцену
+                        </button>
+                      </form>
+                    </div>
+
                     {/* v2.0 Adaptive Audio Engine DSP Toggles */}
-                    <div className="pt-2 flex flex-wrap items-center gap-2">
+                    <div className="pt-1 flex flex-wrap items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setCrossfadeEnabled((v) => !v)}
@@ -3079,7 +3714,9 @@ export default function GameVibeSpotifyApp() {
                           Фокус на шагах (Киберспорт): {competitiveFootstepsDucking ? 'ВКЛ' : 'ВЫКЛ'}
                           {competitiveFootstepsDucking &&
                           telemetry.isOnlineGame &&
-                          (activeVibe === 'COMBAT' || activeVibe === 'BOSSFIGHT' || telemetry.motionDelta >= 44)
+                          (activeVibe === 'COMBAT' ||
+                            activeVibe === 'BOSSFIGHT' ||
+                            telemetry.motionDelta >= (telemetry.neuralEvolution?.learnedThresholds?.combatMotionThreshold ?? 42))
                             ? ' · 28% DUCKED'
                             : ''}
                         </span>
@@ -3089,11 +3726,11 @@ export default function GameVibeSpotifyApp() {
                 </div>
 
                 {/* Action Bar */}
-                <div className="px-5 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-[#1E1B1D] bg-[#131114]">
+                <div className="px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5 border-b border-[#1E1B1D] bg-[#131114]">
                   <div className="flex items-center gap-3 flex-wrap">
                     <button
                       onClick={togglePlayPause}
-                      className="w-11 h-11 rounded-full bg-[#7A1F34] hover:bg-[#8E253D] text-white flex items-center justify-center shadow-lg transition shrink-0"
+                      className="w-10 h-10 rounded-full bg-[#7A1F34] hover:bg-[#8E253D] text-white flex items-center justify-center shadow-lg transition shrink-0"
                     >
                       {isPlaying ? (
                         <Pause className="w-5 h-5" />
@@ -3110,24 +3747,52 @@ export default function GameVibeSpotifyApp() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleTrackSceneFeedback(true)}
+                      className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] py-1.5 rounded-md border text-[11px] font-medium transition ${
+                        trackFeedbackStatus?.trackId === currentTrack?.id && trackFeedbackStatus?.type === 'up'
+                          ? 'bg-[#123323] border-[#10B981] text-[#6EE7B7]'
+                          : 'bg-[#1A181B] hover:bg-[#242024] border-[#2A2629] text-[#EDE9E8]'
+                      }`}
+                      title="Трек отлично подходит к текущей игровой сцене (+15 XP нейросети)"
+                    >
+                      <ThumbsUp className="w-3.5 h-3.5 text-[#10B981]" />
+                      <span>В тему</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleTrackSceneFeedback(false)}
+                      className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] py-1.5 rounded-md border text-[11px] font-medium transition ${
+                        trackFeedbackStatus?.trackId === currentTrack?.id && trackFeedbackStatus?.type === 'down'
+                          ? 'bg-[#3A161D] border-[#EF4444] text-[#FCA5A5]'
+                          : 'bg-[#1A181B] hover:bg-[#2B191E] border-[#382228] text-[#EDE9E8]'
+                      }`}
+                      title="Трек не подходит к сцене — исключить, переобучить модель и сразу переключить"
+                    >
+                      <ThumbsDown className="w-3.5 h-3.5 text-[#F87171]" />
+                      <span>Не под сцену</span>
+                    </button>
+
                     <button
                       onClick={() => openExternalMusic('ytmusic')}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
+                      className="inline-flex items-center gap-1 px-2.5 min-h-[40px] py-1.5 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
                     >
                       <span>YouTube Music</span>
                       <ExternalLink className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => openExternalMusic('spotify')}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
+                      className="inline-flex items-center gap-1 px-2.5 min-h-[40px] py-1.5 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
                     >
                       <span>Spotify</span>
                       <ExternalLink className="w-3 h-3" />
                     </button>
                     <button
                       onClick={() => openExternalMusic('yandex')}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
+                      className="inline-flex items-center gap-1 px-2.5 min-h-[40px] py-1.5 rounded bg-[#1A181B] hover:bg-[#242024] border border-[#2A2629] text-[11px] text-[#9E9694] hover:text-white transition"
                     >
                       <span>Я.Музыка</span>
                       <ExternalLink className="w-3 h-3" />
@@ -3169,6 +3834,13 @@ export default function GameVibeSpotifyApp() {
                             <img
                               src={track.thumbnail}
                               alt={track.title}
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (!img.dataset.fallbackApplied) {
+                                  img.dataset.fallbackApplied = '1';
+                                  img.src = '/logo-icon.svg';
+                                }
+                              }}
                               className="w-10 h-10 rounded object-cover bg-[#1A181B] shrink-0"
                             />
                             <div className="min-w-0 flex-1">
@@ -3511,6 +4183,13 @@ export default function GameVibeSpotifyApp() {
                             <img
                               src={track.thumbnail}
                               alt={track.title}
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                if (!img.dataset.fallbackApplied) {
+                                  img.dataset.fallbackApplied = '1';
+                                  img.src = '/logo-icon.svg';
+                                }
+                              }}
                               className="w-10 h-10 rounded object-cover bg-[#1A181B] shrink-0"
                             />
                             <div className="min-w-0 flex-1">
@@ -3857,6 +4536,13 @@ export default function GameVibeSpotifyApp() {
                                     <img
                                       src={t.thumbnail}
                                       alt={t.title}
+                                      onError={(e) => {
+                                        const img = e.currentTarget;
+                                        if (!img.dataset.fallbackApplied) {
+                                          img.dataset.fallbackApplied = '1';
+                                          img.src = '/logo-icon.svg';
+                                        }
+                                      }}
                                       className="w-8 h-8 rounded object-cover bg-black shrink-0"
                                     />
                                     <div className="min-w-0">
@@ -3913,6 +4599,13 @@ export default function GameVibeSpotifyApp() {
                                 <img
                                   src={track.thumbnail}
                                   alt={track.title}
+                                  onError={(e) => {
+                                    const img = e.currentTarget;
+                                    if (!img.dataset.fallbackApplied) {
+                                      img.dataset.fallbackApplied = '1';
+                                      img.src = '/logo-icon.svg';
+                                    }
+                                  }}
                                   className="w-10 h-10 rounded object-cover bg-black shrink-0 border border-[#252026]"
                                 />
                                 <div className="min-w-0">
@@ -3948,6 +4641,127 @@ export default function GameVibeSpotifyApp() {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Flexible Custom Scene Rules (Unlimited beyond 6 buckets) */}
+                    <div className="p-5 rounded-xl bg-[#141215] border border-[#242023] space-y-4 shadow-inner">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#221E22]">
+                        <div>
+                          <h3 className="text-sm font-bold text-[#EDE9E8]">
+                            Собственные гибкие сцены (без лимита в 6 эмоций)
+                          </h3>
+                          <p className="text-xs text-[#8C8482]">
+                            Создай любую ситуацию (напр. «Ночное расследование», «Таверна», «Побег на таймере») — ИИ подберет эти треки по смыслу и уровню Энергии / Напряжения.
+                          </p>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleAddCustomSceneRule} className="grid grid-cols-1 md:grid-cols-4 gap-2.5 items-end">
+                        <div className="md:col-span-1">
+                          <label className="text-[11px] text-[#8C8482] block mb-1">Название сцены</label>
+                          <input
+                            type="text"
+                            value={newCustomSceneName}
+                            onChange={(e) => setNewCustomSceneName(e.target.value)}
+                            placeholder="Напр.: Таверна и отдых"
+                            className="w-full px-3 py-2 min-h-[40px] rounded-md bg-[#0E0D10] border border-[#292328] focus:border-[#FF6A00] text-xs text-[#EDE9E8] outline-none"
+                          />
+                        </div>
+                        <div className="md:col-span-1">
+                          <label className="text-[11px] text-[#8C8482] block mb-1">Ключевые слова / стиль музыки</label>
+                          <input
+                            type="text"
+                            value={newCustomSceneBrief}
+                            onChange={(e) => setNewCustomSceneBrief(e.target.value)}
+                            placeholder="tavern, cozy, acoustic, у костра"
+                            className="w-full px-3 py-2 min-h-[40px] rounded-md bg-[#0E0D10] border border-[#292328] focus:border-[#FF6A00] text-xs text-[#EDE9E8] outline-none"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="text-[11px] text-[#8C8482] block mb-1">Энергия {newCustomSceneEnergy}%</label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={newCustomSceneEnergy}
+                              onChange={(e) => setNewCustomSceneEnergy(Number(e.target.value))}
+                              className="w-full accent-[#FF6A00]"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[11px] text-[#8C8482] block mb-1">Накал {newCustomSceneTension}%</label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={newCustomSceneTension}
+                              onChange={(e) => setNewCustomSceneTension(Number(e.target.value))}
+                              className="w-full accent-[#6E1D2F]"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={!newCustomSceneName.trim()}
+                          className="px-4 py-2 min-h-[40px] rounded-md bg-[#FF6A00] hover:bg-[#FF7E24] disabled:opacity-40 text-black font-semibold text-xs transition"
+                        >
+                          + Добавить сцену
+                        </button>
+                      </form>
+
+                      {(activeScenePlaylist.customScenes || []).length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                          {(activeScenePlaylist.customScenes || []).map((rule) => (
+                            <div key={rule.id} className="p-3 rounded-lg bg-[#0E0D10] border border-[#252026] space-y-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-xs font-semibold text-[#EDE9E8]">{rule.name}</div>
+                                  <div className="text-[11px] text-[#8C8482]">
+                                    Энергия {rule.targetEnergy}% · Накал {rule.targetTension}% · {rule.tracks?.length || 0} трек.
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {currentTrack && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddTrackToCustomScene(rule.id, currentTrack)}
+                                      className="px-2.5 py-1.5 rounded bg-[#1E1A1E] hover:bg-[#2B242B] border border-[#342D34] text-[11px] text-[#EDE9E8] transition"
+                                      title="Привязать текущий играющий трек к этой сцене"
+                                    >
+                                      + Текущий трек
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomSceneRule(rule.id)}
+                                    className="p-1.5 text-[#8C8482] hover:text-[#EA7B93]"
+                                    title="Удалить сцену"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              {(rule.tracks || []).length > 0 && (
+                                <div className="space-y-1 pt-1 border-t border-[#1D1A1F]">
+                                  {rule.tracks.map((tr) => (
+                                    <div key={tr.id} className="flex items-center justify-between gap-2 text-[11px] text-[#C8C0BE]">
+                                      <span className="break-words">{tr.artist} — {tr.title}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveTrackFromCustomScene(rule.id, tr.id)}
+                                        className="text-[#8C8482] hover:text-[#EA7B93] shrink-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -4141,66 +4955,302 @@ export default function GameVibeSpotifyApp() {
                   </div>
                 </div>
 
-                {/* 2. Bring Your Own Key (BYOK) — Google Gemini Vision */}
+                {/* 2. Official Game State Integration (Dota 2 & CS2) */}
                 <div className="p-5 rounded-xl bg-[#141215] border border-[#242023] space-y-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold text-[#EDE9E8] flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[#FFD166]" />
-                        Собственный API-ключ Google Gemini Vision
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2B231D] text-[#FFB703] border border-[#473620] font-normal">
-                          Опционально (BYOK)
-                        </span>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1 flex-1 min-w-[240px]">
+                      <div className="text-sm font-semibold text-[#EDE9E8] flex flex-wrap items-center gap-2">
+                        <Radio className="w-4 h-4 text-[#10B981] shrink-0" />
+                        <span>Game State Integration (Dota 2 &amp; CS2)</span>
+                        {gsiStatus?.gsiActive ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0E241C] text-[#34D399] border border-[#10B981]/40 font-semibold">
+                            LIVE · {gsiStatus.gsi?.game === 'cs2' ? 'CS2' : 'Dota 2'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1C211E] text-[#8CE9B5] border border-[#2A3F32] font-normal">
+                            100% точность без расхода квот ИИ
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-[#8C8482] leading-relaxed">
-                        По умолчанию GameMusick работает <strong>100% бесплатно и офлайн</strong>, считывая сюжет и субтитры через встроенный в Windows нейро-OCR (WinRT) и OpenCV на процессоре (&lt;1% нагрузки).
-                        Если вы хотите подключить визуальную нейросеть Google для кинематографического анализа каждого кадра игры — активируйте эту опцию.
+                        Официальный локальный протокол Valve: Dota 2 и CS2 сами передают в GameMusick точную фазу игры
+                        (главное меню, пик/драфт, закупка, замес, низкое HP, бомба на пленте, смерть/ожидание, победа) —{' '}
+                        <strong>без нейросетей, задержек и лимитов</strong>.
                       </p>
                     </div>
 
                     <button
-                      onClick={() => {
-                        const next = !integrationsConfig.geminiEnabled;
-                        setIntegrationsConfig((c) => ({ ...c, geminiEnabled: next }));
-                        handleSaveIntegrations({ geminiEnabled: next });
-                      }}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        integrationsConfig.geminiEnabled ? 'bg-[#6E1D2F]' : 'bg-[#2A262B]'
-                      }`}
+                      type="button"
+                      onClick={handleInstallGsiCfg}
+                      disabled={installingGsi}
+                      className="min-h-[44px] px-4 py-2 rounded-lg bg-[#123025] hover:bg-[#184032] border border-[#10B981]/40 text-xs font-semibold text-[#6EE7B7] flex items-center gap-2 transition shrink-0 disabled:opacity-50"
                     >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                          integrationsConfig.geminiEnabled ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
+                      {installingGsi ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Zap className="w-4 h-4 text-[#34D399]" />
+                      )}
+                      Автоустановить GSI в Steam (1 клик)
                     </button>
                   </div>
 
-                  {integrationsConfig.geminiEnabled && (
+                  {/* Detected Steam libraries status */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">Dota 2</div>
+                        <div className="text-[11px] text-[#8C8482] break-all">
+                          {gsiStatus?.steam?.dota2Dir ? gsiStatus.steam.dota2Dir : 'Папка Steam не обнаружена автоматически'}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-semibold shrink-0 ${
+                          gsiStatus?.steam?.dota2Installed
+                            ? 'bg-[#0E241C] text-[#34D399] border border-[#10B981]/35'
+                            : 'bg-[#1D1A1E] text-[#8C8482] border border-[#2A252B]'
+                        }`}
+                      >
+                        {gsiStatus?.steam?.dota2Installed ? '✓ .cfg стоит' : 'Не установлен'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">Counter-Strike 2</div>
+                        <div className="text-[11px] text-[#8C8482] break-all">
+                          {gsiStatus?.steam?.cs2Dir ? gsiStatus.steam.cs2Dir : 'Папка Steam не обнаружена автоматически'}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-semibold shrink-0 ${
+                          gsiStatus?.steam?.cs2Installed
+                            ? 'bg-[#0E241C] text-[#34D399] border border-[#10B981]/35'
+                            : 'bg-[#1D1A1E] text-[#8C8482] border border-[#2A252B]'
+                        }`}
+                      >
+                        {gsiStatus?.steam?.cs2Installed ? '✓ .cfg стоит' : 'Не установлен'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {gsiActionMsg && (
+                    <div
+                      className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                        gsiActionMsg.ok
+                          ? 'bg-[#122B18] text-[#4ADE80] border border-[#1E4D27]'
+                          : 'bg-[#2E1419] text-[#F87171] border border-[#521C26]'
+                      }`}
+                    >
+                      {gsiActionMsg.ok ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                      )}
+                      <span>{gsiActionMsg.text}</span>
+                    </div>
+                  )}
+
+                  {/* Manual .cfg copy helpers for users with custom library paths or on GitHub */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setActiveGsiManualTab((t) => (t === 'dota2' ? 'none' : 'dota2'))}
+                      className="min-h-[44px] px-3 py-1.5 rounded-lg bg-[#1A171C] hover:bg-[#242027] border border-[#2D282F] text-[11px] text-[#C8C0BE] transition"
+                    >
+                      {activeGsiManualTab === 'dota2' ? 'Скрыть .cfg Dota 2' : 'Ручная установка .cfg (Dota 2)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveGsiManualTab((t) => (t === 'cs2' ? 'none' : 'cs2'))}
+                      className="min-h-[44px] px-3 py-1.5 rounded-lg bg-[#1A171C] hover:bg-[#242027] border border-[#2D282F] text-[11px] text-[#C8C0BE] transition"
+                    >
+                      {activeGsiManualTab === 'cs2' ? 'Скрыть .cfg CS2' : 'Ручная установка .cfg (CS2)'}
+                    </button>
+                  </div>
+
+                  {activeGsiManualTab !== 'none' && (
+                    <div className="p-3.5 rounded-lg bg-[#0C0B0D] border border-[#2A262B] space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-[11px] text-[#A8A0A4]">
+                          Сохраните этот текст как{' '}
+                          <code className="text-[#EDE9E8] font-mono">gamestate_integration_gamemusick.cfg</code> в папку{' '}
+                          <code className="text-[#FF6A00] font-mono">
+                            {activeGsiManualTab === 'dota2'
+                              ? 'Steam/steamapps/common/dota 2 beta/game/dota/cfg/'
+                              : 'Steam/steamapps/common/Counter-Strike Global Offensive/game/csgo/cfg/'}
+                          </code>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyGsiCfg(activeGsiManualTab)}
+                          className="min-h-[44px] px-3 py-1.5 rounded-lg bg-[#241B20] hover:bg-[#33222B] border border-[#44222E] text-[11px] font-medium text-[#EDE9E8] flex items-center gap-1.5 transition shrink-0"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-[#FF6A00]" />
+                          {copiedGsiCfg === activeGsiManualTab ? '✓ Скопировано' : 'Копировать .cfg'}
+                        </button>
+                      </div>
+                      <pre className="p-2.5 rounded bg-[#141215] border border-[#221E23] text-[10px] font-mono text-[#B7B0AE] overflow-x-auto max-h-48">
+                        {activeGsiManualTab === 'dota2'
+                          ? gsiStatus?.cfgSamples?.dota2
+                          : gsiStatus?.cfgSamples?.cs2}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Universal AI Vision Director Mode (4 Modes: Local / Gemini / Ollama / OpenRouter) */}
+                <div className="p-5 rounded-xl bg-[#141215] border border-[#242023] space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-[#EDE9E8] flex flex-wrap items-center gap-2">
+                        <Brain className="w-4 h-4 text-[#FFD166]" />
+                        <span>ИИ-режиссёр: выбор движка (4 режима)</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#241E22] text-[#C8C0BE] border border-[#352C32] font-normal">
+                          Активен:{' '}
+                          {integrationsConfig.aiProvider === 'gemini'
+                            ? 'Google Gemini'
+                            : integrationsConfig.aiProvider === 'ollama'
+                            ? 'Ollama (Локальная VLM)'
+                            : integrationsConfig.aiProvider === 'openrouter' || integrationsConfig.aiProvider === 'openai-compat'
+                            ? 'OpenRouter / OpenAI API'
+                            : 'Локальный 50Hz + OCR'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#8C8482] leading-relaxed">
+                        Выберите, кто анализирует сложные сюжетные игры: встроенный офлайн-сенсор (0₽), бесплатный облачный
+                        Gemini, ваша локальная видеомодель в Ollama или собственный OpenAI-совместимый API. Для Dota 2 и CS2 при активном GSI облачные запросы не тратятся.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 4 Mode Selector Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    {[
+                      {
+                        id: 'none' as const,
+                        title: 'Локальный 50Hz + OCR',
+                        badge: 'Офлайн · 0% GPU',
+                        desc: 'Rust + WinRT OCR + OpenCV. Мгновенно, без интернета и ключей.',
+                        accent: '#10B981',
+                      },
+                      {
+                        id: 'gemini' as const,
+                        title: 'Google Gemini Vision',
+                        badge: 'Free Tier · Лучшее IQ',
+                        desc: 'gemini-3.5-flash-lite с защитой от дублей. Бесплатный ключ AI Studio.',
+                        accent: '#FFD166',
+                      },
+                      {
+                        id: 'ollama' as const,
+                        title: 'Ollama (Локальная VLM)',
+                        badge: 'Без лимитов · ПК',
+                        desc: 'qwen3-vl:2b / gemma4 прямо на вашей видеокарте. Полная приватность.',
+                        accent: '#FF6A00',
+                      },
+                      {
+                        id: 'openrouter' as const,
+                        title: 'OpenRouter / Custom API',
+                        badge: 'Любая VLM модель',
+                        desc: 'OpenRouter, LM Studio, vLLM или ваш прокси OpenAI Vision format.',
+                        accent: '#E5384F',
+                      },
+                    ].map((mode) => {
+                      const active =
+                        integrationsConfig.aiProvider === mode.id ||
+                        (mode.id === 'openrouter' && integrationsConfig.aiProvider === 'openai-compat');
+                      return (
+                        <button
+                          key={mode.id}
+                          type="button"
+                          onClick={() => {
+                            const nextProvider = mode.id;
+                            const defaultModel =
+                              nextProvider === 'gemini'
+                                ? 'gemini-3.5-flash-lite'
+                                : nextProvider === 'ollama'
+                                ? 'qwen3-vl:2b'
+                                : nextProvider === 'openrouter'
+                                ? 'google/gemini-2.5-flash-lite'
+                                : integrationsConfig.aiModel;
+                            const defaultBaseUrl =
+                              nextProvider === 'ollama'
+                                ? 'http://127.0.0.1:11434/v1'
+                                : nextProvider === 'openrouter'
+                                ? 'https://openrouter.ai/api/v1'
+                                : integrationsConfig.aiBaseUrl;
+                            setIntegrationsConfig((c) => ({
+                              ...c,
+                              aiProvider: nextProvider,
+                              aiModel: defaultModel,
+                              aiBaseUrl: defaultBaseUrl,
+                            }));
+                            handleSaveIntegrations({
+                              aiProvider: nextProvider,
+                              aiModel: defaultModel,
+                              aiBaseUrl: defaultBaseUrl,
+                            });
+                          }}
+                          className={`min-h-[44px] p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-2 ${
+                            active
+                              ? 'bg-[#1D181E] border-[#FF6A00] shadow-[0_0_20px_rgba(255,106,0,0.12)]'
+                              : 'bg-[#100E12] border-[#242024] hover:border-[#3A323A]'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="text-xs font-semibold text-[#EDE9E8]">{mode.title}</span>
+                              {active && <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6A00] shrink-0" />}
+                            </div>
+                            <span
+                              className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-[#1A171C] font-medium"
+                              style={{ color: mode.accent }}
+                            >
+                              {mode.badge}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#8C8482] leading-snug">{mode.desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mode-specific configuration panel */}
+                  {integrationsConfig.aiProvider === 'none' && (
+                    <div className="p-3.5 rounded-lg bg-[#101915] border border-[#1E3B2E] text-xs text-[#A7F3D0] leading-relaxed">
+                      ✓ Активен лёгкий локальный режим: Rust-сенсор (50 Гц) + WinRT OCR субтитров + официальная телеметрия
+                      Dota 2 / CS2 GSI. Для 100% точности в сюжетных играх выберите Google Gemini или Ollama выше.
+                    </div>
+                  )}
+
+                  {integrationsConfig.aiProvider === 'gemini' && (
                     <div className="pt-3 border-t border-[#221E22] space-y-3">
                       <div>
                         <label className="block text-[11px] font-medium text-[#9E9694] mb-1">
-                          API-ключ Google Gemini (из Google AI Studio):
+                          API-ключ Google Gemini (Free Tier в Google AI Studio):
                         </label>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
+                        <div className="flex flex-wrap gap-2">
+                          <div className="relative flex-1 min-w-[220px]">
                             <input
                               type={showGeminiKey ? 'text' : 'password'}
-                              value={integrationsConfig.geminiApiKey}
+                              value={integrationsConfig.aiApiKey}
                               onChange={(e) =>
-                                setIntegrationsConfig((c) => ({ ...c, geminiApiKey: e.target.value }))
+                                setIntegrationsConfig((c) => ({
+                                  ...c,
+                                  aiApiKey: e.target.value,
+                                  geminiApiKey: e.target.value,
+                                }))
                               }
                               placeholder={
-                                integrationsConfig.geminiMaskedKey
-                                  ? `Сохранённый ключ: ${integrationsConfig.geminiMaskedKey}`
+                                integrationsConfig.aiMaskedKey || integrationsConfig.geminiMaskedKey
+                                  ? `Сохранённый ключ: ${integrationsConfig.aiMaskedKey || integrationsConfig.geminiMaskedKey}`
                                   : 'Вставьте ваш ключ: AIzaSy...'
                               }
-                              className="w-full px-3 py-2 pr-10 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] placeholder-[#5A5458] focus:border-[#6E1D2F] outline-none font-mono"
+                              className="w-full min-h-[44px] px-3 py-2 pr-10 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] placeholder-[#5A5458] focus:border-[#FF6A00] outline-none font-mono"
                             />
                             <button
                               type="button"
                               onClick={() => setShowGeminiKey((v) => !v)}
-                              className="absolute right-2.5 top-2.5 text-[#8C8482] hover:text-[#EDE9E8]"
+                              className="absolute right-2.5 top-3 text-[#8C8482] hover:text-[#EDE9E8]"
                             >
                               {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
@@ -4208,38 +5258,39 @@ export default function GameVibeSpotifyApp() {
 
                           <button
                             type="button"
-                            onClick={handleTestGeminiKey}
+                            onClick={handleTestAiEndpoint}
                             disabled={testingGemini}
-                            className="px-3.5 py-2 rounded-lg bg-[#241B20] hover:bg-[#33222B] border border-[#44222E] text-xs font-medium text-[#EDE9E8] flex items-center gap-1.5 transition shrink-0 disabled:opacity-50"
+                            className="min-h-[44px] px-4 py-2 rounded-lg bg-[#241B20] hover:bg-[#33222B] border border-[#44222E] text-xs font-medium text-[#EDE9E8] flex items-center gap-1.5 transition shrink-0 disabled:opacity-50"
                           >
                             {testingGemini ? (
                               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                             ) : (
                               <Key className="w-3.5 h-3.5 text-[#FF6B8B]" />
                             )}
-                            Проверить
+                            Проверить и сохранить
                           </button>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <div>
-                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">
-                            Модель Gemini:
-                          </label>
+                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">Модель Gemini:</label>
                           <select
-                            value={integrationsConfig.geminiModel}
+                            value={integrationsConfig.aiModel}
                             onChange={(e) => {
                               const m = e.target.value;
-                              setIntegrationsConfig((c) => ({ ...c, geminiModel: m }));
-                              handleSaveIntegrations({ geminiModel: m });
+                              setIntegrationsConfig((c) => ({ ...c, aiModel: m, geminiModel: m }));
+                              handleSaveIntegrations({ aiProvider: 'gemini', aiModel: m, geminiModel: m });
                             }}
-                            className="w-full px-3 py-1.5 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] outline-none"
+                            className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] outline-none"
                           >
-                            <option value="gemini-3.5-flash">gemini-3.5-flash (Рекомендуется, быстрый)</option>
-                            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Ультрабыстрый)</option>
-                            <option value="gemini-3.8-flash">gemini-3.8-flash (Новейший)</option>
+                            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (По умолчанию · Free Tier, быстрый)</option>
+                            <option value="gemini-3.5-flash">gemini-3.5-flash (Высокая точность анализа)</option>
+                            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (Резервный Free Tier)</option>
                           </select>
+                          <p className="text-[10px] text-[#8C8482] mt-1">
+                            Кадры 640px отправляются только при реальной смене сцены + кэш субтитров (~3–5 ч игры в бесплатной квоте/сутки).
+                          </p>
                         </div>
 
                         <div className="flex items-end">
@@ -4247,35 +5298,189 @@ export default function GameVibeSpotifyApp() {
                             href="https://aistudio.google.com/app/apikey"
                             target="_blank"
                             rel="noreferrer"
-                            className="text-xs text-[#B84A62] hover:text-[#EDE9E8] inline-flex items-center gap-1 pb-1.5 transition"
+                            className="min-h-[44px] text-xs text-[#FF6A00] hover:text-[#EDE9E8] inline-flex items-center gap-1.5 transition"
                           >
-                            Получить ключ в Google AI Studio
-                            <ExternalLink className="w-3 h-3" />
+                            Получить бесплатный ключ в Google AI Studio
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         </div>
                       </div>
+                    </div>
+                  )}
 
-                      {geminiStatusMsg && (
-                        <div
-                          className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
-                            geminiStatusMsg.ok
-                              ? 'bg-[#122B18] text-[#4ADE80] border border-[#1E4D27]'
-                              : 'bg-[#2E1419] text-[#F87171] border border-[#521C26]'
+                  {integrationsConfig.aiProvider === 'ollama' && (
+                    <div className="pt-3 border-t border-[#221E22] space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">
+                            Адрес Ollama (локальный ПК):
+                          </label>
+                          <input
+                            type="text"
+                            value={integrationsConfig.aiBaseUrl}
+                            onChange={(e) => setIntegrationsConfig((c) => ({ ...c, aiBaseUrl: e.target.value }))}
+                            placeholder="http://127.0.0.1:11434/v1"
+                            className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] font-mono outline-none focus:border-[#FF6A00]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">
+                            Локальная VLM-модель:
+                          </label>
+                          <input
+                            type="text"
+                            list="ollama-vlm-presets"
+                            value={integrationsConfig.aiModel}
+                            onChange={(e) => setIntegrationsConfig((c) => ({ ...c, aiModel: e.target.value }))}
+                            placeholder="qwen3-vl:2b"
+                            className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] font-mono outline-none focus:border-[#FF6A00]"
+                          />
+                          <datalist id="ollama-vlm-presets">
+                            {Array.from(new Set(['qwen3-vl:2b', 'qwen3.5:4b', 'gemma4:e4b', ...ollamaModels])).map((m) => (
+                              <option key={m} value={m} />
+                            ))}
+                          </datalist>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[11px] text-[#8C8482]">
+                          Команда установки лёгкой модели: <code className="text-[#EDE9E8] font-mono">ollama pull qwen3-vl:2b</code> (~2 ГБ VRAM, работает полностью без интернета).
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleTestAiEndpoint}
+                          disabled={testingGemini}
+                          className="min-h-[44px] px-4 py-2 rounded-lg bg-[#241B20] hover:bg-[#33222B] border border-[#FF6A00]/40 text-xs font-medium text-[#EDE9E8] flex items-center gap-1.5 transition shrink-0 disabled:opacity-50"
+                        >
+                          {testingGemini ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Cpu className="w-3.5 h-3.5 text-[#FF6A00]" />}
+                          Проверить Ollama и сохранить
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(integrationsConfig.aiProvider === 'openrouter' || integrationsConfig.aiProvider === 'openai-compat') && (
+                    <div className="pt-3 border-t border-[#221E22] space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIntegrationsConfig((c) => ({
+                              ...c,
+                              aiProvider: 'openrouter',
+                              aiBaseUrl: 'https://openrouter.ai/api/v1',
+                              aiModel: 'google/gemini-2.5-flash-lite',
+                            }))
+                          }
+                          className={`min-h-[44px] px-3 py-1.5 rounded-lg text-xs border transition ${
+                            integrationsConfig.aiProvider === 'openrouter'
+                              ? 'bg-[#251A20] border-[#E5384F] text-[#EDE9E8]'
+                              : 'bg-[#0C0B0D] border-[#262226] text-[#8C8482]'
                           }`}
                         >
-                          {geminiStatusMsg.ok ? (
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 shrink-0" />
-                          )}
-                          <span>{geminiStatusMsg.text}</span>
+                          Пресет OpenRouter
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIntegrationsConfig((c) => ({
+                              ...c,
+                              aiProvider: 'openai-compat',
+                              aiBaseUrl: 'http://127.0.0.1:1234/v1',
+                              aiModel: 'qwen3-vl-4b-instruct',
+                            }))
+                          }
+                          className={`min-h-[44px] px-3 py-1.5 rounded-lg text-xs border transition ${
+                            integrationsConfig.aiProvider === 'openai-compat'
+                              ? 'bg-[#251A20] border-[#E5384F] text-[#EDE9E8]'
+                              : 'bg-[#0C0B0D] border-[#262226] text-[#8C8482]'
+                          }`}
+                        >
+                          LM Studio / Custom OpenAI URL
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">Base URL (OpenAI v1):</label>
+                          <input
+                            type="text"
+                            value={integrationsConfig.aiBaseUrl}
+                            onChange={(e) => setIntegrationsConfig((c) => ({ ...c, aiBaseUrl: e.target.value }))}
+                            placeholder="https://openrouter.ai/api/v1"
+                            className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] font-mono outline-none focus:border-[#E5384F]"
+                          />
                         </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-[#9E9694] mb-1">ID модели (Vision):</label>
+                          <input
+                            type="text"
+                            value={integrationsConfig.aiModel}
+                            onChange={(e) => setIntegrationsConfig((c) => ({ ...c, aiModel: e.target.value }))}
+                            placeholder="google/gemini-2.5-flash-lite"
+                            className="w-full min-h-[44px] px-3 py-2 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] font-mono outline-none focus:border-[#E5384F]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <div className="relative flex-1 min-w-[220px]">
+                          <input
+                            type={showGeminiKey ? 'text' : 'password'}
+                            value={integrationsConfig.aiApiKey}
+                            onChange={(e) => setIntegrationsConfig((c) => ({ ...c, aiApiKey: e.target.value }))}
+                            placeholder={
+                              integrationsConfig.aiMaskedKey
+                                ? `Сохранённый ключ: ${integrationsConfig.aiMaskedKey}`
+                                : 'API Key (sk-or-... или пусто для локального сервера)'
+                            }
+                            className="w-full min-h-[44px] px-3 py-2 pr-10 text-xs rounded-lg bg-[#0C0B0D] border border-[#2A262B] text-[#EDE9E8] font-mono outline-none focus:border-[#E5384F]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowGeminiKey((v) => !v)}
+                            className="absolute right-2.5 top-3 text-[#8C8482] hover:text-[#EDE9E8]"
+                          >
+                            {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleTestAiEndpoint}
+                          disabled={testingGemini}
+                          className="min-h-[44px] px-4 py-2 rounded-lg bg-[#241B20] hover:bg-[#33222B] border border-[#44222E] text-xs font-medium text-[#EDE9E8] flex items-center gap-1.5 transition shrink-0 disabled:opacity-50"
+                        >
+                          {testingGemini ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Key className="w-3.5 h-3.5 text-[#E5384F]" />
+                          )}
+                          Проверить и сохранить
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {geminiStatusMsg && (
+                    <div
+                      className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                        geminiStatusMsg.ok
+                          ? 'bg-[#122B18] text-[#4ADE80] border border-[#1E4D27]'
+                          : 'bg-[#2E1419] text-[#F87171] border border-[#521C26]'
+                      }`}
+                    >
+                      {geminiStatusMsg.ok ? (
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 shrink-0" />
                       )}
+                      <span>{geminiStatusMsg.text}</span>
                     </div>
                   )}
                 </div>
 
-                {/* 3. External Player Desktop Bridge */}
+                {/* 4. External Player Desktop Bridge */}
                 <div className="p-5 rounded-xl bg-[#141215] border border-[#242023] space-y-4">
                   <div className="text-sm font-semibold text-[#EDE9E8] flex items-center gap-2">
                     <Sliders className="w-4 h-4 text-[#B84A62]" />
@@ -4372,23 +5577,30 @@ export default function GameVibeSpotifyApp() {
       </div>
 
       {/* BOTTOM PERSISTENT SPOTIFY-STYLE PLAYER BAR (Full Track Duration) */}
-      <footer className="h-[84px] shrink-0 bg-[#0B0A0C] border-t border-[#1E1B1D] px-4 sm:px-6 flex items-center justify-between gap-4">
+      <footer className="h-auto sm:h-[84px] shrink-0 bg-[#0B0A0C] border-t border-[#1E1B1D] px-3 sm:px-6 py-2 sm:py-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         {/* Left: Current Playing Track Info */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-[42%] sm:w-[30%] overflow-hidden">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-full sm:w-[30%]">
           <img
             src={currentTrack?.thumbnail || FALLBACK_REAL_TRACKS[0].thumbnail}
             alt={currentTrack?.title || 'cover'}
-            className="w-11 h-11 sm:w-14 sm:h-14 rounded object-cover bg-[#18161A] border border-[#262225] shrink-0"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (!img.dataset.fallbackApplied) {
+                img.dataset.fallbackApplied = '1';
+                img.src = '/logo-icon.svg';
+              }
+            }}
+            className="w-10 h-10 sm:w-14 sm:h-14 rounded object-cover bg-[#18161A] border border-[#262225] shrink-0"
           />
-          <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="min-w-0 flex-1">
             <div
-              className="text-xs sm:text-sm font-semibold text-[#EDE9E8] truncate"
+              className="text-xs sm:text-sm font-semibold text-[#EDE9E8] break-words leading-snug sm:truncate"
               title={currentTrack?.title}
             >
               {currentTrack?.title}
             </div>
             <div
-              className="text-[11px] sm:text-xs text-[#8C8482] truncate mt-0.5"
+              className="text-[11px] sm:text-xs text-[#8C8482] break-words leading-snug sm:truncate mt-0.5"
               title={currentTrack?.artist}
             >
               {currentTrack?.artist}
@@ -4397,7 +5609,7 @@ export default function GameVibeSpotifyApp() {
         </div>
 
         {/* Center: Playback Controls + Full-Length Seek Bar */}
-        <div className="flex-1 max-w-[520px] flex flex-col items-center gap-1.5">
+        <div className="w-full sm:flex-1 sm:max-w-[520px] flex flex-col items-center gap-1">
           <div className="flex items-center gap-4">
             <button
               onClick={() => skipTrack(-1)}
@@ -4429,7 +5641,7 @@ export default function GameVibeSpotifyApp() {
           </div>
 
           <div className="w-full flex items-center gap-2">
-            <span className="text-[11px] font-mono text-[#8C8482] min-w-[44px] text-right">
+            <span className="text-[11px] font-mono text-[#8C8482] min-w-[36px] sm:min-w-[44px] text-right">
               {formatTime(progressSec)}
             </span>
             <input
@@ -4441,7 +5653,7 @@ export default function GameVibeSpotifyApp() {
               onChange={(e) => handleSeek(Number(e.target.value))}
               className="flex-1 h-1 bg-[#221E21] rounded-lg cursor-pointer"
             />
-            <span className="text-[11px] font-mono text-[#8C8482] min-w-[44px]">
+            <span className="text-[11px] font-mono text-[#8C8482] min-w-[36px] sm:min-w-[44px]">
               {formatTime(durationSec)}
             </span>
           </div>
@@ -4462,7 +5674,7 @@ export default function GameVibeSpotifyApp() {
             telemetry.isOnlineGame &&
             (activeVibe === 'COMBAT' ||
               activeVibe === 'BOSSFIGHT' ||
-              telemetry.motionDelta >= 44) && (
+              telemetry.motionDelta >= (telemetry.neuralEvolution?.learnedThresholds?.combatMotionThreshold ?? 42)) && (
               <div
                 className="px-2 py-1 rounded bg-[#2E180D] border border-[#FF6A00]/50 text-[11px] text-[#FF9E4A] font-medium flex items-center gap-1 shrink-0"
                 title="Фокус на шагах: музыка приглушена до 28% во время перестрелки / клатча"
@@ -4800,11 +6012,11 @@ export default function GameVibeSpotifyApp() {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <img src="/logo-icon.svg" alt="GameVibe" className="w-4 h-4 rounded-sm shrink-0" />
-                <span className="px-2 py-0.5 rounded bg-[#6E1D2F] text-[10px] font-bold uppercase tracking-wider text-white">
-                  {SCENE_BUCKET_CONFIGS[activeVibe as SceneBucketId]?.shortLabel || currentSceneMeta.shortLabel}
+                <span className="px-2 py-0.5 rounded bg-[#6E1D2F] text-[10px] font-bold uppercase tracking-wider text-white shrink-0">
+                  {telemetry.sceneVector?.sceneNameRu || SCENE_BUCKET_CONFIGS[activeVibe as SceneBucketId]?.shortLabel || currentSceneMeta.shortLabel}
                 </span>
-                <span className="text-xs font-medium text-[#D47A8D] truncate">
-                  {telemetry.sceneLabel || currentSceneMeta.label}
+                <span className="text-xs font-medium text-[#D47A8D] leading-tight">
+                  Энергия {telemetry.sceneVector?.energy ?? telemetry.motionDelta}% · Накал {telemetry.sceneVector?.tension ?? Math.round(telemetry.motionDelta * 0.7)}%
                 </span>
                 {isDialogueDucked && autoDialogueDucking && (
                   <span className="px-1.5 py-0.5 rounded bg-[#251218] border border-[#6E1D2F] text-[10px] text-[#FF85A0]">
@@ -4815,7 +6027,7 @@ export default function GameVibeSpotifyApp() {
                   telemetry.isOnlineGame &&
                   (activeVibe === 'COMBAT' ||
                     activeVibe === 'BOSSFIGHT' ||
-                    telemetry.motionDelta >= 44) && (
+                    telemetry.motionDelta >= (telemetry.neuralEvolution?.learnedThresholds?.combatMotionThreshold ?? 42)) && (
                     <span className="px-1.5 py-0.5 rounded bg-[#2E180D] border border-[#FF6A00]/50 text-[10px] text-[#FF9E4A] font-semibold shrink-0">
                       🎧 Шаги 28%
                     </span>
@@ -4839,13 +6051,20 @@ export default function GameVibeSpotifyApp() {
                 <img
                   src={currentTrack?.thumbnail || FALLBACK_REAL_TRACKS[0].thumbnail}
                   alt={currentTrack?.title || 'cover'}
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (!img.dataset.fallbackApplied) {
+                      img.dataset.fallbackApplied = '1';
+                      img.src = '/logo-icon.svg';
+                    }
+                  }}
                   className="w-11 h-11 rounded-lg object-cover border border-[#2C242B] shrink-0"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold text-[#EDE9E8] truncate">
+                  <div className="text-sm font-bold text-[#EDE9E8] break-words leading-snug">
                     {currentTrack?.title}
                   </div>
-                  <div className="text-xs text-[#8C8482] truncate">
+                  <div className="text-xs text-[#8C8482] break-words leading-snug">
                     {currentTrack?.artist} · {formatTime(progressSec)} / {formatTime(durationSec)}
                   </div>
                 </div>

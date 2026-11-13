@@ -7,6 +7,52 @@ export type VibeStateId =
   | 'BOSSFIGHT'
   | 'VICTORY';
 
+export type SceneTagId =
+  | 'standby'
+  | 'menu_lobby'
+  | 'cozy_hub'
+  | 'explore_wander'
+  | 'vista_wonder'
+  | 'stealth_infiltrate'
+  | 'horror_dread'
+  | 'dialogue_story'
+  | 'tragedy_drama'
+  | 'respawn_downtime'
+  | 'skirmish_combat'
+  | 'teamfight_clash'
+  | 'chase_escape'
+  | 'boss_climax'
+  | 'victory_triumph'
+  | (string & {});
+
+export type ScenePacing = 'still' | 'slow' | 'steady' | 'driving' | 'frantic';
+
+export interface SceneVector {
+  sceneTag: SceneTagId;
+  sceneNameRu: string;
+  energy: number;
+  tension: number;
+  valence: number;
+  pacing: ScenePacing;
+  musicBrief: string;
+  confidence: number;
+  source: 'standby' | 'sensor' | 'ocr' | 'vision' | 'gsi' | 'manual';
+  accentHex?: string;
+}
+
+export interface CustomSceneRule {
+  id: string;
+  name: string;
+  description: string;
+  musicBrief: string;
+  keywords: string[];
+  targetEnergy: number;
+  targetTension: number;
+  targetValence: number;
+  accentColor: string;
+  tracks: TrackItem[];
+}
+
 export type MusicPlatformId =
   | 'builtin'
   | 'ytmusic'
@@ -64,11 +110,22 @@ export interface TelemetrySnapshot {
   luminance: number;
   compositeIntensity: number;
   inferredVibe: VibeStateId;
+  sceneVector?: SceneVector;
+  cursorTravel?: number;
+  attackApm?: number;
+  moveApm?: number;
+  lumaVariance?: number;
+  sceneHint?: string;
+  activeAudioMode?: string;
   isCutscene?: boolean;
   isNewLocation?: boolean;
   gameAudioDucked?: boolean;
   isOnlineGame?: boolean;
   isRespawnSpectating?: boolean;
+  gsiActive?: boolean;
+  gsiGame?: string;
+  gsiPhase?: string;
+  gsiSummary?: string;
   sceneKey?: string;
   sceneEmotion?: string;
   sceneLabel?: string;
@@ -110,11 +167,14 @@ export interface NeuralEvolutionState {
     hysteresis: number;
   };
   lastUpdate: number;
+  dislikedTrackIds?: string[];
+  sceneFeedbackCount?: number;
 }
 
 /** Scene understanding produced by desktop/vision_director.py (Gemini vision). */
 export interface DirectorScene {
   timestamp: number;
+  process?: string;
   game: string;
   sceneType: string;
   vibe: VibeStateId;
@@ -124,6 +184,31 @@ export interface DirectorScene {
   summary: string;
   onScreenText: string;
   musicStyle: string;
+  sceneTag?: string;
+  energy?: number;
+  valence?: number;
+  sceneLabel?: string;
   changeMusic: boolean;
+  hasGeminiVision?: boolean;
+  aiProvider?: string;
   picks: { artist: string; title: string }[];
+}
+
+export interface GsiStateSnapshot {
+  timestamp: number;
+  game: 'dota2' | 'cs2';
+  gameTitle: string;
+  providerAppId: number;
+  phase: string;
+  sceneTag: SceneTagId;
+  sceneNameRu: string;
+  energy: number;
+  tension: number;
+  valence: number;
+  pacing: ScenePacing;
+  summary: string;
+  location: string;
+  isRespawning: boolean;
+  respawnSeconds: number;
+  inCombat: boolean;
 }

@@ -1,7 +1,7 @@
 {
   "name": "gamevibe",
-  "version": "2.0.0",
-  "description": "GameVibe v2.0 — AI Sound Director & Adaptive Gaming Soundtrack Platform with Scene-Based Playlists",
+  "version": "3.0.0",
+  "description": "GameMusick v3.0 — Hybrid AI Sound Director (50Hz Rust + WinRT OCR + Dota 2/CS2 GSI + Gemini/Ollama/OpenRouter Vision)",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {

@@ -377,7 +377,7 @@ export async function POST(request: NextRequest) {
     // 8. ADD TRACK TO SCENE (e.g. EXPLORE / COMBAT / BOSSFIGHT / DRAMA / MAJESTIC / STEALTH)
     if (action === 'ADD_TRACK_TO_SCENE') {
       const plId = String(body.playlistId || '');
-      const sceneId = (String(body.sceneId || 'EXPLORE').toUpperCase()) as SceneBucketId;
+      const sceneId = (String(body.sceneId || body.scene || 'EXPLORE').toUpperCase()) as SceneBucketId;
       const track = body.track as TrackItem;
 
       if (!track || !track.title) {
@@ -425,7 +425,7 @@ export async function POST(request: NextRequest) {
     // 9. REMOVE TRACK FROM SCENE
     if (action === 'REMOVE_TRACK_FROM_SCENE') {
       const plId = String(body.playlistId || '');
-      const sceneId = (String(body.sceneId || 'EXPLORE').toUpperCase()) as SceneBucketId;
+      const sceneId = (String(body.sceneId || body.scene || 'EXPLORE').toUpperCase()) as SceneBucketId;
       const trackId = String(body.trackId || '');
 
       const pl = activeAccount.playlists.find((p) => p.id === plId);
@@ -526,6 +526,91 @@ export async function POST(request: NextRequest) {
         playlist: importedPl,
         activeAccount,
       });
+    }
+
+    // 11. ADD CUSTOM FLEXIBLE SCENE RULE TO PLAYLIST
+    if (action === 'ADD_CUSTOM_SCENE') {
+      const plId = String(body.playlistId || '');
+      const name = String(body.name || '').trim();
+      const musicBrief = String(body.musicBrief || '').trim();
+      if (!name) {
+        return NextResponse.json({ error: 'Укажите название сцены' }, { status: 400 });
+      }
+      const pl = activeAccount.playlists.find((p) => p.id === plId);
+      if (!pl) return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
+
+      if (!Array.isArray(pl.customScenes)) pl.customScenes = [];
+      const newRule = {
+        id: `csc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        description: String(body.description || name).trim(),
+        musicBrief: musicBrief || name,
+        keywords: Array.isArray(body.keywords)
+          ? body.keywords.map((k: unknown) => String(k).trim()).filter(Boolean)
+          : name.toLowerCase().split(/[\s,]+/).filter(Boolean),
+        targetEnergy: Math.max(0, Math.min(100, Number(body.targetEnergy ?? 45))),
+        targetTension: Math.max(0, Math.min(100, Number(body.targetTension ?? 45))),
+        targetValence: Math.max(-100, Math.min(100, Number(body.targetValence ?? 0))),
+        accentColor: String(body.accentColor || '#FF6A00'),
+        tracks: [],
+      };
+      pl.customScenes.push(newRule);
+      pl.updatedAt = Date.now();
+      saveAccountsStore(store);
+
+      return NextResponse.json({
+        ok: true,
+        customScene: newRule,
+        playlist: pl,
+        activeAccount,
+      });
+    }
+
+    // 12. ADD TRACK TO CUSTOM SCENE RULE
+    if (action === 'ADD_TRACK_TO_CUSTOM_SCENE') {
+      const plId = String(body.playlistId || '');
+      const customSceneId = String(body.customSceneId || '');
+      const track = body.track as TrackItem;
+      const pl = activeAccount.playlists.find((p) => p.id === plId);
+      const rule = pl?.customScenes?.find((c) => c.id === customSceneId);
+      if (!pl || !rule || !track?.title) {
+        return NextResponse.json({ error: 'Scene or track not found' }, { status: 404 });
+      }
+      if (!Array.isArray(rule.tracks)) rule.tracks = [];
+      const exists = rule.tracks.some(
+        (t) => (t.videoId && t.videoId === track.videoId) || t.id === track.id
+      );
+      if (!exists) {
+        rule.tracks.push(track);
+        pl.updatedAt = Date.now();
+        saveAccountsStore(store);
+      }
+      return NextResponse.json({ ok: true, playlist: pl, activeAccount });
+    }
+
+    // 13. REMOVE CUSTOM SCENE RULE OR TRACK FROM CUSTOM SCENE RULE
+    if (action === 'REMOVE_CUSTOM_SCENE') {
+      const plId = String(body.playlistId || '');
+      const customSceneId = String(body.customSceneId || '');
+      const pl = activeAccount.playlists.find((p) => p.id === plId);
+      if (!pl) return NextResponse.json({ error: 'Playlist not found' }, { status: 404 });
+      pl.customScenes = (pl.customScenes || []).filter((c) => c.id !== customSceneId);
+      pl.updatedAt = Date.now();
+      saveAccountsStore(store);
+      return NextResponse.json({ ok: true, playlist: pl, activeAccount });
+    }
+
+    if (action === 'REMOVE_TRACK_FROM_CUSTOM_SCENE') {
+      const plId = String(body.playlistId || '');
+      const customSceneId = String(body.customSceneId || '');
+      const trackId = String(body.trackId || '');
+      const pl = activeAccount.playlists.find((p) => p.id === plId);
+      const rule = pl?.customScenes?.find((c) => c.id === customSceneId);
+      if (!pl || !rule) return NextResponse.json({ error: 'Scene not found' }, { status: 404 });
+      rule.tracks = (rule.tracks || []).filter((t) => t.id !== trackId && t.videoId !== trackId);
+      pl.updatedAt = Date.now();
+      saveAccountsStore(store);
+      return NextResponse.json({ ok: true, playlist: pl, activeAccount });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

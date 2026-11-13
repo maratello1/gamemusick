@@ -17,10 +17,14 @@ import sys
 import time
 import json
 import io
+import re
+import base64
+import urllib.request
+import urllib.error
 import ctypes
 from ctypes import wintypes
 import asyncio
-from PIL import Image, ImageStat, ImageOps, ImageEnhance
+from PIL import Image, ImageStat, ImageOps, ImageEnhance, ImageChops
 import cv2
 import numpy as np
 
@@ -42,6 +46,7 @@ DIALOGUE_FILE = os.path.join(DATA_DIR, 'live-dialogue.json')
 DIALOGUE_TMP = os.path.join(DATA_DIR, 'live-dialogue.tmp.json')
 APP_STATE_FILE = os.path.join(DATA_DIR, 'app-state.json')
 USER_INTEGRATIONS_FILE = os.path.join(DATA_DIR, 'user-integrations.json')
+GSI_FILE = os.path.join(DATA_DIR, 'live-gsi.json')
 
 DENYLIST_PROCESSES = {
     'explorer', 'msedge', 'chrome', 'firefox', 'opera', 'brave', 'vivaldi', 'chrome-headless-shell',
@@ -75,6 +80,23 @@ COMBAT_WORDS = {
     'blade', 'sword', 'weapon', 'flesh', 'prepare to die', 'have at you', 'crush',
     'combat', 'slain', 'battle', 'danger',
     'атака', 'бой', 'битва', 'враг', 'босс', 'уничтожь', 'сдайся', 'клинок', 'меч', 'умри', 'сражение'
+}
+
+MENU_WORDS = {
+    'inventory', 'equipment', 'crafting', 'merchant', 'skills', 'settings', 'main menu',
+    'select hero', 'draft', 'accept', 'match found', 'queue', 'loadout', 'level up',
+    'инвентарь', 'снаряжение', 'крафт', 'торговец', 'навыки', 'настройки', 'меню',
+    'выбор героя', 'драфт', 'принять', 'поиск игры', 'задание'
+}
+
+COZY_WORDS = {
+    'tavern', 'camp', 'bonfire', 'inn', 'rest', 'hearth', 'safe zone', 'sanctuary', 'village',
+    'таверна', 'лагерь', 'костер', 'отдых', 'убежище', 'деревня', 'сохранить'
+}
+
+HORROR_WORDS = {
+    'hide', 'run', 'monster', 'battery', 'sanity', 'locked', 'alarm', 'basement', 'stalker',
+    'прячься', 'беги', 'монстр', 'тревога', 'заперто', 'подвал', 'опасно', 'шум'
 }
 
 LOCATION_WORDS = {
@@ -119,6 +141,51 @@ def contains_ui_garbage(text: str) -> bool:
         return False
     t = text.lower()
     return any(p in t for p in UI_GARBAGE_PATTERNS)
+
+
+def is_valid_dialogue_text(text: str) -> bool:
+    """Reject WinRT OCR hallucinations from UI graphics/textures (bullets, mixed-script glyphs, non-vowel fragments)."""
+    if not text:
+        return False
+    clean = ' '.join(text.strip().split())
+    if len(clean) < 6 or len(clean) > 220 or contains_ui_garbage(clean):
+        return False
+
+    # Reject UI/glyph noise commonly hallucinated by WinRT OCR on game textures
+    if re.search(r'[•«»ø§¤°¬|~^_\[\]{}<>■□◆◇★☆]', clean):
+        return False
+
+    allowed_chars = sum(1 for c in clean if c.isalnum() or c in " .,!?:'\"-—–…()")
+    if (allowed_chars / len(clean)) < 0.85:
+        return False
+
+    non_space = [c for c in clean if not c.isspace()]
+    if not non_space:
+        return False
+    alpha_ratio = sum(1 for c in non_space if c.isalpha()) / len(non_space)
+    if alpha_ratio < 0.70:
+        return False
+
+    tokens = re.findall(r"[A-Za-zА-Яа-яЁё0-9']+", clean)
+    if len(tokens) < 2:
+        return False
+
+    vowels = set('aeiouyAEIOUYаеёиоуыэюяАЕЁИОУЫЭЮЯ')
+    valid_words = 0
+    for tok in tokens:
+        has_lat = bool(re.search(r'[A-Za-z]', tok))
+        has_cyr = bool(re.search(r'[А-Яа-яЁё]', tok))
+        has_dig = any(c.isdigit() for c in tok)
+        # Mixed Cyrillic+Latin or digits inside letters = classic OCR texture artifact (e.g. "Crpens6a", "ropøsoutan")
+        if (has_lat and has_cyr) or (has_dig and (has_lat or has_cyr)):
+            return False
+        letters_only = re.sub(r"[^A-Za-zА-Яа-яЁё]", '', tok)
+        if len(letters_only) >= 2:
+            if len(letters_only) >= 3 and not any(ch in vowels for ch in letters_only):
+                continue
+            valid_words += 1
+
+    return valid_words >= 2 and (valid_words / len(tokens)) >= 0.65
 
 def get_user_favorite_artists():
     try:
@@ -311,17 +378,49 @@ async def ocr_crop(img, lang='en-US'):
 
         res = await winocr.recognize_pil(enhanced, lang)
         text = ' '.join(res.text.strip().split())
+        if not is_valid_dialogue_text(text):
+            return ''
         return text
     except Exception:
         return ''
 
 
+def get_active_audio_mode():
+    try:
+        if os.path.exists(APP_STATE_FILE):
+            with open(APP_STATE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                mode = data.get('audioMode')
+                if mode in ('custom', 'game-vibe'):
+                    return mode
+    except Exception:
+        pass
+    return 'game-vibe'
+
+
+def read_fresh_sensor():
+    try:
+        if os.path.exists(LIVE_SENSOR_FILE):
+            if time.time() - os.path.getmtime(LIVE_SENSOR_FILE) < 3.5:
+                with open(LIVE_SENSOR_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
 def analyze_text_sentiment(text):
     text_lower = text.lower()
-    if any(p in text_lower for p in ['you died', 'вы погибли', 'потрачено', 'смерть', 'wasted', 'defeat']):
-        return 'DRAMA', 'Экран гибели / Поражение'
+    if any(p in text_lower for p in ['you died', 'вы погибли', 'потрачено', 'game over', 'wasted', 'defeat']):
+        return 'DRAMA', 'Экран гибели / Поражение', 'tragedy_drama'
     if any(p in text_lower for p in ['victory', 'felled', 'slain', 'победа', 'враг повержен', 'босс повержен', 'quest completed']):
-        return 'MAJESTIC', 'Триумф и Победа'
+        return 'VICTORY', 'Триумф и Победа', 'victory_triumph'
+    if any(p in text_lower for p in HORROR_WORDS):
+        return 'STEALTH', f'Угроза / Саспенс: {text[:28]}', 'horror_dread'
+    if any(p in text_lower for p in MENU_WORDS):
+        return 'EXPLORE', f'Меню / Подготовка: {text[:28]}', 'menu_lobby'
+    if any(p in text_lower for p in COZY_WORDS):
+        return 'EXPLORE', f'Убежище / Отдых: {text[:28]}', 'cozy_hub'
 
     words = set(text_lower.replace(',', ' ').replace('.', ' ').replace('!', ' ').replace('?', ' ').split())
 
@@ -331,14 +430,14 @@ def analyze_text_sentiment(text):
     loc_score = sum(1 for w in words if w in LOCATION_WORDS)
 
     if combat_score > 0 and combat_score >= drama_score:
-        return 'COMBAT', 'Сражение / Боевой диалог'
+        return 'COMBAT', 'Сражение / Боевой диалог', 'skirmish_combat'
     if drama_score > 0 and drama_score >= majestic_score:
-        return 'DRAMA', 'Драматический момент сюжета'
+        return 'DRAMA', 'Драматический момент сюжета', 'tragedy_drama'
     if majestic_score > 0:
-        return 'MAJESTIC', 'Воодушевляющее событие / Надежда'
+        return 'MAJESTIC', 'Воодушевляющее событие / Надежда', 'vista_wonder'
     if loc_score > 0:
-        return 'EXPLORE', f'Новая область: {text[:30]}'
-    return 'DRAMA', 'Сюжетный диалог'
+        return 'EXPLORE', f'Новая область: {text[:28]}', 'vista_wonder'
+    return 'DRAMA', 'Сюжетный диалог', 'dialogue_story'
 
 
 def detect_boss_healthbar(rect):
@@ -390,38 +489,241 @@ def sample_cinematic_bars_and_luma(rect):
     return is_letterbox, int(center_luma)
 
 
-def get_user_gemini_config():
+def read_fresh_gsi(max_age_ms: int = 12000):
+    """Read official Valve Dota 2 / CS2 GSI telemetry if fresh and not in standby."""
     try:
-        cfg = {}
-        if os.path.exists(USER_INTEGRATIONS_FILE):
-            with open(USER_INTEGRATIONS_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                cfg = data.get('gemini', {})
-                if cfg.get('enabled') and cfg.get('apiKey') and len(cfg.get('apiKey')) > 10:
-                    return cfg
-        
-        # Check environment or .env.local
-        env_key = os.environ.get('GEMINI_API_KEY', '')
-        if not env_key:
-            env_file = os.path.join(ROOT, '.env.local')
-            if os.path.exists(env_file):
-                with open(env_file, 'r', encoding='utf-8') as ef:
-                    for line in ef:
-                        line = line.strip()
-                        if line.startswith('GEMINI_API_KEY='):
-                            env_key = line.split('=', 1)[1].strip().strip('"').strip("'")
-                            break
-        if env_key and len(env_key) > 10:
-            return {
-                'enabled': True,
-                'apiKey': env_key,
-                'model': cfg.get('model', 'gemini-3.5-flash'),
-                'intervalSec': int(cfg.get('intervalSec', 10)),
-                'isValidated': True
-            }
+        if not os.path.exists(GSI_FILE):
+            return None
+        with open(GSI_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or data.get('isStandby'):
+            return None
+        ts = int(data.get('timestamp') or 0)
+        now_ms = int(time.time() * 1000)
+        if ts <= 0 or (now_ms - ts) > max_age_ms:
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def _read_env_gemini_key() -> str:
+    env_key = os.environ.get('GEMINI_API_KEY', '').strip()
+    if env_key:
+        return env_key
+    try:
+        env_file = os.path.join(ROOT, '.env.local')
+        if os.path.exists(env_file):
+            with open(env_file, 'r', encoding='utf-8') as ef:
+                for line in ef:
+                    line = line.strip()
+                    if line.startswith('GEMINI_API_KEY='):
+                        return line.split('=', 1)[1].strip().strip('"').strip("'")
     except Exception:
         pass
+    return ''
+
+
+def get_active_ai_vision_config():
+    """Resolve active AI Vision provider (none | gemini | ollama | openrouter | openai-compat)."""
+    try:
+        data = {}
+        if os.path.exists(USER_INTEGRATIONS_FILE):
+            with open(USER_INTEGRATIONS_FILE, 'r', encoding='utf-8') as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+
+        ai_cfg = data.get('aiVision') if isinstance(data.get('aiVision'), dict) else {}
+        gem_cfg = data.get('gemini') if isinstance(data.get('gemini'), dict) else {}
+
+        provider = str(ai_cfg.get('provider') or '').strip().lower()
+        if not provider:
+            # Backward-compat with v2 config format
+            provider = 'gemini' if gem_cfg.get('enabled') else 'none'
+
+        # If no explicit choice in integrations file yet, allow .env.local GEMINI_API_KEY bootstrap
+        if provider == 'none' and not ai_cfg.get('provider'):
+            env_key = _read_env_gemini_key()
+            if len(env_key) > 10:
+                return {
+                    'provider': 'gemini',
+                    'apiKey': env_key,
+                    'baseUrl': 'https://generativelanguage.googleapis.com',
+                    'model': str(gem_cfg.get('model') or 'gemini-3.5-flash-lite'),
+                    'intervalSec': int(gem_cfg.get('intervalSec') or 12),
+                }
+            return None
+
+        if provider == 'none':
+            return None
+
+        interval_sec = int(ai_cfg.get('intervalSec') or gem_cfg.get('intervalSec') or 12)
+        if provider == 'gemini':
+            key = str(ai_cfg.get('apiKey') or gem_cfg.get('apiKey') or _read_env_gemini_key()).strip()
+            if len(key) < 10:
+                return None
+            model_name = str(ai_cfg.get('model') or gem_cfg.get('model') or 'gemini-3.5-flash-lite').strip()
+            if '2.5' in model_name or '2.0' in model_name or not model_name:
+                model_name = 'gemini-3.5-flash-lite'
+            return {
+                'provider': 'gemini',
+                'apiKey': key,
+                'baseUrl': 'https://generativelanguage.googleapis.com',
+                'model': model_name,
+                'intervalSec': max(8, interval_sec),
+            }
+
+        if provider == 'ollama':
+            base_url = str(ai_cfg.get('baseUrl') or 'http://127.0.0.1:11434/v1').strip().rstrip('/')
+            model_name = str(ai_cfg.get('model') or 'qwen3-vl:2b').strip()
+            if not base_url or not model_name:
+                return None
+            return {
+                'provider': 'ollama',
+                'apiKey': str(ai_cfg.get('apiKey') or 'ollama').strip(),
+                'baseUrl': base_url,
+                'model': model_name,
+                'intervalSec': max(5, interval_sec),
+            }
+
+        # openrouter | openai-compat
+        default_url = 'https://openrouter.ai/api/v1' if provider == 'openrouter' else 'http://127.0.0.1:1234/v1'
+        base_url = str(ai_cfg.get('baseUrl') or default_url).strip().rstrip('/')
+        key = str(ai_cfg.get('apiKey') or '').strip()
+        model_name = str(ai_cfg.get('model') or ('google/gemini-2.5-flash-lite' if provider == 'openrouter' else '')).strip()
+        if not base_url or not model_name or (provider == 'openrouter' and len(key) < 8):
+            return None
+        return {
+            'provider': provider,
+            'apiKey': key,
+            'baseUrl': base_url,
+            'model': model_name,
+            'intervalSec': max(6, interval_sec),
+        }
+    except Exception:
+        return None
+
+
+def extract_json_payload(raw_text: str):
+    """Parse JSON object from model output, stripping <think> tags or markdown fences."""
+    if not raw_text:
+        return None
+    cleaned = re.sub(r'<think>[\s\S]*?</think>', '', raw_text, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r'^```(?:json)?\s*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s*```$', '', cleaned)
+    try:
+        parsed = json.loads(cleaned)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        m = re.search(r'\{[\s\S]*\}', cleaned)
+        if m:
+            try:
+                parsed = json.loads(m.group(0))
+                return parsed if isinstance(parsed, dict) else None
+            except Exception:
+                return None
     return None
+
+
+def call_openai_compat_vision(cfg: dict, jpeg_bytes: bytes, prompt: str):
+    """Call Ollama native /api/chat or OpenRouter/OpenAI-compatible /chat/completions with a frame."""
+    provider = cfg.get('provider')
+    base_url = str(cfg.get('baseUrl') or '').rstrip('/')
+    model_name = str(cfg.get('model') or '').strip()
+    api_key = str(cfg.get('apiKey') or '').strip()
+    b64_img = base64.b64encode(jpeg_bytes).decode('ascii')
+
+    headers = {'Content-Type': 'application/json'}
+    if provider == 'ollama':
+        root_url = base_url[:-3] if base_url.endswith('/v1') else base_url
+        endpoint = f'{root_url}/api/chat'
+        payload = {
+            'model': model_name,
+            'stream': False,
+            'think': False,
+            'format': 'json',
+            'options': {'temperature': 0.4, 'num_predict': 350},
+            'messages': [
+                {'role': 'user', 'content': prompt, 'images': [b64_img]}
+            ],
+        }
+    else:
+        endpoint = f'{base_url}/chat/completions' if not base_url.endswith('/chat/completions') else base_url
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
+        if provider == 'openrouter':
+            headers['HTTP-Referer'] = 'https://github.com/maratello1/gamemusick'
+            headers['X-Title'] = 'GameMusick Director'
+        payload = {
+            'model': model_name,
+            'temperature': 0.5,
+            'max_tokens': 380,
+            'messages': [
+                {
+                    'role': 'user',
+                    'content': [
+                        {'type': 'text', 'text': prompt},
+                        {'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64_img}'}},
+                    ],
+                }
+            ],
+        }
+
+    req = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload).encode('utf-8'),
+        headers=headers,
+        method='POST',
+    )
+    with urllib.request.urlopen(req, timeout=22) as resp:
+        body = json.loads(resp.read().decode('utf-8'))
+
+    if provider == 'ollama':
+        raw_content = ((body.get('message') or {}).get('content')) or ''
+    else:
+        choices = body.get('choices') or []
+        raw_content = (((choices[0] if choices else {}).get('message') or {}).get('content')) or ''
+    return extract_json_payload(raw_content)
+
+
+def compute_frame_visual_delta(prev_thumb, cur_thumb) -> float:
+    """Mean grayscale difference (0..255) on tiny 48x27 frame thumbnails to gate duplicate API calls."""
+    if prev_thumb is None or cur_thumb is None:
+        return 255.0
+    try:
+        diff_img = ImageChops.difference(cur_thumb, prev_thumb)
+        return float(ImageStat.Stat(diff_img).mean[0])
+    except Exception:
+        return 255.0
+
+
+def should_trigger_gemini_vision(
+    now_ms: int,
+    last_call_ms: int,
+    backoff_until_ms: int,
+    interval_ms: int,
+    visual_delta: float,
+    scene_tag: str,
+    last_gemini_tag: str,
+    dialogue_text: str,
+    last_dialogue_sent: str,
+) -> bool:
+    """Send frames to Gemini only on meaningful scene/dialogue changes or a 45s static heartbeat."""
+    if now_ms < backoff_until_ms:
+        return False
+    min_cooldown_ms = max(8000, interval_ms)
+    elapsed_ms = now_ms - last_call_ms
+    if last_call_ms > 0 and elapsed_ms < min_cooldown_ms:
+        return False
+    if last_call_ms == 0 or visual_delta >= 7.5:
+        return True
+    if scene_tag != last_gemini_tag:
+        return True
+    if dialogue_text and dialogue_text != last_dialogue_sent:
+        return True
+    heartbeat_ms = max(45000, interval_ms * 4)
+    return elapsed_ms >= heartbeat_ms
 
 
 async def run_director():
@@ -430,8 +732,17 @@ async def run_director():
     gemini_client = None
     last_gemini_key = ''
     last_gemini_call_ms = 0
+    gemini_backoff_until_ms = 0
+    gemini_backoff_sec = 0
+    prev_gemini_thumb = None
+    last_gemini_tag = ''
+    last_dialogue_sent = ''
     cached_gemini_picks = []
     cached_gemini_summary = ''
+    cached_gemini_meta = {}
+    last_vision_proc = ''
+    prev_emitted_tag = 'explore_wander'
+    last_change_music_ms = 0
 
     last_game_info = {
         'process': "Ожидание игры",
@@ -487,10 +798,13 @@ async def run_director():
                     'ok': True,
                     'process': 'Ожидание игры',
                     'game': 'Ожидание игры',
-                    'sceneType': 'exploration',
+                    'sceneType': 'standby',
+                    'sceneTag': 'standby',
                     'vibe': 'EXPLORE',
                     'mood': 'calm ambient',
-                    'tension': 1,
+                    'energy': 12,
+                    'tension': 8,
+                    'valence': 10,
                     'location': 'Рабочий стол',
                     'summary': 'Ожидание запуска игры...',
                     'onScreenText': '',
@@ -572,34 +886,40 @@ async def run_director():
                 # Check subtitles area
                 sub_crop = grab_window_crop(game_rect, 0.12, 0.72, 0.76, 0.22)
                 t_en = await ocr_crop(sub_crop, 'en-US')
-                if len(t_en) >= 5 and not contains_ui_garbage(t_en):
+                if is_valid_dialogue_text(t_en):
                     dialogue_text = t_en
                 else:
                     t_ru = await ocr_crop(sub_crop, 'ru')
-                    if len(t_ru) >= 5 and not contains_ui_garbage(t_ru):
+                    if is_valid_dialogue_text(t_ru):
                         dialogue_text = t_ru
 
-            if len(dialogue_text) >= 5 and not contains_ui_garbage(dialogue_text):
-                dialogue_emotion, d_label = analyze_text_sentiment(dialogue_text)
+            if is_valid_dialogue_text(dialogue_text):
+                dialogue_emotion, d_label, ocr_scene_tag = analyze_text_sentiment(dialogue_text)
                 dialogue_hold_until = time.time() + 9.0
                 is_dialogue_active = True
                 last_dialogue_text = dialogue_text
-                scene_label = f"🎬 {d_label}: \"{dialogue_text[:45]}...\""
-            elif time.time() < dialogue_hold_until and last_dialogue_text and not is_online and not contains_ui_garbage(last_dialogue_text):
+                scene_label = f"{d_label}: \"{dialogue_text[:52]}\""
+            elif time.time() < dialogue_hold_until and last_dialogue_text and not is_online and is_valid_dialogue_text(last_dialogue_text):
                 is_dialogue_active = True
                 dialogue_text = last_dialogue_text
+                _, _, ocr_scene_tag = analyze_text_sentiment(last_dialogue_text)
             else:
                 last_dialogue_text = ''
                 dialogue_text = ''
                 is_dialogue_active = False
+                ocr_scene_tag = ''
 
             if is_dialogue_active or sustained_letterbox:
                 last_cutscene_ms = now_ms
 
-            # 5. Scene State Machine (Supports all 6 buckets: EXPLORE, COMBAT, BOSSFIGHT, DRAMA, MAJESTIC, STEALTH)
-            # In online games, combat requires sustained teamfight APM (>= 10 presses/2s), not 3 menu clicks!
+            # 5. Multi-Dimensional Scene Vector State Machine
+            fresh_sensor = read_fresh_sensor()
+            sensor_motion = int(fresh_sensor.get('motionDelta', 16)) if fresh_sensor else 16
+            sensor_red = int(fresh_sensor.get('redAlertRatio', 0)) if fresh_sensor else 0
+            sensor_hint = str(fresh_sensor.get('sceneHint', '') or '') if fresh_sensor else ''
+
             combat_threshold = 10 if is_online else 3
-            is_fighting = (total_presses_2s >= combat_threshold)
+            is_fighting = (total_presses_2s >= combat_threshold) or (sensor_hint in ('COMBAT', 'TEAMFIGHT', 'BOSSFIGHT'))
             if is_fighting:
                 if combat_streak_start_ms == 0:
                     combat_streak_start_ms = now_ms
@@ -612,6 +932,7 @@ async def run_director():
                 not is_online and (
                     (is_fighting and sustained_boss_bar)
                     or (combat_duration_ms > 32000 and total_presses_2s >= 5)
+                    or sensor_hint == 'BOSSFIGHT'
                 )
             )
             if is_boss_escalated:
@@ -626,140 +947,298 @@ async def run_director():
             in_cutscene_hold = not is_online and (now_ms - last_cutscene_ms < 12000)
             is_recent_room_change = not is_online and (now_ms - last_room_wipe_ms < 10000)
 
-            if is_boss_escalated or in_boss_hold:
+            scene_tag = 'menu_lobby' if is_online else 'explore_wander'
+            est_energy = sensor_motion
+            est_tension = max(12, int(sensor_motion * 0.65 + sensor_red * 0.5))
+            est_valence = 15 if center_luma >= 40 else -15
+
+            if sensor_hint == 'RESPAWN':
+                active_vibe = 'DRAMA'
+                active_scene_type = 'respawn'
+                scene_tag = 'respawn_downtime'
+                scene_label = 'Респавн / Наблюдение'
+                est_energy, est_tension, est_valence = 18, 22, -20
+            elif is_boss_escalated or in_boss_hold:
                 active_vibe = 'BOSSFIGHT'
                 active_scene_type = 'boss_battle'
-                scene_label = '🔥 Эпическая битва с Боссом'
-            elif is_fighting:
+                scene_tag = 'boss_climax'
+                scene_label = 'Битва с Боссом / Кульминация'
+                est_energy, est_tension, est_valence = max(88, sensor_motion), 95, -25
+            elif sensor_hint == 'CHASE_ESCAPE':
+                active_vibe = 'COMBAT'
+                active_scene_type = 'chase_escape'
+                scene_tag = 'chase_escape'
+                scene_label = 'Погоня / Побег'
+                est_energy, est_tension, est_valence = max(80, sensor_motion), 92, -45
+            elif is_fighting or in_combat_hold:
                 active_vibe = 'COMBAT'
                 active_scene_type = 'combat'
-                scene_label = 'Сражение / Боевой экшен'
-            elif in_combat_hold:
-                active_vibe = 'COMBAT'
-                active_scene_type = 'combat'
-                scene_label = 'Напряженная схватка'
-            elif is_recent_room_change:
+                scene_tag = 'teamfight_clash' if is_online else 'skirmish_combat'
+                scene_label = 'Массовый замес / Клатч' if is_online else 'Стычка / Боевой экшен'
+                est_energy = max(72 if not is_online else 80, sensor_motion)
+                est_tension = max(68, est_tension)
+                est_valence = -15
+            elif is_recent_room_change or ocr_scene_tag == 'vista_wonder':
                 active_vibe = 'MAJESTIC'
                 active_scene_type = 'new_location'
-                scene_label = 'Вход в новую локацию'
+                scene_tag = 'vista_wonder'
+                scene_label = 'Панорама / Открытие локации'
+                est_energy, est_tension, est_valence = 44, 25, 76
+            elif ocr_scene_tag in ('menu_lobby', 'cozy_hub', 'horror_dread', 'victory_triumph'):
+                scene_tag = ocr_scene_tag
+                active_scene_type = ocr_scene_tag
+                if ocr_scene_tag == 'victory_triumph':
+                    active_vibe = 'VICTORY'
+                    est_energy, est_tension, est_valence = 64, 20, 92
+                elif ocr_scene_tag == 'horror_dread':
+                    active_vibe = 'STEALTH'
+                    est_energy, est_tension, est_valence = 26, 86, -80
+                elif ocr_scene_tag == 'cozy_hub':
+                    active_vibe = 'EXPLORE'
+                    est_energy, est_tension, est_valence = 18, 10, 60
+                else:
+                    active_vibe = 'EXPLORE'
+                    est_energy, est_tension, est_valence = 22, 18, 8
             elif in_cutscene_hold:
                 active_vibe = dialogue_emotion if dialogue_emotion in ['DRAMA', 'MAJESTIC', 'COMBAT'] else 'DRAMA'
                 active_scene_type = 'cutscene'
+                scene_tag = 'tragedy_drama' if active_vibe == 'DRAMA' and dialogue_text else 'dialogue_story'
                 if not is_dialogue_active:
-                    scene_label = 'Кинематографическая катсцена'
-            elif in_stealth_hold:
+                    scene_label = 'Сюжетная катсцена / Диалог'
+                est_energy, est_tension, est_valence = 22, 48 if scene_tag == 'tragedy_drama' else 36, -65 if scene_tag == 'tragedy_drama' else -10
+            elif in_stealth_hold or sensor_hint in ('STEALTH', 'HORROR_DREAD'):
                 active_vibe = 'STEALTH'
-                active_scene_type = 'stealth'
-                scene_label = 'Скрытное проникновение'
+                is_horror = (sensor_hint == 'HORROR_DREAD') or (center_luma < 24 and sensor_red > 10)
+                scene_tag = 'horror_dread' if is_horror else 'stealth_infiltrate'
+                active_scene_type = scene_tag
+                scene_label = 'Хоррор / Саспенс' if is_horror else 'Скрытное проникновение'
+                est_energy, est_tension, est_valence = 28, 82 if is_horror else 68, -75 if is_horror else -35
+            elif sensor_hint == 'MENU_LOBBY' or is_online:
+                active_vibe = 'EXPLORE'
+                active_scene_type = 'menu_lobby'
+                scene_tag = 'menu_lobby'
+                scene_label = 'Меню / Лобби / Подготовка'
+                est_energy, est_tension, est_valence = 22, 18, 8
             else:
                 active_vibe = 'EXPLORE'
                 active_scene_type = 'exploration'
-                scene_label = 'Атмосферное исследование' if not is_online else 'Лобби / Исследование карты'
+                scene_tag = 'cozy_hub' if sensor_hint == 'COZY_HUB' else 'explore_wander'
+                scene_label = 'Мирное убежище' if scene_tag == 'cozy_hub' else 'Атмосферное исследование'
+                est_energy, est_tension, est_valence = max(18, sensor_motion), 22, 30 if scene_tag == 'cozy_hub' else 15
 
             # 6. Dynamic Music Style & Recommendations
             music_style_map = {
-                'EXPLORE': f"{game_title} ambient exploration soundtrack atmospheric",
-                'MAJESTIC': f"{game_title} majestic vista orchestral triumph ost",
-                'DRAMA': f"{game_title} dramatic sorrowful melancholic ost",
-                'COMBAT': f"{game_title} combat battle action theme ost",
-                'BOSSFIGHT': f"{game_title} epic boss battle fight orchestral theme",
-                'STEALTH': f"{game_title} stealth suspense dark drone ambient",
-                'VICTORY': f"{game_title} victory fanfare triumph theme ost",
+                'menu_lobby': f"{game_title} main menu lobby atmospheric synth ambient",
+                'cozy_hub': f"{game_title} peaceful tavern sanctuary acoustic ambient ost",
+                'explore_wander': f"{game_title} ambient exploration soundtrack atmospheric",
+                'vista_wonder': f"{game_title} majestic vista orchestral wonder theme ost",
+                'horror_dread': f"{game_title} horror dread dark eerie suspense drone ost",
+                'stealth_infiltrate': f"{game_title} stealth espionage dark minimal tension",
+                'dialogue_story': f"{game_title} emotional story dialogue piano strings ost",
+                'tragedy_drama': f"{game_title} tragic sorrowful cello dramatic requiem ost",
+                'respawn_downtime': "chill downtempo reflective lo-fi break",
+                'skirmish_combat': f"{game_title} dynamic combat battle action theme ost",
+                'teamfight_clash': f"{game_title} intense clash competitive adrenaline theme",
+                'chase_escape': f"{game_title} frantic chase escape countdown synth ost",
+                'boss_climax': f"{game_title} epic choir boss battle orchestral climax ost",
+                'victory_triumph': f"{game_title} victory fanfare triumphant heroic theme ost",
             }
-            rec_style = music_style_map.get(active_vibe, f"{game_title} ambient ost")
+            rec_style = music_style_map.get(scene_tag, f"{game_title} ambient ost")
 
-            # 6b. Optional: User-Provided Gemini Vision Scoring (BYOK)
-            gemini_cfg = get_user_gemini_config()
-            if gemini_cfg:
-                if gemini_client is None or gemini_cfg.get('apiKey') != last_gemini_key:
-                    try:
-                        from google import genai
-                        gemini_client = genai.Client(api_key=gemini_cfg['apiKey'])
-                        last_gemini_key = gemini_cfg['apiKey']
-                        print('[LocalDirector] Google Gemini Vision activated with user key!', flush=True)
-                    except Exception as ex:
-                        print(f'[LocalDirector] Gemini init: {ex}', flush=True)
+            # 6a. Official Game State Integration (Dota 2 / CS2) ground-truth override (0 Vision quota spent)
+            gsi_snapshot = read_fresh_gsi()
+            if gsi_snapshot:
+                if gsi_snapshot.get('sceneTag'):
+                    scene_tag = str(gsi_snapshot['sceneTag']).strip().lower()
+                if gsi_snapshot.get('vibe'):
+                    active_vibe = str(gsi_snapshot['vibe'])
+                if gsi_snapshot.get('phase'):
+                    active_scene_type = str(gsi_snapshot['phase'])
+                if isinstance(gsi_snapshot.get('energy'), (int, float)):
+                    est_energy = int(max(0, min(100, gsi_snapshot['energy'])))
+                if isinstance(gsi_snapshot.get('tension'), (int, float)):
+                    est_tension = int(max(0, min(100, gsi_snapshot['tension'])))
+                if isinstance(gsi_snapshot.get('valence'), (int, float)):
+                    est_valence = int(max(-100, min(100, gsi_snapshot['valence'])))
+                if gsi_snapshot.get('summary'):
+                    scene_label = str(gsi_snapshot['summary'])
+                rec_style = music_style_map.get(scene_tag, rec_style)
+                cached_gemini_summary = ''
+                cached_gemini_meta = {}
 
-                interval_ms = int(gemini_cfg.get('intervalSec', 12)) * 1000
-                # Only analyze screen with Gemini if the game is actually focused!
-                if gemini_client and is_game_foreground and (now_ms - last_gemini_call_ms > interval_ms) and center_luma > 6:
-                    last_gemini_call_ms = now_ms
-                    try:
-                        from google.genai import types
+            # 6b. Optional: Universal AI Vision Director (Gemini / Ollama / OpenRouter / OpenAI-compatible)
+            ai_cfg = get_active_ai_vision_config()
+            active_audio_mode = get_active_audio_mode()
+            gemini_requested_change = False
+
+            if last_vision_proc != game_proc or not ai_cfg:
+                cached_gemini_picks = []
+                cached_gemini_summary = ''
+                cached_gemini_meta = {}
+                last_vision_proc = game_proc
+
+            if ai_cfg and not gsi_snapshot:
+                ai_provider = ai_cfg.get('provider', 'gemini')
+                if ai_provider == 'gemini':
+                    if gemini_client is None or ai_cfg.get('apiKey') != last_gemini_key:
+                        try:
+                            from google import genai
+                            gemini_client = genai.Client(api_key=ai_cfg['apiKey'])
+                            last_gemini_key = ai_cfg['apiKey']
+                            print(f"[LocalDirector] Google Gemini Vision activated ({ai_cfg.get('model')})!", flush=True)
+                        except Exception as ex:
+                            print(f'[LocalDirector] Gemini init: {ex}', flush=True)
+
+                provider_ready = (gemini_client is not None) if ai_provider == 'gemini' else True
+                interval_ms = int(ai_cfg.get('intervalSec', 12)) * 1000
+                # Smart quota-saving trigger: analyze only on real scene/dialogue changes + heartbeat
+                if provider_ready and is_game_foreground and center_luma > 6 and now_ms >= gemini_backoff_until_ms:
+                    if last_gemini_call_ms == 0 or (now_ms - last_gemini_call_ms) >= max(5000 if ai_provider == 'ollama' else 8000, interval_ms):
                         full_frame = grab_window_crop(game_rect, 0.0, 0.0, 1.0, 1.0)
-                        full_frame.thumbnail((800, 800))
-                        b = io.BytesIO()
-                        full_frame.save(b, format='JPEG', quality=65)
-                        jpeg_bytes = b.getvalue()
+                        cur_thumb = full_frame.convert('L').resize((48, 27), Image.Resampling.BILINEAR)
+                        v_delta = compute_frame_visual_delta(prev_gemini_thumb, cur_thumb)
+                        if should_trigger_gemini_vision(
+                            now_ms=now_ms,
+                            last_call_ms=last_gemini_call_ms,
+                            backoff_until_ms=gemini_backoff_until_ms,
+                            interval_ms=interval_ms,
+                            visual_delta=v_delta,
+                            scene_tag=scene_tag,
+                            last_gemini_tag=last_gemini_tag,
+                            dialogue_text=dialogue_text,
+                            last_dialogue_sent=last_dialogue_sent,
+                        ):
+                            last_gemini_call_ms = now_ms
+                            last_gemini_tag = scene_tag
+                            last_dialogue_sent = dialogue_text
+                            prev_gemini_thumb = cur_thumb
+                            try:
+                                full_frame.thumbnail((640, 640))
+                                b = io.BytesIO()
+                                full_frame.save(b, format='JPEG', quality=60)
+                                jpeg_bytes = b.getvalue()
 
-                        fav_artists, fav_genres = get_user_favorite_artists()
-                        artists_hint = f" Player favorite artists: {', '.join(fav_artists[:3])}." if fav_artists else ""
+                                fav_artists, fav_genres = get_user_favorite_artists()
+                                if active_audio_mode == 'custom' and fav_artists:
+                                    taste_rule = (
+                                        f"PLAYER MODE IS 'MY ARTISTS'. You MUST ONLY pick real tracks by the user's favorite artists ({', '.join(fav_artists[:6])}) "
+                                        f"or genres ({', '.join(fav_genres[:4])}) whose musical mood matches this game scene! NEVER pick game OSTs."
+                                    )
+                                else:
+                                    taste_rule = (
+                                        f"PLAYER MODE IS 'GAME VIBE & AMBIENT'. Pick fitting atmospheric tracks or OSTs/soundtracks matching this exact scene. "
+                                        f"{('Blend seamlessly with tastes: ' + ', '.join(fav_artists[:3])) if fav_artists else ''}"
+                                    )
 
-                        prompt = (
-                            f'Scoring scene for "{game_title}". Subtitles: "{dialogue_text}".{artists_hint} '
-                            'Return JSON with: summary (Russian 1 sentence describing gameplay scene), '
-                            'mood (2-3 words), picks (5 real tracks with artist, title fitting the scene and player tastes).'
-                        )
-                        model_name = gemini_cfg.get('model', 'gemini-3.5-flash')
-                        if '2.5' in model_name or '2.0' in model_name:
-                            model_name = 'gemini-3.5-flash'
-                        resp = gemini_client.models.generate_content(
-                            model=model_name,
-                            contents=[
-                                types.Part.from_bytes(data=jpeg_bytes, mime_type='image/jpeg'),
-                                prompt
-                            ],
-                            config=types.GenerateContentConfig(
-                                response_mime_type='application/json',
-                                temperature=0.7
-                            )
-                        )
-                        if resp.text:
-                            parsed_g = json.loads(resp.text)
-                            if isinstance(parsed_g, dict):
-                                if parsed_g.get('summary'):
-                                    cached_gemini_summary = parsed_g['summary']
-                                if isinstance(parsed_g.get('picks'), list):
-                                    cached_gemini_picks = parsed_g['picks'][:5]
-                    except Exception as ex:
-                        print(f'[LocalDirector] Gemini ping: {ex}', flush=True)
+                                prompt = (
+                                    f'Analyze gameplay screenshot for "{game_title}". Subtitles: "{dialogue_text}". {taste_rule} '
+                                    'Do NOT squeeze into 6 generic moods — describe the exact nuance (e.g. menu_lobby, cozy_hub, horror_dread, stealth_infiltrate, chase_escape, vista_wonder, skirmish_combat, boss_climax, tragedy_drama, dialogue_story, victory_triumph, or custom snake_case tag). '
+                                    'Return strict JSON only: {"sceneTag": string, "sceneType": string, "mood": "2-4 English mood words", "summary": "1 concise Russian sentence", '
+                                    '"location": "short location in Russian", "energy": 0..100 int, "tension": 0..100 int, "valence": -100..100 int, '
+                                    '"musicStyle": "specific English musical instrumentation & tempo brief", "changeMusic": bool, "picks": [{"artist": str, "title": str}] (5 tracks)}.'
+                                )
 
-            final_summary = cached_gemini_summary if (cached_gemini_summary and not dialogue_text) else scene_label
+                                parsed_g = None
+                                if ai_provider == 'gemini':
+                                    from google.genai import types
+                                    model_name = str(ai_cfg.get('model') or 'gemini-3.5-flash-lite').strip()
+                                    def _call_gemini():
+                                        return gemini_client.models.generate_content(
+                                            model=model_name,
+                                            contents=[
+                                                types.Part.from_bytes(data=jpeg_bytes, mime_type='image/jpeg'),
+                                                prompt,
+                                            ],
+                                            config=types.GenerateContentConfig(
+                                                response_mime_type='application/json',
+                                                temperature=0.6,
+                                            ),
+                                        )
+                                    resp = await asyncio.to_thread(_call_gemini)
+                                    if getattr(resp, 'text', None):
+                                        parsed_g = extract_json_payload(resp.text)
+                                else:
+                                    parsed_g = await asyncio.to_thread(call_openai_compat_vision, ai_cfg, jpeg_bytes, prompt)
+
+                                gemini_backoff_sec = 0
+                                if isinstance(parsed_g, dict):
+                                    if parsed_g.get('summary'):
+                                        cached_gemini_summary = parsed_g['summary']
+                                    if isinstance(parsed_g.get('picks'), list):
+                                        cached_gemini_picks = parsed_g['picks'][:5]
+                                    cached_gemini_meta = {
+                                        'sceneTag': parsed_g.get('sceneTag'),
+                                        'sceneType': parsed_g.get('sceneType'),
+                                        'mood': parsed_g.get('mood'),
+                                        'location': parsed_g.get('location'),
+                                        'energy': parsed_g.get('energy'),
+                                        'tension': parsed_g.get('tension'),
+                                        'valence': parsed_g.get('valence'),
+                                        'musicStyle': parsed_g.get('musicStyle'),
+                                    }
+                                    gemini_requested_change = bool(parsed_g.get('changeMusic', False))
+                            except urllib.error.HTTPError as http_err:
+                                if http_err.code == 429:
+                                    gemini_backoff_sec = 60 if gemini_backoff_sec == 0 else min(300, gemini_backoff_sec * 2)
+                                    gemini_backoff_until_ms = now_ms + gemini_backoff_sec * 1000
+                                    print(f'[LocalDirector] {ai_provider} rate limit 429, cooling {gemini_backoff_sec}s', flush=True)
+                                else:
+                                    print(f'[LocalDirector] {ai_provider} HTTP {http_err.code}', flush=True)
+                            except Exception as ex:
+                                err_str = str(ex)
+                                if '429' in err_str or 'RESOURCE_EXHAUSTED' in err_str or 'quota' in err_str.lower():
+                                    gemini_backoff_sec = 60 if gemini_backoff_sec == 0 else min(300, gemini_backoff_sec * 2)
+                                    gemini_backoff_until_ms = now_ms + gemini_backoff_sec * 1000
+                                    print(f'[LocalDirector] {ai_provider} quota 429, cooling down {gemini_backoff_sec}s (local AI stays active)', flush=True)
+                                else:
+                                    print(f'[LocalDirector] {ai_provider} ping: {err_str[:160]}', flush=True)
+
+            # Merge AI Vision rich scene vector when GSI is inactive and hardware combat isn't overriding
+            if not gsi_snapshot and ai_cfg and cached_gemini_meta and not is_fighting and not is_boss_escalated:
+                if cached_gemini_meta.get('sceneTag'):
+                    scene_tag = str(cached_gemini_meta['sceneTag']).strip().lower().replace(' ', '_')[:40]
+                if cached_gemini_meta.get('sceneType'):
+                    active_scene_type = str(cached_gemini_meta['sceneType'])
+                if cached_gemini_meta.get('musicStyle'):
+                    rec_style = str(cached_gemini_meta['musicStyle'])
+                if isinstance(cached_gemini_meta.get('energy'), (int, float)):
+                    est_energy = int(max(0, min(100, cached_gemini_meta['energy'])))
+                if isinstance(cached_gemini_meta.get('tension'), (int, float)):
+                    est_tension = int(max(0, min(100, cached_gemini_meta['tension'])))
+                if isinstance(cached_gemini_meta.get('valence'), (int, float)):
+                    est_valence = int(max(-100, min(100, cached_gemini_meta['valence'])))
+
+            should_change_music = gemini_requested_change or (
+                scene_tag != prev_emitted_tag and (now_ms - last_change_music_ms > (2500 if gsi_snapshot else 5000))
+            )
+            if should_change_music:
+                prev_emitted_tag = scene_tag
+                last_change_music_ms = now_ms
+
+            final_summary = cached_gemini_summary if (cached_gemini_summary and not dialogue_text and not gsi_snapshot) else scene_label
 
             # 7. Write Payloads Atomically
-            sensor_payload = {
-                'timestamp': now_ms,
-                'detectedProcess': game_proc,
-                'windowTitle': game_title,
-                'motionDelta': 65 if active_vibe == 'COMBAT' else 16,
-                'redAlertRatio': 0,
-                'brightness': center_luma,
-                'inferredVibe': active_vibe,
-                'sceneEmotion': active_vibe,
-                'sceneKey': f"{active_vibe}_{active_scene_type.upper()}",
-                'sceneLabel': final_summary,
-                'isCutscene': in_cutscene_hold,
-                'isNewLocation': is_recent_room_change,
-                'gameAudioDucked': True,
-                'sensorMode': 'local-director-gemini' if gemini_cfg else 'local-director-winrt-cv'
-            }
-
             director_payload = {
                 'timestamp': now_ms,
                 'ok': True,
                 'process': game_proc,
                 'game': game_title,
                 'sceneType': active_scene_type,
+                'sceneTag': scene_tag,
                 'vibe': active_vibe,
-                'mood': f"{active_scene_type} {active_vibe.lower()} atmosphere",
-                'tension': 8 if active_vibe == 'COMBAT' else 3,
-                'location': 'Игровой мир',
+                'mood': cached_gemini_meta.get('mood') or f"{scene_tag.replace('_', ' ')} mood",
+                'energy': est_energy,
+                'tension': est_tension,
+                'valence': est_valence,
+                'location': ('Dota 2 / CS2 (GSI)' if gsi_snapshot else (cached_gemini_meta.get('location') or 'Игровой мир')),
                 'summary': final_summary,
                 'onScreenText': dialogue_text,
                 'musicStyle': rec_style,
-                'changeMusic': False,
+                'changeMusic': should_change_music,
                 'picks': cached_gemini_picks,
-                'hasGeminiVision': bool(gemini_cfg)
+                'hasGeminiVision': bool(ai_cfg),
+                'aiProvider': ('gsi' if gsi_snapshot else (ai_cfg.get('provider') if ai_cfg else 'none')),
+                'gsiActive': bool(gsi_snapshot),
             }
 
             dialogue_payload = {

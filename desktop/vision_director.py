@@ -9,7 +9,7 @@ is playing right now still fits, and which real released tracks would fit next.
 Output: data/scene-director.json (consumed by /api/telemetry and the player).
 
 Setup: put GEMINI_API_KEY=... into .env.local in the project root (file is gitignored).
-Optional: GEMINI_MODEL (default gemini-2.5-flash), DIRECTOR_INTERVAL (default 10 sec).
+Optional: GEMINI_MODEL (default gemini-3.5-flash-lite), DIRECTOR_INTERVAL (default 10 sec).
 
 Privacy: only the foreground window of a *non-denylisted* process is captured.
 Browsers, editors, messengers, file manager etc. are never sent anywhere.
@@ -119,13 +119,13 @@ def foreground_game_window():
 def grab(bbox):
     from PIL import ImageGrab
     img = ImageGrab.grab(bbox=bbox, all_screens=True).convert('RGB')
-    img.thumbnail((896, 896))
+    img.thumbnail((640, 640))
     return img
 
 
 def to_jpeg(img):
     b = io.BytesIO()
-    img.save(b, format='JPEG', quality=70)
+    img.save(b, format='JPEG', quality=60)
     return b.getvalue()
 
 
@@ -181,7 +181,9 @@ def main():
     from google.genai import types
 
     client = genai.Client(api_key=key)
-    model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+    model = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash-lite')
+    if '2.5' in model or '2.0' in model:
+        model = 'gemini-3.5-flash-lite'
     base_interval = float(os.environ.get('DIRECTOR_INTERVAL', '10'))
     print(f'[Director] model={model} interval={base_interval}s', flush=True)
 

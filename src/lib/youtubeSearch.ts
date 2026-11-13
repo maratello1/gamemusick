@@ -74,6 +74,69 @@ export function cleanTitleAndArtist(rawTitle: string, rawChannel: string): { tit
   };
 }
 
+function extractYtInitialDataJson(html: string): Record<string, any> | null {
+  const markers = ['var ytInitialData = ', 'window["ytInitialData"] = ', 'ytInitialData = '];
+  for (const marker of markers) {
+    const startIdx = html.indexOf(marker);
+    if (startIdx === -1) continue;
+    const jsonStart = html.indexOf('{', startIdx + marker.length);
+    if (jsonStart === -1) continue;
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = jsonStart; i < html.length; i++) {
+      const ch = html[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\' && inString) {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = !inString;
+        continue;
+      }
+      if (!inString) {
+        if (ch === '{') depth++;
+        else if (ch === '}') {
+          depth--;
+          if (depth === 0) {
+            try {
+              return JSON.parse(html.slice(jsonStart, i + 1));
+            } catch {
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function deduplicateYtResults(items: YouTubeVideoResult[]): YouTubeVideoResult[] {
+  const seenIds = new Set<string>();
+  const seenTitles = new Set<string>();
+  const clean: YouTubeVideoResult[] = [];
+  for (const v of items) {
+    if (!v.videoId || v.videoId.length !== 11 || seenIds.has(v.videoId)) continue;
+    if (!v.title || v.channel === 'Game Audio') continue;
+    const normTitle = v.title
+      .toLowerCase()
+      .replace(/[\(\)\[\]]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!normTitle || seenTitles.has(normTitle)) continue;
+    seenIds.add(v.videoId);
+    seenTitles.add(normTitle);
+    clean.push(v);
+  }
+  return clean;
+}
+
 export async function searchYouTubeDirect(
   query: string,
   vibe: VibeStateId = 'EXPLORE',
@@ -82,9 +145,12 @@ export async function searchYouTubeDirect(
   const cleanQ = query.trim().toLowerCase();
   if (!cleanQ) return [];
 
-  // 1. Check in-memory / persistent cache
+  // 1. Check in-memory / persistent cache (ignoring old corrupted "Game Audio" dummy entries)
   if (searchCache[cleanQ] && Array.isArray(searchCache[cleanQ]) && searchCache[cleanQ].length > 0) {
-    return searchCache[cleanQ].slice(0, limit).map((v, idx) => mapYtToTrack(v, vibe, idx));
+    const validCached = deduplicateYtResults(searchCache[cleanQ]);
+    if (validCached.length > 0) {
+      return validCached.slice(0, limit).map((v, idx) => mapYtToTrack(v, vibe, idx));
+    }
   }
 
   try {
@@ -92,21 +158,20 @@ export async function searchYouTubeDirect(
     const res = await fetch(url, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(5500),
     });
 
     if (!res.ok) return [];
 
     const html = await res.text();
-    const match = html.match(/ytInitialData\s*=\s*({.+?});<\/script>/);
     const parsedVideos: YouTubeVideoResult[] = [];
 
-    if (match) {
+    const data = extractYtInitialDataJson(html);
+    if (data) {
       try {
-        const data = JSON.parse(match[1]);
         const contents =
           data.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents;
         if (Array.isArray(contents)) {
@@ -124,6 +189,7 @@ export async function searchYouTubeDirect(
                     `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
 
                   if (
+                    title.trim().length > 1 &&
                     !title.toLowerCase().includes('live stream') &&
                     !v.badges?.some(
                       (b: { metadataBadgeRenderer?: { style?: string } }) =>
@@ -133,47 +199,63 @@ export async function searchYouTubeDirect(
                     parsedVideos.push({
                       videoId: v.videoId,
                       title: title.replace(/[\r\n\t]/g, ' ').trim(),
-                      channel: channel.trim(),
+                      channel: channel.trim() || 'Music Channel',
                       duration,
                       thumbnail: thumb,
                     });
                   }
-                  if (parsedVideos.length >= limit) break;
+                  if (parsedVideos.length >= limit * 2) break;
                 }
               }
             }
-            if (parsedVideos.length >= limit) break;
+            if (parsedVideos.length >= limit * 2) break;
           }
         }
       } catch {
-        // Fallback to regex below
+        // Fallback below
       }
     }
 
-    // Regex fallback
+    // oEmbed fallback if HTML renderer structure changed: resolves genuine YouTube track titles instead of fake query duplicates!
     if (parsedVideos.length === 0) {
       const regex = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
       let m: RegExpExecArray | null;
-      const seen = new Set<string>();
-      while ((m = regex.exec(html)) !== null && parsedVideos.length < limit) {
-        const id = m[1];
-        if (!seen.has(id)) {
-          seen.add(id);
-          parsedVideos.push({
-            videoId: id,
-            title: query,
-            channel: 'Game Audio',
-            duration: '03:45',
-            thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-          });
-        }
+      const candidateIds: string[] = [];
+      while ((m = regex.exec(html)) !== null && candidateIds.length < Math.min(limit, 8)) {
+        if (!candidateIds.includes(m[1])) candidateIds.push(m[1]);
+      }
+      const oembedResults = await Promise.all(
+        candidateIds.map(async (id) => {
+          try {
+            const oe = await fetch(
+              `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`,
+              { signal: AbortSignal.timeout(2500) }
+            );
+            if (!oe.ok) return null;
+            const meta = (await oe.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+            if (!meta.title) return null;
+            return {
+              videoId: id,
+              title: meta.title.trim(),
+              channel: (meta.author_name || 'YouTube Music').trim(),
+              duration: '03:45',
+              thumbnail: meta.thumbnail_url || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const item of oembedResults) {
+        if (item) parsedVideos.push(item);
       }
     }
 
-    if (parsedVideos.length > 0) {
-      searchCache[cleanQ] = parsedVideos;
+    const deduped = deduplicateYtResults(parsedVideos).slice(0, limit);
+    if (deduped.length > 0) {
+      searchCache[cleanQ] = deduped;
       persistCache();
-      return parsedVideos.map((v, idx) => mapYtToTrack(v, vibe, idx));
+      return deduped.map((v, idx) => mapYtToTrack(v, vibe, idx));
     }
   } catch {
     // Return empty on network timeout

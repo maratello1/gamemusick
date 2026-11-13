@@ -104,7 +104,7 @@ const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
 const SRCCOPY: u32 = 0x00CC0020;
 const CAPTUREBLT: u32 = 0x40000000;
 
-const DENYLIST: [&str; 33] = [
+const DENYLIST: [&str; 65] = [
     "explorer",
     "msedge",
     "chrome",
@@ -113,18 +113,29 @@ const DENYLIST: [&str; 33] = [
     "opera",
     "yandex",
     "vivaldi",
+    "chrome-headless-shell",
     "gamemusick",
     "gamevibe",
     "electron",
     "antigravity",
     "searchhost",
+    "startmenuexperiencehost",
     "shellexperiencehost",
     "applicationframehost",
+    "textinputhost",
+    "systemsettings",
+    "lockapp",
+    "dwm",
+    "csrss",
+    "audiodg",
+    "idle",
+    "system",
     "taskmgr",
     "cmd",
     "powershell",
     "pwsh",
     "windowsterminal",
+    "conhost",
     "code",
     "devenv",
     "cursor",
@@ -135,14 +146,38 @@ const DENYLIST: [&str; 33] = [
     "sublime_text",
     "discord",
     "telegram",
+    "whatsapp",
+    "slack",
+    "teams",
     "spotify",
+    "steam",
     "steamwebhelper",
     "epicgameslauncher",
+    "nvcontainer",
+    "nvidia",
+    "xboxpcappft",
+    "gamebar",
+    "hydra",
+    "happ",
+    "v2ray",
+    "clash",
+    "nekoray",
+    "sing-box",
+    "xray",
+    "anydesk",
+    "teamviewer",
+    "1password",
+    "keepass",
+    "bitwarden",
+    "notepad",
 ];
 
 fn is_denylisted(proc_name: &str) -> bool {
     let lower = proc_name.to_lowercase();
     let stem = lower.strip_suffix(".exe").unwrap_or(&lower);
+    if stem == "node" || stem == "python" || stem == "pythonw" {
+        return true;
+    }
     DENYLIST.iter().any(|&d| stem == d || lower.contains(d))
 }
 
@@ -479,6 +514,7 @@ fn main() {
     let mut last_brain_sync_ms: u128 = 0;
 
     let mut prev_lumas = [40i32; 16];
+    let mut has_prev_luma = false;
     let mut rolling_energy: f32 = 14.0;
     let mut last_combat_spike_ms: u128 = 0;
     let mut combat_streak_start_ms: u128 = 0;
@@ -688,11 +724,15 @@ fn main() {
             let mut optical_diff_sum = 0i32;
             let mut luma_sum = 0i32;
             for i in 0..16 {
-                optical_diff_sum += (vis.lumas[i] - prev_lumas[i]).abs();
+                if has_prev_luma {
+                    optical_diff_sum += (vis.lumas[i] - prev_lumas[i]).abs();
+                }
                 luma_sum += vis.lumas[i];
                 prev_lumas[i] = vis.lumas[i];
             }
+            has_prev_luma = true;
             let avg_luma = (luma_sum / 16).clamp(2, 100);
+            let luma_variance = (vis.lumas.iter().map(|&l| (l - avg_luma).abs()).sum::<i32>() / 16).clamp(0, 100);
             let optical_delta_score = (optical_diff_sum / 2).clamp(0, 100);
 
             // Dynamic Neural Evolution Brain Sync (Every ~3.5 seconds)
@@ -832,41 +872,82 @@ fn main() {
             let in_stealth_hold = cur_ms.saturating_sub(last_stealth_ms) < 14000;
 
             let is_standby = last_game_proc == "IDLE_STANDBY" || last_game_proc.is_empty();
+            let is_chase_escape = !is_online
+                && !is_fighting
+                && (move_edge_presses + move_held_ticks >= 4)
+                && attack_edge_presses == 0
+                && final_motion >= 36
+                && vis.red_score >= 20;
+            let is_teamfight = is_online
+                && (is_fighting || in_combat_hold)
+                && (final_motion >= (learned_combat + 18) || attack_edge_presses >= 5);
+            let is_horror_dread = !is_online
+                && avg_luma < learned_stealth
+                && !is_fighting
+                && (vis.red_score >= 30 || (luma_variance <= 12 && avg_luma < 26));
+            let is_menu_lobby = (cursor_travel >= 160 && attack_edge_presses == 0 && move_edge_presses == 0 && move_held_ticks == 0)
+                || (is_online && final_motion < 24 && attack_edge_presses == 0);
+            let is_vista_wonder = is_recent_room_change
+                || (!is_online && avg_luma >= 58 && luma_variance >= 18 && !is_fighting && final_motion < 30);
+            let is_cozy_hub = !is_online
+                && avg_luma >= 40
+                && final_motion <= 18
+                && vis.red_score == 0
+                && attack_edge_presses == 0;
 
-            let (vibe, scene_label) = if is_standby {
-                ("EXPLORE", "STANDBY")
+            let (vibe, scene_label, scene_hint) = if is_standby {
+                ("EXPLORE", "STANDBY", "STANDBY")
             } else if is_respawn_spectating {
-                ("DRAMA", "RESPAWN")
+                ("DRAMA", "RESPAWN", "RESPAWN")
             } else if in_boss_hold {
-                ("BOSSFIGHT", "BOSSFIGHT")
+                ("BOSSFIGHT", "BOSSFIGHT", "BOSSFIGHT")
+            } else if is_chase_escape {
+                ("COMBAT", "CHASE_ESCAPE", "CHASE_ESCAPE")
+            } else if is_teamfight {
+                ("COMBAT", "TEAMFIGHT", "TEAMFIGHT")
             } else if is_fighting || in_combat_hold {
-                ("COMBAT", "COMBAT")
-            } else if is_recent_room_change {
-                ("MAJESTIC", "MAJESTIC")
+                ("COMBAT", "COMBAT", "COMBAT")
+            } else if is_vista_wonder {
+                ("MAJESTIC", "MAJESTIC", "VISTA_WONDER")
             } else if in_cutscene_hold {
-                ("DRAMA", "DRAMA")
+                ("DRAMA", "DRAMA", "DRAMA")
+            } else if is_horror_dread {
+                ("STEALTH", "HORROR_DREAD", "HORROR_DREAD")
             } else if in_stealth_hold {
-                ("STEALTH", "STEALTH")
+                ("STEALTH", "STEALTH", "STEALTH")
+            } else if is_menu_lobby {
+                ("EXPLORE", "MENU_LOBBY", "MENU_LOBBY")
+            } else if is_cozy_hub {
+                ("EXPLORE", "COZY_HUB", "COZY_HUB")
             } else {
-                ("EXPLORE", if is_online { "LOBBY" } else { "EXPLORE" })
+                ("EXPLORE", "EXPLORE", "EXPLORE")
             };
 
             let out_motion = if is_standby { 10 } else { final_motion };
             let out_red = if is_standby { 0 } else { vis.red_score };
             let out_cutscene = if is_standby { "false" } else if in_cutscene_hold { "true" } else { "false" };
             let out_room_wipe = if is_standby { "false" } else if is_recent_room_change { "true" } else { "false" };
+            let out_cursor = if is_standby { 0 } else { cursor_travel };
+            let out_attack = if is_standby { 0 } else { attack_edge_presses };
+            let out_move = if is_standby { 0 } else { move_edge_presses };
+            let out_luma_var = if is_standby { 0 } else { luma_variance };
 
             let json = format!(
-                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":false,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{},\"isOnlineGame\":{},\"isRespawnSpectating\":{}}}",
+                "{{\"timestamp\":{},\"detectedProcess\":\"{}\",\"windowTitle\":\"{}\",\"motionDelta\":{},\"redAlertRatio\":{},\"brightness\":{},\"lumaVariance\":{},\"cursorTravel\":{},\"attackApm\":{},\"moveApm\":{},\"inferredVibe\":\"{}\",\"sceneEmotion\":\"{}\",\"sceneLabel\":\"{}\",\"sceneHint\":\"{}\",\"isCutscene\":{},\"isNewLocation\":{},\"gameAudioDucked\":false,\"sensorMode\":\"rust-win32-50hz-neural-synced\",\"learnedCombatThreshold\":{},\"learnedStealthThreshold\":{},\"isOnlineGame\":{},\"isRespawnSpectating\":{}}}",
                 cur_ms,
                 last_game_proc,
                 last_game_title,
                 out_motion,
                 out_red,
                 avg_luma,
+                out_luma_var,
+                out_cursor,
+                out_attack,
+                out_move,
                 vibe,
                 vibe,
                 scene_label,
+                scene_hint,
                 out_cutscene,
                 out_room_wipe,
                 learned_combat,

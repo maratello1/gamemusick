@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { VibeStateId } from '@/types/vibe';
+import { NeuralEvolutionState, VibeStateId } from '@/types/vibe';
+export type { NeuralEvolutionState };
 
 export interface GameNeuralProfile {
   executable: string;
@@ -17,36 +18,6 @@ export interface GameNeuralProfile {
   crimsonAvg: number;
   lastCorrectionTime: number;
   successfulClassifications: number;
-}
-
-export interface NeuralEvolutionState {
-  enabled: boolean;
-  isGeminiActive: boolean;
-  mode: 'ONLINE_LEARNING' | 'GEMINI_CLOUD';
-  statusMessage: string;
-  level: number;
-  xp: number;
-  xpToNextLevel: number;
-  totalEpochs: number;
-  accuracy: number;
-  totalCorrections: number;
-  activeGame: string;
-  gameAdaptationsCount: number;
-  learnedThresholds: {
-    combatMotionThreshold: number;
-    bossSensitivity: number;
-    stealthLumaThreshold: number;
-    reactionSpeedMs: number;
-  };
-  recentLearnings: string[];
-  weights: {
-    motion: number;
-    apm: number;
-    redAlert: number;
-    ocrKeywords: number;
-    hysteresis: number;
-  };
-  lastUpdate: number;
 }
 
 const BRAIN_FILE = path.join(process.cwd(), 'data', 'neural-evolution.json');
@@ -359,6 +330,8 @@ const DEFAULT_STATE: NeuralEvolutionState = {
     hysteresis: 0.88,
   },
   lastUpdate: Date.now(),
+  dislikedTrackIds: [],
+  sceneFeedbackCount: 0,
 };
 
 interface BrainStorage {
@@ -648,6 +621,75 @@ export function recordPlayerFeedback(params: {
   storage.state.learnedThresholds.combatMotionThreshold = profile.combatMotionThreshold;
   storage.state.learnedThresholds.bossSensitivity = profile.bossSensitivity;
   storage.state.learnedThresholds.stealthLumaThreshold = profile.stealthLumaThreshold;
+
+  storage.state.recentLearnings.unshift(feedbackNote);
+  if (storage.state.recentLearnings.length > 8) storage.state.recentLearnings.pop();
+
+  saveBrain();
+  return storage.state;
+}
+
+/**
+ * Multi-Dimensional Track-Scene Match Feedback:
+ * Captures explicit 👍 ("Подходит") / 👎 ("Не подходит к сцене") signals across ANY
+ * semantic sceneTag (not just 6 moods) and trains both neural weights and track exclusions.
+ */
+export function recordTrackSceneFeedback(params: {
+  detectedProcess: string;
+  windowTitle: string;
+  sceneTag: string;
+  sceneNameRu: string;
+  trackId: string;
+  trackTitle: string;
+  isPositive: boolean;
+  energy: number;
+  tension: number;
+  motionDelta: number;
+}): NeuralEvolutionState {
+  const storage = loadBrain();
+  const proc = params.detectedProcess || 'Общая сессия';
+  const profile = getGameProfile(storage, proc, params.windowTitle || proc);
+
+  storage.state.sceneFeedbackCount = (storage.state.sceneFeedbackCount || 0) + 1;
+  if (!Array.isArray(storage.state.dislikedTrackIds)) {
+    storage.state.dislikedTrackIds = [];
+  }
+
+  let feedbackNote = '';
+  if (params.isPositive) {
+    storage.state.xp += 15;
+    profile.successfulClassifications += 2;
+    profile.adaptationsCount += 1;
+    feedbackNote = `👍 Закреплено соответствие для сцены «${params.sceneNameRu}» («${params.trackTitle.slice(0, 32)}») (+15 XP)`;
+  } else {
+    storage.state.totalCorrections += 1;
+    storage.state.xp += 20;
+    profile.adaptationsCount += 1;
+    if (params.trackId) {
+      storage.state.dislikedTrackIds = [
+        params.trackId,
+        ...storage.state.dislikedTrackIds.filter((id) => id !== params.trackId),
+      ].slice(0, 120);
+    }
+
+    // Fine-tune threshold gently when mismatch happens around combat/calm boundary
+    if (params.energy >= 60 && params.motionDelta >= 35 && params.motionDelta <= 60) {
+      profile.combatMotionThreshold = Math.min(62, profile.combatMotionThreshold + 2);
+    } else if (params.sceneTag === 'stealth_infiltrate' || params.sceneTag === 'horror_dread') {
+      profile.stealthLumaThreshold = Math.max(22, Math.min(58, profile.stealthLumaThreshold + 2));
+    }
+
+    feedbackNote = `👎 Исключен неподходящий трек для «${params.sceneNameRu}» — ИИ перестраивает подбор (+20 XP)`;
+  }
+
+  storage.state.level = Math.floor(Math.sqrt(storage.state.xp / 100)) + 1;
+  storage.state.xpToNextLevel = Math.pow(storage.state.level, 2) * 100;
+  const total = profile.successfulClassifications + storage.state.totalCorrections;
+  storage.state.accuracy = Number(((profile.successfulClassifications / Math.max(1, total)) * 100).toFixed(1));
+  storage.state.gameAdaptationsCount = profile.adaptationsCount;
+  storage.state.learnedThresholds.combatMotionThreshold = profile.combatMotionThreshold;
+  storage.state.learnedThresholds.stealthLumaThreshold = profile.stealthLumaThreshold;
+  storage.state.lastUpdate = Date.now();
 
   storage.state.recentLearnings.unshift(feedbackNote);
   if (storage.state.recentLearnings.length > 8) storage.state.recentLearnings.pop();

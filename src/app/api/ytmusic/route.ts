@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TrackItem, VibeStateId } from '@/types/vibe';
 import { searchYouTubeDirect } from '@/lib/youtubeSearch';
+import {
+  buildSemanticTrackQueries,
+  getSceneTaxonomy,
+  mapSceneTagToLegacyVibe,
+} from '@/lib/scene-engine';
 
 export const dynamic = 'force-dynamic';
+
+// Clean dynamic track router (supports continuous SceneVector + custom artists)
 
 function formatDurationMs(ms?: number): string {
   if (!ms || ms <= 0) return '03:40';
@@ -12,16 +19,28 @@ function formatDurationMs(ms?: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-const ITUNES_HEADERS = {
-  'User-Agent': 'iTunes/12.9.5 (Windows; Microsoft Windows 10.0; x64) AppleWebKit/7607.2001.3001.9',
-  Accept: 'application/json',
-};
+import { getNeuralBrainState } from '@/lib/neural-evolution';
 
-const BAD_ITUNES_ARTISTS =
-  /\b(tribute|karaoke|orchestra|string quartet|in the style of|originally performed by|cover band|soundtrack band|etrusco music|myers music|obsidian silence|age of valour|drakula|sordid ghosting|dark music specialist|camuna music|mystic rpg|inkwell & ivy|relaxing music|spa music|sleep music|study music|meditation|background music|royalty free|sound effects|halloween)\b/i;
-
-const BAD_ITUNES_TITLES =
-  /\b(tribute|karaoke|in the style of|string quartet|piano cover|lullaby version|remix|remixed|rmx|cover|кавер|ремикс|slowed|reverb|radio mix|club mix|extended mix|live at|live from|acoustic version|mashup|bootleg|demo version)\b/i;
+function filterAndDeduplicateTracks(tracks: TrackItem[], excludeIdsParam: string[]): TrackItem[] {
+  let disliked: string[] = [];
+  try {
+    disliked = getNeuralBrainState().dislikedTrackIds || [];
+  } catch {
+    // ignore
+  }
+  const excluded = new Set([...disliked, ...excludeIdsParam].filter(Boolean));
+  const seenKeys = new Set<string>();
+  const out: TrackItem[] = [];
+  for (const t of tracks) {
+    if (!t || !t.title) continue;
+    if (excluded.has(t.id) || (t.videoId && excluded.has(t.videoId))) continue;
+    const key = `${t.artist.toLowerCase().trim()}::${t.title.toLowerCase().trim()}`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    out.push(t);
+  }
+  return out;
+}
 
 // Procedural Atmosphere Archetypes: Infinite dynamic variety, ZERO hardcoded fixed song lists!
 interface AtmosphereArchetype {
@@ -361,6 +380,15 @@ function cleanGameName(raw: string): string {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const mode = searchParams.get('mode') || 'autopilot';
+  const sceneTag = searchParams.get('sceneTag') || '';
+  const musicBrief = searchParams.get('musicBrief') || '';
+  const energyParam = Number(searchParams.get('energy'));
+  const tensionParam = Number(searchParams.get('tension'));
+  const valenceParam = Number(searchParams.get('valence'));
+  const excludeIdsParam = (searchParams.get('excludeIds') || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const query = searchParams.get('q') || '';
   const vibe = (searchParams.get('vibe') as VibeStateId) || 'EXPLORE';
   const userHint = searchParams.get('hint') || '';
@@ -441,6 +469,46 @@ export async function GET(request: NextRequest) {
     const isGameActive = gameClean && !gameClean.includes('Ожидание игры') && gameClean.length > 1;
 
     // Strict priority: If user chose "Мои артисты" (custom), ALWAYS honor user taste!
+    if (audioMode === 'custom' && sceneTag) {
+      const selectedArtistsList = artistsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const selectedGenresList = genresParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const customSemanticSeeds = buildSemanticTrackQueries({
+        audioMode: 'custom',
+        sceneTag,
+        energy: Number.isFinite(energyParam) ? energyParam : getSceneTaxonomy(sceneTag).energy,
+        tension: Number.isFinite(tensionParam) ? tensionParam : getSceneTaxonomy(sceneTag).tension,
+        valence: Number.isFinite(valenceParam) ? valenceParam : getSceneTaxonomy(sceneTag).valence,
+        musicBrief,
+        artists: selectedArtistsList,
+        genres: selectedGenresList,
+        vocalPref: searchParams.get('vocal') || 'mixed',
+        languagePref: searchParams.get('lang') || 'all',
+      });
+      if (customSemanticSeeds.length > 0) {
+        const fetched = await Promise.all(
+          customSemanticSeeds.slice(0, 4).map((s) => searchYouTubeDirect(s, vibe, 8))
+        );
+        const merged = filterAndDeduplicateTracks(fetched.flat(), excludeIdsParam);
+        if (merged.length > 0) {
+          const tax = getSceneTaxonomy(sceneTag);
+          return NextResponse.json({
+            ok: true,
+            mode: 'semantic-custom',
+            sceneTag,
+            vibe,
+            resolvedQuery: `${tax.nameRu} (${selectedArtistsList.slice(0, 2).join(', ') || 'Мои артисты'})`,
+            tracks: merged.slice(0, 20),
+          });
+        }
+      }
+    }
+
     if (audioMode === 'custom') {
       const selectedArtists = artistsParam
         .split(',')
@@ -499,7 +567,45 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      // audioMode === 'game-vibe': Procedural Game Soundtrack Discovery
+      if (audioMode !== 'custom' && (sceneTag || musicBrief)) {
+      const tax = getSceneTaxonomy(sceneTag || 'explore_wander');
+      const semanticQueries = buildSemanticTrackQueries({
+        audioMode: 'game-vibe',
+        sceneTag: sceneTag || tax.tag,
+        energy: Number.isFinite(energyParam) ? energyParam : tax.energy,
+        tension: Number.isFinite(tensionParam) ? tensionParam : tax.tension,
+        valence: Number.isFinite(valenceParam) ? valenceParam : tax.valence,
+        musicBrief,
+        artists: artistsParam.split(',').map((s) => s.trim()).filter(Boolean),
+        genres: genresParam.split(',').map((s) => s.trim()).filter(Boolean),
+        gameTitle: rawGameParam,
+        vocalPref: searchParams.get('vocal') || 'mixed',
+        languagePref: searchParams.get('lang') || 'all',
+      });
+      if (semanticQueries.length > 0) {
+        const fetched = await Promise.all(
+          semanticQueries.slice(0, 3).map((qStr) => searchYouTubeDirect(qStr, vibe, 8))
+        );
+        const merged = filterAndDeduplicateTracks(fetched.flat(), excludeIdsParam);
+        if (merged.length >= 3) {
+          return NextResponse.json({
+            ok: true,
+            mode: 'semantic-game-vibe',
+            sceneTag: sceneTag || tax.tag,
+            vibe: mapSceneTagToLegacyVibe(
+              sceneTag || tax.tag,
+              Number.isFinite(energyParam) ? energyParam : tax.energy,
+              Number.isFinite(tensionParam) ? tensionParam : tax.tension,
+              Number.isFinite(valenceParam) ? valenceParam : tax.valence
+            ),
+            resolvedQuery: `${tax.nameRu} · ${rawGameParam && rawGameParam !== 'Ожидание игры' ? rawGameParam : musicBrief || tax.shortRu}`,
+            tracks: merged.slice(0, 20),
+          });
+        }
+      }
+    }
+
+    // audioMode === 'game-vibe': Procedural Game Soundtrack Discovery
       let archetypeKey = 'universal';
 
       if (
@@ -650,7 +756,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Shuffle for variety
-    const randomized = [...uniqueTracks].sort(() => Math.random() - 0.5);
+    const randomized = filterAndDeduplicateTracks(
+      [...uniqueTracks].sort(() => Math.random() - 0.5),
+      excludeIdsParam
+    );
 
     if (randomized.length > 0) {
       const displayLabel =

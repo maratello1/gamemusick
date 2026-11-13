@@ -22,12 +22,15 @@ __pycache__/
 data/*.jsonl
 data/live-sensor.json
 data/live-dialogue.json
+data/live-gsi.json
+data/dialogue-ocr.json
 data/scene-director.json
 data/session-flight-log.jsonl
 data/session-summary.json
 data/neural-evolution.json*
 data/app-state.json
 data/yt-cache.json
+desktop/resource.res
 
 # misc
 .DS_Store

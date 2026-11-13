@@ -1,4 +1,4 @@
-import { TrackItem, VibeStateId } from './vibe';
+import { CustomSceneRule, TrackItem, VibeStateId } from './vibe';
 
 export type SceneBucketId =
   | 'EXPLORE'
@@ -83,6 +83,7 @@ export interface ScenePlaylist {
   createdAt: number;
   updatedAt: number;
   scenes: Record<SceneBucketId, TrackItem[]>;
+  customScenes?: CustomSceneRule[];
 }
 
 export interface UserAccount {

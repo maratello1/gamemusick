@@ -12,6 +12,7 @@ const ROUTES = [
   '/api/userscript',
   '/api/accounts',
   '/api/integrations',
+  '/api/gsi',
 ];
 
 function fetchUrl(path) {
