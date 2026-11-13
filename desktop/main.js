@@ -57,34 +57,54 @@ function checkGameVibeReady() {
   });
 }
 
-function startBackgroundSensors() {
-  // 1. Local AI Scene, Boss & Subtitle Director (Python)
-  const directorScript = path.join(__dirname, 'local_director.py');
-  if (fs.existsSync(directorScript)) {
-    try {
-      directorProcess = spawn('python', [directorScript], {
-        cwd: ROOT_DIR,
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } catch {
-      // ignore if python not installed
-    }
-  }
+let directorRestartCount = 0;
+let sensorRestartCount = 0;
 
-  // 2. 50Hz Win32 Sensor + CoreAudio Game Ducking
-  const sensorExe = path.join(__dirname, 'interactive_sensor.exe');
-  if (fs.existsSync(sensorExe)) {
-    try {
-      sensorProcess = spawn(sensorExe, [], {
-        cwd: ROOT_DIR,
-        stdio: 'ignore',
-        windowsHide: true,
-      });
-    } catch {
-      // ignore
-    }
+function spawnWatchedDirector() {
+  if (isQuitting) return;
+  const directorScript = path.join(__dirname, 'local_director.py');
+  if (!fs.existsSync(directorScript)) return;
+  try {
+    directorProcess = spawn('python', [directorScript], {
+      cwd: ROOT_DIR,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    directorProcess.on('exit', () => {
+      if (!isQuitting && directorRestartCount < 6) {
+        directorRestartCount += 1;
+        setTimeout(spawnWatchedDirector, Math.min(15000, 1500 * directorRestartCount));
+      }
+    });
+  } catch {
+    // ignore if python not installed
   }
+}
+
+function spawnWatchedSensor() {
+  if (isQuitting) return;
+  const sensorExe = path.join(__dirname, 'interactive_sensor.exe');
+  if (!fs.existsSync(sensorExe)) return;
+  try {
+    sensorProcess = spawn(sensorExe, [], {
+      cwd: ROOT_DIR,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    sensorProcess.on('exit', () => {
+      if (!isQuitting && sensorRestartCount < 6) {
+        sensorRestartCount += 1;
+        setTimeout(spawnWatchedSensor, Math.min(15000, 1500 * sensorRestartCount));
+      }
+    });
+  } catch {
+    // ignore
+  }
+}
+
+function startBackgroundSensors() {
+  spawnWatchedDirector();
+  spawnWatchedSensor();
 }
 
 async function ensureBackendServer() {
@@ -138,12 +158,12 @@ function createSystemTray() {
     const iconPath = fs.existsSync(ICON_ICO) ? ICON_ICO : ICON_PNG;
     const image = nativeImage.createFromPath(iconPath);
     tray = new Tray(image);
-    tray.setToolTip('GameMusick v2.0 — AI Game Soundtrack Director');
+    tray.setToolTip('GameMusick v3.1 — AI Game Soundtrack Director');
 
     const updateTrayMenu = () => {
       const contextMenu = Menu.buildFromTemplate([
         {
-          label: 'Открыть GameMusick v2.0',
+          label: 'Открыть GameMusick v3.1',
           click: () => {
             if (mainWindow) {
               mainWindow.show();
@@ -226,7 +246,7 @@ async function createDesktopWindow() {
     height: 920,
     minWidth: 390,
     minHeight: 560,
-    title: 'GameMusick v2.0 — Autonomous AI Soundtrack Director',
+    title: 'GameMusick v3.1 — Autonomous AI Soundtrack Director',
     icon: iconPath,
     backgroundColor: '#080809',
     frame: false,
@@ -351,9 +371,16 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   for (const proc of [serverProcess, directorProcess, sensorProcess]) {
-    if (proc) {
+    if (proc && proc.pid) {
       try {
-        proc.kill();
+        if (process.platform === 'win32') {
+          require('child_process').execSync(`taskkill /PID ${proc.pid} /T /F`, {
+            stdio: 'ignore',
+            windowsHide: true,
+          });
+        } else {
+          proc.kill();
+        }
       } catch {}
     }
   }

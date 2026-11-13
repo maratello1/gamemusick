@@ -20,6 +20,7 @@ function formatDurationMs(ms?: number): string {
 }
 
 import { getNeuralBrainState } from '@/lib/neural-evolution';
+import { applyLearnedTrackRanking } from '@/lib/track-ranking';
 
 function interleaveBatches<T>(batches: T[][]): T[] {
   const maxLen = batches.reduce((m, b) => Math.max(m, b.length), 0);
@@ -32,7 +33,11 @@ function interleaveBatches<T>(batches: T[][]): T[] {
   return result;
 }
 
-function filterAndDeduplicateTracks(tracks: TrackItem[], excludeIdsParam: string[]): TrackItem[] {
+function filterAndDeduplicateTracks(
+  tracks: TrackItem[],
+  excludeIdsParam: string[],
+  gameProcess = ''
+): TrackItem[] {
   let disliked: string[] = [];
   try {
     disliked = getNeuralBrainState().dislikedTrackIds || [];
@@ -50,7 +55,7 @@ function filterAndDeduplicateTracks(tracks: TrackItem[], excludeIdsParam: string
     seenKeys.add(key);
     out.push(t);
   }
-  return out;
+  return applyLearnedTrackRanking(out, { excludeIds: excluded, gameProcess });
 }
 
 // Procedural Atmosphere Archetypes: Infinite dynamic variety, ZERO hardcoded fixed song lists!
@@ -505,7 +510,7 @@ export async function GET(request: NextRequest) {
         const fetched = await Promise.all(
           customSemanticSeeds.slice(0, 4).map((s) => searchYouTubeDirect(s, vibe, 8))
         );
-        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam);
+        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam, gameClean || rawGameParam);
         if (merged.length > 0) {
           const tax = getSceneTaxonomy(sceneTag);
           const label = `${tax.nameRu} (${selectedArtistsList.slice(0, 2).join(', ') || 'Мои артисты'})`;
@@ -599,7 +604,7 @@ export async function GET(request: NextRequest) {
         const fetched = await Promise.all(
           semanticQueries.slice(0, 3).map((qStr) => searchYouTubeDirect(qStr, vibe, 8))
         );
-        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam);
+        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam, gameClean || rawGameParam);
         if (merged.length >= 3) {
           const label = `${tax.nameRu} · ${rawGameParam && rawGameParam !== 'Ожидание игры' ? rawGameParam : musicBrief || tax.shortRu}`;
           return NextResponse.json({

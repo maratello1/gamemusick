@@ -1,7 +1,7 @@
 {
   "name": "gamevibe",
-  "version": "3.0.0",
-  "description": "GameMusick v3.0 — Hybrid AI Sound Director (50Hz Rust + WinRT OCR + Dota 2/CS2 GSI + Gemini/Ollama/OpenRouter Vision)",
+  "version": "3.1.0",
+  "description": "GameMusick v3.1 — Native 6-Game Bridges (Valve GSI + LoL/SC2/PoE/Minecraft), 50Hz CoreAudio WASAPI Sensor, WinRT OCR & Hybrid AI Director",
   "main": "desktop/main.js",
   "private": true,
   "scripts": {

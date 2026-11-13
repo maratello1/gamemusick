@@ -1,10 +1,10 @@
 =====================================================
- GameMusick Interactive Telemetry & GSI Sensor v3.0
- Hybrid 50Hz Rust + WinRT OCR + GSI + Multi-AI Vision
+ GameMusick Interactive Telemetry & Native Bridges Sensor v3.1
+ 50Hz CoreAudio WASAPI + WinRT OCR + 6-Game Bridges + Multi-AI Vision
 =====================================================
 
 1. ЧТО ВХОДИТ В АРХИВ:
-- interactive_sensor.exe                 — нативный 50 Гц сенсор (Rust Win32)
+- interactive_sensor.exe                 — нативный 50 Гц сенсор (Rust Win32 32x18 + CoreAudio WASAPI)
 - local_director.py                      — гибридный ИИ-режиссёр + WinRT OCR + Gemini/Ollama/OpenRouter
 - vision_director.py                     — автономный агент анализа сцен через Gemini 3.5 Flash Lite
 - gamestate_integration_gamemusick.cfg   — официальный конфиг Valve GSI для Dota 2

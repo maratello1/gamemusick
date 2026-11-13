@@ -132,6 +132,12 @@ export interface TelemetrySnapshot {
   brightness?: number;
   windowTitle?: string;
   sensorMode?: string;
+  gameAudioPeak?: number;
+  captureBlocked?: boolean;
+  warmth?: number;
+  coolness?: number;
+  saturation?: number;
+  nativeBridgeSource?: string;
   dialogueText?: string;
   dialogueEmotion?: string;
   dialogueLabel?: string;
@@ -196,7 +202,7 @@ export interface DirectorScene {
 
 export interface GsiStateSnapshot {
   timestamp: number;
-  game: 'dota2' | 'cs2';
+  game: 'dota2' | 'cs2' | 'lol' | 'sc2' | 'poe' | 'minecraft';
   gameTitle: string;
   providerAppId: number;
   phase: string;

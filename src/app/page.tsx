@@ -53,6 +53,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { FALLBACK_REAL_TRACKS, VIBE_STATES } from '@/lib/defaultData';
+import { stemSynth } from '@/lib/stemSynth';
 import {
   CustomSceneRule,
   DirectorScene,
@@ -380,6 +381,14 @@ export default function GameVibeSpotifyApp() {
       cs2Installed: boolean;
       cfgFileName?: string;
     } | null;
+    bridges?: {
+      lolEndpoint?: string;
+      sc2Endpoint?: string;
+      poeLogFound?: boolean;
+      poeLogPath?: string | null;
+      minecraftLogFound?: boolean;
+      minecraftLogPath?: string | null;
+    } | null;
     cfgSamples: { dota2: string; cs2: string };
   } | null>(null);
   const [installingGsi, setInstallingGsi] = useState<boolean>(false);
@@ -396,6 +405,7 @@ export default function GameVibeSpotifyApp() {
           gsiActive: Boolean(data.gsiActive),
           gsi: data.gsi || null,
           steam: data.steam || null,
+          bridges: data.bridges || null,
           cfgSamples: data.cfgSamples || { dota2: '', cs2: '' },
         });
       }
@@ -596,7 +606,12 @@ export default function GameVibeSpotifyApp() {
   const ytPlayerRef = useRef<any>(null);
   const ytPlayerReadyRef = useRef<boolean>(false);
   const pendingVideoIdRef = useRef<string>('');
-  const skipTrackRef = useRef<(dir?: 1 | -1) => void>(() => {});
+  const skipTrackRef = useRef<(dir?: 1 | -1, opts?: { suppressAiPenalty?: boolean }) => void>(() => {});
+  const playGenerationRef = useRef<number>(0);
+  const consecutiveYtFailuresRef = useRef<number>(0);
+  const isStemFallbackActiveRef = useRef<boolean>(false);
+  const localTracksRef = useRef<TrackItem[]>([]);
+  const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
   const activeVibeRef = useRef<VibeStateId>('EXPLORE');
   const activeSceneTagRef = useRef<string>('standby');
   const [activeSceneTag, setActiveSceneTag] = useState<string>('standby');
@@ -889,6 +904,9 @@ export default function GameVibeSpotifyApp() {
       track: TrackItem,
       options?: { resumeSec?: number; skipCrossfade?: boolean }
     ) => {
+      // Cancel any earlier concurrent fade ramp
+      const playGen = ++playGenerationRef.current;
+
       // 0. Save current EXPLORE track timecode before switching to Combat/Boss/Drama
       const prevTrack = currentTrackRef.current;
       if (
@@ -942,9 +960,11 @@ export default function GameVibeSpotifyApp() {
         try {
           const steps = [0.7, 0.45, 0.2, 0.08];
           for (const factor of steps) {
+            if (playGen !== playGenerationRef.current) return;
             ytPlayerRef.current.setVolume(Math.max(4, Math.round(targetVol * factor)));
-            await new Promise((r) => setTimeout(r, 70));
+            await new Promise((r) => setTimeout(r, 65));
           }
+          if (playGen !== playGenerationRef.current) return;
         } catch {
           // ignore
         }
@@ -990,6 +1010,8 @@ export default function GameVibeSpotifyApp() {
           track.previewUrl.startsWith('file:') ||
           track.localPath)
       ) {
+        isStemFallbackActiveRef.current = false;
+        stemSynth.stop();
         if (ytPlayerRef.current?.pauseVideo) {
           ytPlayerRef.current.pauseVideo();
         }
@@ -1011,6 +1033,7 @@ export default function GameVibeSpotifyApp() {
               track.artist
             )}&title=${encodeURIComponent(track.title)}`
           );
+          if (playGen !== playGenerationRef.current) return;
           if (res.ok) {
             const d = await res.json();
             if (d.videoId) {
@@ -1023,7 +1046,11 @@ export default function GameVibeSpotifyApp() {
         }
       }
 
+      if (playGen !== playGenerationRef.current) return;
+
       if (vId) {
+        isStemFallbackActiveRef.current = false;
+        stemSynth.stop();
         if (audioRef.current) audioRef.current.pause();
         if (ytPlayerRef.current?.loadVideoById) {
           if (startSec > 0) {
@@ -1038,10 +1065,11 @@ export default function GameVibeSpotifyApp() {
           if (crossfadeEnabledRef.current && !options?.skipCrossfade && !isMuted) {
             ytPlayerRef.current.setVolume(Math.max(6, Math.round(targetVol * 0.15)));
             ytPlayerRef.current.playVideo();
-            // Smooth fade-in ramp
+            // Smooth fade-in ramp guarded against concurrent track switches
             const rampSteps = [0.35, 0.55, 0.78, 1.0];
             for (const factor of rampSteps) {
-              await new Promise((r) => setTimeout(r, 95));
+              await new Promise((r) => setTimeout(r, 90));
+              if (playGen !== playGenerationRef.current) return;
               try {
                 ytPlayerRef.current?.setVolume(Math.round(targetVol * factor));
               } catch {
@@ -1055,6 +1083,14 @@ export default function GameVibeSpotifyApp() {
         } else {
           pendingVideoIdRef.current = vId;
         }
+      } else if (localTracksRef.current.length > 0) {
+        const localFallback = localTracksRef.current[0];
+        executePlayTrack(localFallback, { skipCrossfade: true });
+      } else {
+        isStemFallbackActiveRef.current = true;
+        stemSynth.start(track.vibe, Math.max(0.15, targetVol / 100));
+        setPlaybackNotice('Адаптивный синтезатор (офлайн/не удалось загрузить видео)');
+        setTimeout(() => setPlaybackNotice(null), 4000);
       }
     },
     [isMuted, volume]
@@ -1716,6 +1752,11 @@ export default function GameVibeSpotifyApp() {
                   skipTrackRef.current(1);
                 }
               } else if (event.data === 1) {
+                consecutiveYtFailuresRef.current = 0;
+                if (isStemFallbackActiveRef.current) {
+                  isStemFallbackActiveRef.current = false;
+                  stemSynth.stop();
+                }
                 setIsPlaying(true);
                 isPlayingRef.current = true;
               } else if (event.data === 2) {
@@ -1725,12 +1766,37 @@ export default function GameVibeSpotifyApp() {
             },
             onError: (err: { data: number }) => {
               console.warn('[GameMusick YouTube Player] Playback error code:', err?.data);
+              const failed = currentTrackRef.current;
+              if (failed) {
+                excludedTrackIdsRef.current = [
+                  failed.id,
+                  ...(failed.videoId ? [failed.videoId] : []),
+                  ...excludedTrackIdsRef.current.filter(
+                    (x) => x !== failed.id && x !== failed.videoId
+                  ),
+                ].slice(0, 120);
+              }
+              consecutiveYtFailuresRef.current += 1;
+              if (consecutiveYtFailuresRef.current >= 3) {
+                consecutiveYtFailuresRef.current = 0;
+                if (localTracksRef.current.length > 0) {
+                  executePlayTrack(localTracksRef.current[0], { skipCrossfade: true });
+                } else {
+                  isStemFallbackActiveRef.current = true;
+                  stemSynth.start(activeVibeRef.current, Math.max(0.15, volume / 100));
+                  setPlaybackNotice('Включён резервный адаптивный синтезатор (YouTube недоступен)');
+                  setTimeout(() => setPlaybackNotice(null), 4000);
+                }
+                return;
+              }
               const now = Date.now();
-              if (now - lastAutoSkipTimeRef.current > 3000) {
+              if (now - lastAutoSkipTimeRef.current > 800) {
                 lastAutoSkipTimeRef.current = now;
+                setPlaybackNotice('Трек недоступен (DMCA/embed) — переключаю...');
+                setTimeout(() => setPlaybackNotice(null), 2200);
                 setTimeout(() => {
-                  skipTrackRef.current(1);
-                }, 1200);
+                  skipTrackRef.current(1, { suppressAiPenalty: true });
+                }, 350);
               }
             },
           },
@@ -1805,6 +1871,10 @@ export default function GameVibeSpotifyApp() {
     }
     if (audioRef.current) {
       audioRef.current.volume = effectiveVol / 100;
+    }
+    if (isStemFallbackActiveRef.current) {
+      stemSynth.setVibe(activeVibe);
+      stemSynth.setVolume(effectiveVol / 100);
     }
   }, [
     volume,
@@ -2477,12 +2547,16 @@ export default function GameVibeSpotifyApp() {
     }
   };
 
+  useEffect(() => {
+    localTracksRef.current = localTracks;
+  }, [localTracks]);
+
   const playSpecificTrack = (track: TrackItem) => {
     executePlayTrack(track);
   };
 
   const skipTrack = useCallback(
-    (dir: 1 | -1 = 1) => {
+    (dir: 1 | -1 = 1, opts?: { suppressAiPenalty?: boolean }) => {
       const activePool =
         activeSection === 'search' && searchResults.length > 0
           ? searchResults
@@ -2492,9 +2566,9 @@ export default function GameVibeSpotifyApp() {
       const idx = activePool.findIndex((t) => t.id === currentTrackRef.current?.id);
       const nextIdx = idx + dir;
 
-      // Continuous AI Reinforcement: Record listen retention or fast skip
+      // Continuous AI Reinforcement: Record listen retention or deliberate skip (skip on DMCA/embed errors)
       const playDuration = (Date.now() - currentTrackStartTimeRef.current) / 1000;
-      if (currentTrackRef.current) {
+      if (currentTrackRef.current && !opts?.suppressAiPenalty) {
         const isFastSkip = playDuration < 20;
         const isCompletion = playDuration > 120;
         fetch('/api/presets', {
@@ -2530,14 +2604,14 @@ export default function GameVibeSpotifyApp() {
 
       const wrappedIdx = (nextIdx + activePool.length) % activePool.length;
       const nextTrack = activePool[wrappedIdx];
-      recentlyPlayedIdsRef.current = [nextTrack.id, ...recentlyPlayedIdsRef.current.filter((id) => id !== nextTrack.id)].slice(0, 8);
+      recentlyPlayedIdsRef.current = [nextTrack.id, ...recentlyPlayedIdsRef.current.filter((id) => id !== nextTrack.id)].slice(0, 50);
       executePlayTrack(nextTrack);
 
       if (systemMediaSync) {
         fetch('/api/system-media', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: dir === 1 ? 'next' : 'prev' }),
+          body: JSON.stringify({ command: dir === 1 ? 'NEXT_TRACK' : 'PREV_TRACK' }),
         }).catch(() => {});
       }
     },
@@ -2590,6 +2664,10 @@ export default function GameVibeSpotifyApp() {
         }
         if (audioRef.current) {
           audioRef.current.pause();
+        }
+        if (isStemFallbackActiveRef.current) {
+          isStemFallbackActiveRef.current = false;
+          stemSynth.stop();
         }
       }
       return next;
@@ -2758,11 +2836,11 @@ export default function GameVibeSpotifyApp() {
             className="w-4 h-4 rounded-sm shrink-0"
           />
           <span className="text-[11px] font-bold tracking-wider uppercase text-[#EDE9E8] whitespace-nowrap">
-            GameMusick Desktop <span className="text-[#E5384F] font-mono">v3.0</span>
+            GameMusick Desktop <span className="text-[#E5384F] font-mono">v3.1</span>
           </span>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#121014] border border-[#241F25] text-[10px] text-[#A8A0A4] truncate max-w-[260px]">
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#121014] border border-[#241F25] text-[10px] text-[#A8A0A4] whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shrink-0" />
-            <span className="truncate">Сенсор: {telemetry.detectedProcess}</span>
+            <span>Сенсор: {telemetry.detectedProcess}</span>
           </span>
           {telemetry.isOnlineGame && (
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#FF6A00]/15 border border-[#FF6A00]/40 text-[10px] font-semibold text-[#FF6A00] tracking-wide shrink-0">
@@ -4955,16 +5033,16 @@ export default function GameVibeSpotifyApp() {
                   </div>
                 </div>
 
-                {/* 2. Official Game State Integration (Dota 2 & CS2) */}
+                {/* 2. Official Native Game Bridges & State Integration (Zero Memory Read) */}
                 <div className="p-5 rounded-xl bg-[#141215] border border-[#242023] space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="space-y-1 flex-1 min-w-[240px]">
                       <div className="text-sm font-semibold text-[#EDE9E8] flex flex-wrap items-center gap-2">
                         <Radio className="w-4 h-4 text-[#10B981] shrink-0" />
-                        <span>Game State Integration (Dota 2 &amp; CS2)</span>
-                        {gsiStatus?.gsiActive ? (
+                        <span>Native Game Bridges &amp; GSI (6 игр без чтения памяти)</span>
+                        {gsiStatus?.gsiActive || telemetry.nativeBridgeSource ? (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0E241C] text-[#34D399] border border-[#10B981]/40 font-semibold">
-                            LIVE · {gsiStatus.gsi?.game === 'cs2' ? 'CS2' : 'Dota 2'}
+                            LIVE · {telemetry.gsiGame || gsiStatus?.gsi?.game || telemetry.nativeBridgeSource}
                           </span>
                         ) : (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1C211E] text-[#8CE9B5] border border-[#2A3F32] font-normal">
@@ -4973,9 +5051,10 @@ export default function GameVibeSpotifyApp() {
                         )}
                       </div>
                       <p className="text-xs text-[#8C8482] leading-relaxed">
-                        Официальный локальный протокол Valve: Dota 2 и CS2 сами передают в GameMusick точную фазу игры
-                        (главное меню, пик/драфт, закупка, замес, низкое HP, бомба на пленте, смерть/ожидание, победа) —{' '}
-                        <strong>без нейросетей, задержек и лимитов</strong>.
+                        Официальные локальные API и безопасные логи: <strong>Dota 2</strong>, <strong>CS2</strong>,{' '}
+                        <strong>League of Legends (:2999)</strong>, <strong>StarCraft II (:6119)</strong>,{' '}
+                        <strong>Path of Exile 1/2</strong> и <strong>Minecraft</strong> передают точную фазу боя, респавн, драфт и боссов —{' '}
+                        <strong>безопасно для любого античита</strong>.
                       </p>
                     </div>
 
@@ -4994,13 +5073,15 @@ export default function GameVibeSpotifyApp() {
                     </button>
                   </div>
 
-                  {/* Detected Steam libraries status */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-2">
-                      <div>
+                  {/* Detected Steam libraries & Zero-Config Native APIs status */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <div className="font-semibold text-[#EDE9E8]">Dota 2</div>
-                        <div className="text-[11px] text-[#8C8482] break-all">
-                          {gsiStatus?.steam?.dota2Dir ? gsiStatus.steam.dota2Dir : 'Папка Steam не обнаружена автоматически'}
+                        <div className="text-[11px] text-[#8C8482] break-words [overflow-wrap:anywhere] mt-0.5">
+                          {gsiStatus?.steam?.dota2Dir
+                            ? gsiStatus.steam.dota2Dir.replace(/([\\/])/g, '$1\u200B')
+                            : 'Папка Steam не обнаружена автоматически'}
                         </div>
                       </div>
                       <span
@@ -5014,11 +5095,13 @@ export default function GameVibeSpotifyApp() {
                       </span>
                     </div>
 
-                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-2">
-                      <div>
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <div className="font-semibold text-[#EDE9E8]">Counter-Strike 2</div>
-                        <div className="text-[11px] text-[#8C8482] break-all">
-                          {gsiStatus?.steam?.cs2Dir ? gsiStatus.steam.cs2Dir : 'Папка Steam не обнаружена автоматически'}
+                        <div className="text-[11px] text-[#8C8482] break-words [overflow-wrap:anywhere] mt-0.5">
+                          {gsiStatus?.steam?.cs2Dir
+                            ? gsiStatus.steam.cs2Dir.replace(/([\\/])/g, '$1\u200B')
+                            : 'Папка Steam не обнаружена автоматически'}
                         </div>
                       </div>
                       <span
@@ -5030,6 +5113,80 @@ export default function GameVibeSpotifyApp() {
                       >
                         {gsiStatus?.steam?.cs2Installed ? '✓ .cfg стоит' : 'Не установлен'}
                       </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">League of Legends</div>
+                        <div className="text-[11px] text-[#8C8482]">Live Client API (:2999)</div>
+                      </div>
+                      <span className="px-2 py-1 rounded text-[10px] font-semibold bg-[#0E241C] text-[#34D399] border border-[#10B981]/35 shrink-0">
+                        ✓ Авто-мост
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">StarCraft II</div>
+                        <div className="text-[11px] text-[#8C8482]">Client Web API (:6119)</div>
+                      </div>
+                      <span className="px-2 py-1 rounded text-[10px] font-semibold bg-[#0E241C] text-[#34D399] border border-[#10B981]/35 shrink-0">
+                        ✓ Авто-мост
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">Path of Exile 1 / 2</div>
+                        <div className="text-[11px] text-[#8C8482] break-words">
+                          {gsiStatus?.bridges?.poeLogPath ? 'Client.txt подключен' : 'Авточтение лога локаций'}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-semibold shrink-0 ${
+                          gsiStatus?.bridges?.poeLogFound
+                            ? 'bg-[#0E241C] text-[#34D399] border border-[#10B981]/35'
+                            : 'bg-[#1D1A1E] text-[#8CE9B5] border border-[#2A3F32]'
+                        }`}
+                      >
+                        {gsiStatus?.bridges?.poeLogFound ? '✓ Лог найден' : 'Автопоиск'}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-[#EDE9E8]">Minecraft</div>
+                        <div className="text-[11px] text-[#8C8482] break-words">
+                          {gsiStatus?.bridges?.minecraftLogPath ? 'latest.log подключен' : 'Чтение лога биомов/боссов'}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2 py-1 rounded text-[10px] font-semibold shrink-0 ${
+                          gsiStatus?.bridges?.minecraftLogFound
+                            ? 'bg-[#0E241C] text-[#34D399] border border-[#10B981]/35'
+                            : 'bg-[#1D1A1E] text-[#8CE9B5] border border-[#2A3F32]'
+                        }`}
+                      >
+                        {gsiStatus?.bridges?.minecraftLogFound ? '✓ Лог найден' : 'Автопоиск'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Live CoreAudio WASAPI Sensor Telemetry Strip */}
+                  <div className="p-3 rounded-lg bg-[#100F12] border border-[#221E23] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                    <div className="flex items-center gap-2 text-[#C8C0BE]">
+                      <span className="w-2 h-2 rounded-full bg-[#FF6A00]" />
+                      <span>Сенсор v3.1 (32×18 GDI + Windows CoreAudio WASAPI):</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-[#EDE9E8] font-mono">
+                      <span className="px-2 py-0.5 rounded bg-[#1A1619] border border-[#2C242B]">
+                        Аудио-пик игры: {typeof telemetry.gameAudioPeak === 'number' ? `${telemetry.gameAudioPeak}%` : '—'}
+                      </span>
+                      {telemetry.captureBlocked && (
+                        <span className="px-2 py-0.5 rounded bg-[#2D1A12] border border-[#FF6A00]/40 text-[#FF9E4A]">
+                          DX12 Fullscreen (режим APM+Аудио)
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -6018,6 +6175,11 @@ export default function GameVibeSpotifyApp() {
                 <span className="text-xs font-medium text-[#D47A8D] leading-tight">
                   Энергия {telemetry.sceneVector?.energy ?? telemetry.motionDelta}% · Накал {telemetry.sceneVector?.tension ?? Math.round(telemetry.motionDelta * 0.7)}%
                 </span>
+                {typeof telemetry.gameAudioPeak === 'number' && telemetry.gameAudioPeak > 0 && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#1E191E] border border-[#342B34] text-[10px] text-[#EDE9E8] shrink-0">
+                    🔊 {telemetry.gameAudioPeak}%
+                  </span>
+                )}
                 {isDialogueDucked && autoDialogueDucking && (
                   <span className="px-1.5 py-0.5 rounded bg-[#251218] border border-[#6E1D2F] text-[10px] text-[#FF85A0]">
                     🔉 Диалог
@@ -6070,7 +6232,21 @@ export default function GameVibeSpotifyApp() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => handleTrackSceneFeedback(true)}
+                  className="p-2 rounded-lg bg-[#1A171C] hover:bg-[#192B1E] border border-[#2A242C] text-[#8CE9B5] transition"
+                  title="Трек отлично подходит к сцене"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleTrackSceneFeedback(false)}
+                  className="p-2 rounded-lg bg-[#1A171C] hover:bg-[#2F161D] border border-[#2A242C] text-[#FF85A0] transition"
+                  title="Не подходит к сцене (поменять)"
+                >
+                  <ThumbsDown className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => skipTrack(-1)}
                   className="p-2 rounded-lg bg-[#1A171C] hover:bg-[#242027] text-[#EDE9E8] transition"
@@ -6116,6 +6292,12 @@ export default function GameVibeSpotifyApp() {
               })}
             </div>
           </div>
+        </div>
+      )}
+      {playbackNotice && (
+        <div className="fixed bottom-4 right-4 z-50 px-3.5 py-2 rounded-lg bg-[#18141A]/95 border border-[#FF6A00]/40 text-xs text-[#EDE9E8] shadow-xl flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-[#FF6A00] shrink-0" />
+          <span>{playbackNotice}</span>
         </div>
       )}
     </div>

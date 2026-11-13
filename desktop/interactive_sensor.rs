@@ -2,10 +2,55 @@
 // Windows hides the console window automatically via windowsHide: true / -WindowStyle Hidden
 
 use std::env;
+use std::ffi::c_void;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
+use std::sync::Once;
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+struct GUID {
+    data1: u32,
+    data2: u16,
+    data3: u16,
+    data4: [u8; 8],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+struct BITMAPINFOHEADER {
+    bi_size: u32,
+    bi_width: i32,
+    bi_height: i32,
+    bi_planes: u16,
+    bi_bit_count: u16,
+    bi_compression: u32,
+    bi_size_image: u32,
+    bi_xpels_per_meter: i32,
+    bi_ypels_per_meter: i32,
+    bi_clr_used: u32,
+    bi_clr_important: u32,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Default)]
+struct BITMAPINFO {
+    bmi_header: BITMAPINFOHEADER,
+    bmi_colors: [u32; 1],
+}
+
+static SUBSYSTEMS_INIT: Once = Once::new();
+static WASAPI_AUDIO_PEAK: AtomicI32 = AtomicI32::new(0);
+static LAST_CAPTURE_BLOCKED: AtomicBool = AtomicBool::new(false);
+static LAST_WARMTH: AtomicI32 = AtomicI32::new(0);
+static LAST_COOLNESS: AtomicI32 = AtomicI32::new(0);
+static LAST_SATURATION: AtomicI32 = AtomicI32::new(0);
+static LAST_TARGET_PID: AtomicU32 = AtomicU32::new(0);
+static LAST_AUDIO_POLL_TICK: AtomicU32 = AtomicU32::new(0);
+static DPI_AWARE_ENABLED: AtomicBool = AtomicBool::new(false);
 
 #[repr(C)]
 #[derive(Copy, Clone, Default)]
@@ -80,22 +125,47 @@ extern "system" {
     fn CreateCompatibleDC(hdc: isize) -> isize;
     fn CreateCompatibleBitmap(hdc: isize, cx: i32, cy: i32) -> isize;
     fn SelectObject(hdc: isize, h: isize) -> isize;
-    fn BitBlt(
-        hdc: isize,
-        x: i32,
-        y: i32,
-        cx: i32,
-        cy: i32,
-        hdcSrc: isize,
-        x1: i32,
-        y1: i32,
+    fn StretchBlt(
+        hdc_dest: isize,
+        x_dest: i32,
+        y_dest: i32,
+        w_dest: i32,
+        h_dest: i32,
+        hdc_src: isize,
+        x_src: i32,
+        y_src: i32,
+        w_src: i32,
+        h_src: i32,
         rop: u32,
     ) -> i32;
-    fn GetPixel(hdc: isize, x: i32, y: i32) -> u32;
+    fn SetStretchBltMode(hdc: isize, mode: i32) -> i32;
+    fn GetDIBits(
+        hdc: isize,
+        hbm: isize,
+        start: u32,
+        c_lines: u32,
+        lpv_bits: *mut u8,
+        lpbmi: *mut BITMAPINFO,
+        usage: u32,
+    ) -> i32;
     fn DeleteObject(ho: isize) -> i32;
     fn DeleteDC(hdc: isize) -> i32;
 }
 
+#[link(name = "ole32")]
+extern "system" {
+    fn CoInitializeEx(pv_reserved: *mut c_void, dw_co_init: u32) -> i32;
+    fn CoCreateInstance(
+        rclsid: *const GUID,
+        p_unk_outer: *mut c_void,
+        dw_cls_context: u32,
+        riid: *const GUID,
+        ppv: *mut *mut c_void,
+    ) -> i32;
+}
+
+type SetProcessDpiAwarenessContextFn = unsafe extern "system" fn(isize) -> i32;
+type SetProcessDPIAwareFn = unsafe extern "system" fn() -> i32;
 type XInputGetStateFn = unsafe extern "system" fn(u32, *mut XINPUT_STATE) -> u32;
 type GetAsyncKeyStateFn = unsafe extern "system" fn(i32) -> i16;
 type GetCursorPosFn = unsafe extern "system" fn(*mut POINT) -> i32;
@@ -181,13 +251,11 @@ fn is_denylisted(proc_name: &str) -> bool {
     DENYLIST.iter().any(|&d| stem == d || lower.contains(d))
 }
 
-fn get_process_name(hwnd: isize) -> String {
+fn get_process_name_by_pid(pid: u32) -> String {
+    if pid == 0 {
+        return String::new();
+    }
     unsafe {
-        let mut pid: u32 = 0;
-        GetWindowThreadProcessId(hwnd, &mut pid);
-        if pid == 0 {
-            return String::new();
-        }
         let h_proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if h_proc == 0 {
             return String::new();
@@ -208,6 +276,17 @@ fn get_process_name(hwnd: isize) -> String {
             }
         }
         String::new()
+    }
+}
+
+fn get_process_name(hwnd: isize) -> String {
+    unsafe {
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid != 0 {
+            LAST_TARGET_PID.store(pid, Ordering::Relaxed);
+        }
+        get_process_name_by_pid(pid)
     }
 }
 
@@ -236,43 +315,55 @@ struct FoundGame {
     rect: RECT,
 }
 
+fn inspect_window_as_game(hwnd: isize) -> Option<FoundGame> {
+    if hwnd == 0 {
+        return None;
+    }
+    unsafe {
+        if IsWindowVisible(hwnd) == 0 {
+            return None;
+        }
+        let mut rect = RECT::default();
+        if GetWindowRect(hwnd, &mut rect) == 0 {
+            return None;
+        }
+        let w = rect.right - rect.left;
+        let h = rect.bottom - rect.top;
+        if w < 300 || h < 200 {
+            return None;
+        }
+
+        let proc = get_process_name(hwnd);
+        if proc.is_empty() || is_denylisted(&proc) {
+            return None;
+        }
+
+        let title = get_window_title(hwnd);
+        let title_lower = title.to_lowercase();
+        if title_lower.contains("overlay")
+            || title_lower.contains("nvidia")
+            || title_lower.contains("geforce")
+            || title_lower.contains("settings")
+        {
+            return None;
+        }
+
+        Some(FoundGame {
+            hwnd,
+            proc,
+            title,
+            rect,
+        })
+    }
+}
+
 unsafe extern "system" fn enum_game_window_cb(hwnd: isize, lparam: isize) -> i32 {
     let out = &mut *(lparam as *mut Option<FoundGame>);
-    if IsWindowVisible(hwnd) == 0 {
-        return 1;
+    if let Some(game) = inspect_window_as_game(hwnd) {
+        *out = Some(game);
+        return 0; // stop enumeration
     }
-    let mut rect = RECT::default();
-    if GetWindowRect(hwnd, &mut rect) == 0 {
-        return 1;
-    }
-    let w = rect.right - rect.left;
-    let h = rect.bottom - rect.top;
-    if w < 300 || h < 200 {
-        return 1;
-    }
-
-    let proc = get_process_name(hwnd);
-    if proc.is_empty() || is_denylisted(&proc) {
-        return 1;
-    }
-
-    let title = get_window_title(hwnd);
-    let title_lower = title.to_lowercase();
-    if title_lower.contains("overlay")
-        || title_lower.contains("nvidia")
-        || title_lower.contains("geforce")
-        || title_lower.contains("settings")
-    {
-        return 1;
-    }
-
-    *out = Some(FoundGame {
-        hwnd,
-        proc,
-        title,
-        rect,
-    });
-    0 // stop enumeration
+    1
 }
 
 fn find_running_game() -> Option<FoundGame> {
@@ -281,12 +372,286 @@ fn find_running_game() -> Option<FoundGame> {
         if h_desk != 0 {
             let _ = SetThreadDesktop(h_desk);
         }
+        // Foreground window takes strict priority over background Z-order windows
+        let fg = GetForegroundWindow();
+        if let Some(fg_game) = inspect_window_as_game(fg) {
+            return Some(fg_game);
+        }
     }
     let mut found: Option<FoundGame> = None;
     unsafe {
         EnumWindows(enum_game_window_cb, &mut found as *mut _ as isize);
     }
     found
+}
+
+fn enable_per_monitor_dpi_awareness() {
+    unsafe {
+        let h_user32 = LoadLibraryA(b"user32.dll\0".as_ptr());
+        if h_user32 != 0 {
+            let p_ctx = GetProcAddress(h_user32, b"SetProcessDpiAwarenessContext\0".as_ptr());
+            if p_ctx != 0 {
+                let func: SetProcessDpiAwarenessContextFn = std::mem::transmute(p_ctx);
+                // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
+                if func(-4) != 0 || func(-3) != 0 {
+                    DPI_AWARE_ENABLED.store(true, Ordering::Relaxed);
+                    return;
+                }
+            }
+            let p_aware = GetProcAddress(h_user32, b"SetProcessDPIAware\0".as_ptr());
+            if p_aware != 0 {
+                let func: SetProcessDPIAwareFn = std::mem::transmute(p_aware);
+                if func() != 0 {
+                    DPI_AWARE_ENABLED.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+}
+
+fn init_sensor_subsystems() {
+    SUBSYSTEMS_INIT.call_once(|| {
+        enable_per_monitor_dpi_awareness();
+        unsafe {
+            // COINIT_MULTITHREADED = 0
+            let _ = CoInitializeEx(std::ptr::null_mut(), 0);
+        }
+    });
+}
+
+const CLSID_MM_DEVICE_ENUMERATOR: GUID = GUID {
+    data1: 0xBCDE0395,
+    data2: 0xE52F,
+    data3: 0x467C,
+    data4: [0x8E, 0x3D, 0xC4, 0x57, 0x92, 0x91, 0x69, 0x2E],
+};
+
+const IID_IMM_DEVICE_ENUMERATOR: GUID = GUID {
+    data1: 0xA95664D2,
+    data2: 0x9614,
+    data3: 0x4F35,
+    data4: [0xA7, 0x46, 0xDE, 0x8D, 0xB6, 0x36, 0x17, 0xE6],
+};
+
+const IID_IAUDIO_SESSION_MANAGER2: GUID = GUID {
+    data1: 0x77AA99A0,
+    data2: 0x1BD6,
+    data3: 0x484F,
+    data4: [0x8B, 0xC7, 0x2C, 0x65, 0x4C, 0x9A, 0x9B, 0x6F],
+};
+
+const IID_IAUDIO_SESSION_CONTROL2: GUID = GUID {
+    data1: 0xBFB7FF88,
+    data2: 0x7239,
+    data3: 0x4FC9,
+    data4: [0x8F, 0xA2, 0x07, 0xC9, 0x50, 0xBE, 0x9C, 0x6D],
+};
+
+const IID_IAUDIO_METER_INFORMATION: GUID = GUID {
+    data1: 0xC02216F6,
+    data2: 0x8C67,
+    data3: 0x4B5B,
+    data4: [0x9D, 0x00, 0xD0, 0x08, 0xE7, 0x3E, 0x00, 0x64],
+};
+
+#[inline]
+unsafe fn com_vtbl(obj: *mut c_void) -> *const *const c_void {
+    *(obj as *const *const *const c_void)
+}
+
+unsafe fn com_release(obj: *mut c_void) {
+    if obj.is_null() {
+        return;
+    }
+    let fn_ptr = *com_vtbl(obj).add(2);
+    let release_fn: unsafe extern "system" fn(*mut c_void) -> u32 = std::mem::transmute(fn_ptr);
+    release_fn(obj);
+}
+
+unsafe fn com_query_interface(obj: *mut c_void, iid: &GUID) -> *mut c_void {
+    if obj.is_null() {
+        return std::ptr::null_mut();
+    }
+    let fn_ptr = *com_vtbl(obj).add(0);
+    let qi_fn: unsafe extern "system" fn(*mut c_void, *const GUID, *mut *mut c_void) -> i32 =
+        std::mem::transmute(fn_ptr);
+    let mut out: *mut c_void = std::ptr::null_mut();
+    if qi_fn(obj, iid as *const GUID, &mut out) >= 0 {
+        out
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+fn measure_wasapi_game_audio_peak(target_pid: u32) -> Option<i32> {
+    unsafe {
+        let mut enum_dev: *mut c_void = std::ptr::null_mut();
+        // CLSCTX_ALL = 0x17
+        let hr = CoCreateInstance(
+            &CLSID_MM_DEVICE_ENUMERATOR,
+            std::ptr::null_mut(),
+            0x17,
+            &IID_IMM_DEVICE_ENUMERATOR,
+            &mut enum_dev,
+        );
+        if hr < 0 || enum_dev.is_null() {
+            return None;
+        }
+
+        // IMMDeviceEnumerator::GetDefaultAudioEndpoint (slot 4): eRender=0, eMultimedia=1
+        let get_default_fn: unsafe extern "system" fn(
+            *mut c_void,
+            i32,
+            i32,
+            *mut *mut c_void,
+        ) -> i32 = std::mem::transmute(*com_vtbl(enum_dev).add(4));
+        let mut device: *mut c_void = std::ptr::null_mut();
+        let hr_dev = get_default_fn(enum_dev, 0, 1, &mut device);
+        com_release(enum_dev);
+        if hr_dev < 0 || device.is_null() {
+            return None;
+        }
+
+        // IMMDevice::Activate (slot 3)
+        let activate_fn: unsafe extern "system" fn(
+            *mut c_void,
+            *const GUID,
+            u32,
+            *mut c_void,
+            *mut *mut c_void,
+        ) -> i32 = std::mem::transmute(*com_vtbl(device).add(3));
+        let mut mgr2: *mut c_void = std::ptr::null_mut();
+        let hr_act = activate_fn(
+            device,
+            &IID_IAUDIO_SESSION_MANAGER2,
+            0x17,
+            std::ptr::null_mut(),
+            &mut mgr2,
+        );
+        com_release(device);
+        if hr_act < 0 || mgr2.is_null() {
+            return None;
+        }
+
+        // IAudioSessionManager2::GetSessionEnumerator (slot 5)
+        let get_enum_fn: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> i32 =
+            std::mem::transmute(*com_vtbl(mgr2).add(5));
+        let mut sess_enum: *mut c_void = std::ptr::null_mut();
+        let hr_en = get_enum_fn(mgr2, &mut sess_enum);
+        com_release(mgr2);
+        if hr_en < 0 || sess_enum.is_null() {
+            return None;
+        }
+
+        // IAudioSessionEnumerator::GetCount (slot 3) & GetSession (slot 4)
+        let get_count_fn: unsafe extern "system" fn(*mut c_void, *mut i32) -> i32 =
+            std::mem::transmute(*com_vtbl(sess_enum).add(3));
+        let get_session_fn: unsafe extern "system" fn(*mut c_void, i32, *mut *mut c_void) -> i32 =
+            std::mem::transmute(*com_vtbl(sess_enum).add(4));
+
+        let mut count: i32 = 0;
+        if get_count_fn(sess_enum, &mut count) < 0 || count <= 0 {
+            com_release(sess_enum);
+            return Some(0);
+        }
+
+        let self_pid = std::process::id();
+        let mut best_target_peak: Option<f32> = None;
+        let mut best_game_peak: f32 = 0.0;
+
+        for idx in 0..count.min(64) {
+            let mut ctrl: *mut c_void = std::ptr::null_mut();
+            if get_session_fn(sess_enum, idx, &mut ctrl) < 0 || ctrl.is_null() {
+                continue;
+            }
+
+            // IAudioSessionControl::GetState (slot 3): 1 == Active
+            let get_state_fn: unsafe extern "system" fn(*mut c_void, *mut i32) -> i32 =
+                std::mem::transmute(*com_vtbl(ctrl).add(3));
+            let mut state: i32 = 0;
+            if get_state_fn(ctrl, &mut state) < 0 || state != 1 {
+                com_release(ctrl);
+                continue;
+            }
+
+            let ctrl2 = com_query_interface(ctrl, &IID_IAUDIO_SESSION_CONTROL2);
+            if ctrl2.is_null() {
+                com_release(ctrl);
+                continue;
+            }
+
+            // IAudioSessionControl2::IsSystemSoundsSession (slot 15): 0 == S_OK (system sounds)
+            let is_sys_fn: unsafe extern "system" fn(*mut c_void) -> i32 =
+                std::mem::transmute(*com_vtbl(ctrl2).add(15));
+            if is_sys_fn(ctrl2) == 0 {
+                com_release(ctrl2);
+                com_release(ctrl);
+                continue;
+            }
+
+            // IAudioSessionControl2::GetProcessId (slot 14)
+            let get_pid_fn: unsafe extern "system" fn(*mut c_void, *mut u32) -> i32 =
+                std::mem::transmute(*com_vtbl(ctrl2).add(14));
+            let mut pid: u32 = 0;
+            let pid_ok = get_pid_fn(ctrl2, &mut pid) >= 0 && pid != 0 && pid != self_pid;
+            com_release(ctrl2);
+            if !pid_ok {
+                com_release(ctrl);
+                continue;
+            }
+
+            let is_target = target_pid != 0 && pid == target_pid;
+            let include = if is_target {
+                true
+            } else {
+                let pname = get_process_name_by_pid(pid);
+                !pname.is_empty() && !is_denylisted(&pname)
+            };
+
+            if include {
+                let meter = com_query_interface(ctrl, &IID_IAUDIO_METER_INFORMATION);
+                if !meter.is_null() {
+                    // IAudioMeterInformation::GetPeakValue (slot 3)
+                    let get_peak_fn: unsafe extern "system" fn(*mut c_void, *mut f32) -> i32 =
+                        std::mem::transmute(*com_vtbl(meter).add(3));
+                    let mut peak: f32 = 0.0;
+                    if get_peak_fn(meter, &mut peak) >= 0 && peak.is_finite() {
+                        let clamped = peak.clamp(0.0, 1.0);
+                        if is_target {
+                            best_target_peak = Some(best_target_peak.unwrap_or(0.0).max(clamped));
+                        } else if clamped > best_game_peak {
+                            best_game_peak = clamped;
+                        }
+                    }
+                    com_release(meter);
+                }
+            }
+
+            com_release(ctrl);
+        }
+
+        com_release(sess_enum);
+        let chosen = best_target_peak.unwrap_or(best_game_peak);
+        Some(((chosen * 100.0).round() as i32).clamp(0, 100))
+    }
+}
+
+fn update_wasapi_peak_throttled() -> i32 {
+    let tick = LAST_AUDIO_POLL_TICK.fetch_add(1, Ordering::Relaxed);
+    if tick % 4 == 0 {
+        let target_pid = LAST_TARGET_PID.load(Ordering::Relaxed);
+        if let Some(raw_peak) = measure_wasapi_game_audio_peak(target_pid) {
+            let prev = WASAPI_AUDIO_PEAK.load(Ordering::Relaxed);
+            // Fast attack, smooth decay so combat booms stay readable
+            let smoothed = if raw_peak >= prev {
+                (raw_peak * 3 + prev) / 4
+            } else {
+                (raw_peak + prev * 2) / 3
+            };
+            WASAPI_AUDIO_PEAK.store(smoothed.clamp(0, 100), Ordering::Relaxed);
+        }
+    }
+    WASAPI_AUDIO_PEAK.load(Ordering::Relaxed)
 }
 
 struct VisualSample {
@@ -297,104 +662,198 @@ struct VisualSample {
 }
 
 fn sample_game_visuals(rect: RECT) -> VisualSample {
+    const W: usize = 32;
+    const H: usize = 18;
+    const TOTAL_PX: usize = W * H;
+
+    let _ = update_wasapi_peak_throttled();
+
     unsafe {
-        let rw = (rect.right - rect.left).max(640);
-        let rh = (rect.bottom - rect.top).max(480);
+        let rw = (rect.right - rect.left).max(320);
+        let rh = (rect.bottom - rect.top).max(200);
         let rx = rect.left;
         let ry = rect.top;
 
         let hdc_screen = GetDC(0);
+        if hdc_screen == 0 {
+            LAST_CAPTURE_BLOCKED.store(true, Ordering::Relaxed);
+            return VisualSample {
+                lumas: [25; 16],
+                red_score: 0,
+                is_letterbox: false,
+                has_boss_hp_bar: false,
+            };
+        }
+
         let hdc_mem = CreateCompatibleDC(hdc_screen);
-        let hbm = CreateCompatibleBitmap(hdc_screen, 1, 1);
+        let hbm = CreateCompatibleBitmap(hdc_screen, W as i32, H as i32);
         let old_obj = SelectObject(hdc_mem, hbm);
 
-        let sample_rgb = |x: i32, y: i32| -> (i32, i32, i32, i32) {
-            BitBlt(hdc_mem, 0, 0, 1, 1, hdc_screen, x, y, SRCCOPY | CAPTUREBLT);
-            let color = GetPixel(hdc_mem, 0, 0);
-            if color == 0xFFFFFFFF {
-                return (20, 20, 20, 20);
-            }
-            let r = (color & 0xFF) as i32;
-            let g = ((color >> 8) & 0xFF) as i32;
-            let b = ((color >> 16) & 0xFF) as i32;
-            let l = ((299 * r + 587 * g + 114 * b) / 2550).clamp(0, 100);
-            (r, g, b, l)
+        // COLORONCOLOR = 3
+        SetStretchBltMode(hdc_mem, 3);
+        let blt_ok = StretchBlt(
+            hdc_mem,
+            0,
+            0,
+            W as i32,
+            H as i32,
+            hdc_screen,
+            rx,
+            ry,
+            rw,
+            rh,
+            SRCCOPY | CAPTUREBLT,
+        );
+
+        let mut bmi = BITMAPINFO::default();
+        bmi.bmi_header.bi_size = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
+        bmi.bmi_header.bi_width = W as i32;
+        bmi.bmi_header.bi_height = -(H as i32); // top-down DIB
+        bmi.bmi_header.bi_planes = 1;
+        bmi.bmi_header.bi_bit_count = 32;
+        bmi.bmi_header.bi_compression = 0; // BI_RGB
+
+        let mut buf = [0u8; TOTAL_PX * 4];
+        let lines = if blt_ok != 0 {
+            GetDIBits(hdc_mem, hbm, 0, H as u32, buf.as_mut_ptr(), &mut bmi, 0)
+        } else {
+            0
         };
-
-        // 1. 16-point grid for optical motion & red alert
-        let xs = [
-            rx + rw / 5,
-            rx + (rw * 2) / 5,
-            rx + (rw * 3) / 5,
-            rx + (rw * 4) / 5,
-        ];
-        let ys = [
-            ry + rh / 5,
-            ry + (rh * 2) / 5,
-            ry + (rh * 3) / 5,
-            ry + (rh * 4) / 5,
-        ];
-
-        let mut lumas = [0i32; 16];
-        let mut red_score = 0i32;
-        let mut idx = 0;
-
-        for &y in ys.iter() {
-            for &x in xs.iter() {
-                let (r, g, b, l) = sample_rgb(x, y);
-                lumas[idx] = l;
-                if r > ((g + b) * 2) / 3 && r > 110 {
-                    red_score += 12;
-                }
-                idx += 1;
-            }
-        }
-
-        // 2. Letterbox 21:9 Cutscene detection (top 2.5% and bottom 97.5% black bars while center is lit)
-        let mut top_bar_luma = 0;
-        let mut bot_bar_luma = 0;
-        for step in 1..=4 {
-            let x = rx + (rw * step) / 5;
-            top_bar_luma += sample_rgb(x, ry + (rh * 25) / 1000).3;
-            bot_bar_luma += sample_rgb(x, ry + (rh * 975) / 1000).3;
-        }
-        top_bar_luma /= 4;
-        bot_bar_luma /= 4;
-        let center_avg: i32 = lumas.iter().sum::<i32>() / 16;
-        let is_letterbox = top_bar_luma <= 3 && bot_bar_luma <= 3 && center_avg >= 10;
-
-        // 3. Boss Health Bar Detection (wide crimson or gold horizontal strip at y=9% or y=86%)
-        let mut has_boss_hp_bar = false;
-        for &y_permil in &[90, 860] {
-            let y = ry + (rh * y_permil) / 1000;
-            let mut hp_hits = 0;
-            for step in 0..12 {
-                let x = rx + (rw * (250 + step * 42)) / 1000;
-                let (r, g, b, _) = sample_rgb(x, y);
-                let is_crimson = r > 135 && g < 55 && b < 55 && (r - g.max(b)) > 85;
-                let is_gold = r > 185 && g > 130 && b < 60 && (r - b) > 120;
-                if is_crimson || is_gold {
-                    hp_hits += 1;
-                }
-            }
-            if hp_hits >= 8 {
-                has_boss_hp_bar = true;
-                break;
-            }
-        }
 
         SelectObject(hdc_mem, old_obj);
         DeleteObject(hbm);
         DeleteDC(hdc_mem);
         ReleaseDC(0, hdc_screen);
 
+        if blt_ok == 0 || lines <= 0 {
+            LAST_CAPTURE_BLOCKED.store(true, Ordering::Relaxed);
+            return VisualSample {
+                lumas: [25; 16],
+                red_score: 0,
+                is_letterbox: false,
+                has_boss_hp_bar: false,
+            };
+        }
+
+        let px_rgb = |x: usize, y: usize| -> (i32, i32, i32, i32) {
+            let off = (y * W + x) * 4;
+            let b = buf[off] as i32;
+            let g = buf[off + 1] as i32;
+            let r = buf[off + 2] as i32;
+            let l = ((299 * r + 587 * g + 114 * b) / 2550).clamp(0, 100);
+            (r, g, b, l)
+        };
+
+        // Detect DX12 exclusive-fullscreen zeroed capture buffer
+        let mut non_zero_pixels = 0i32;
+        let mut red_hits = 0i32;
+        let mut warm_hits = 0i32;
+        let mut cool_hits = 0i32;
+        let mut sat_sum = 0i32;
+
+        // 16-zone grid over center screen (4x4 buckets across 32x18)
+        let mut lumas = [0i32; 16];
+        for row in 0..4 {
+            let y0 = 2 + row * 3;
+            let y1 = (y0 + 3).min(H - 1);
+            for col in 0..4 {
+                let x0 = 2 + col * 7;
+                let x1 = (x0 + 7).min(W - 1);
+                let mut zone_sum = 0i32;
+                let mut zone_cnt = 0i32;
+                for y in y0..=y1 {
+                    for x in x0..=x1 {
+                        let (r, g, b, l) = px_rgb(x, y);
+                        if r > 2 || g > 2 || b > 2 {
+                            non_zero_pixels += 1;
+                        }
+                        let max_c = r.max(g).max(b);
+                        let min_c = r.min(g).min(b);
+                        if max_c > 0 {
+                            sat_sum += ((max_c - min_c) * 100) / max_c;
+                        }
+                        if r > ((g + b) * 2) / 3 && r > 110 {
+                            red_hits += 1;
+                        }
+                        if r > 130 && g >= 65 && b < 95 && r > b + 45 {
+                            warm_hits += 1;
+                        }
+                        if b > 105 && g >= 70 && b > r + 25 {
+                            cool_hits += 1;
+                        }
+                        zone_sum += l;
+                        zone_cnt += 1;
+                    }
+                }
+                lumas[row * 4 + col] = if zone_cnt > 0 { zone_sum / zone_cnt } else { 20 };
+            }
+        }
+
+        let is_blocked = non_zero_pixels == 0;
+        LAST_CAPTURE_BLOCKED.store(is_blocked, Ordering::Relaxed);
+        let grid_total = (4 * 3) * (4 * 7);
+        LAST_WARMTH.store(((warm_hits * 100) / grid_total.max(1)).clamp(0, 100), Ordering::Relaxed);
+        LAST_COOLNESS.store(((cool_hits * 100) / grid_total.max(1)).clamp(0, 100), Ordering::Relaxed);
+        LAST_SATURATION.store((sat_sum / grid_total.max(1)).clamp(0, 100), Ordering::Relaxed);
+
+        let red_score = ((red_hits * 100) / 48).clamp(0, 100);
+
+        // 2. Letterbox 21:9 Cutscene detection (top row y=0 and bottom row y=17 dark while center is lit)
+        let mut top_bar_luma = 0i32;
+        let mut bot_bar_luma = 0i32;
+        for x in 4..28 {
+            top_bar_luma += px_rgb(x, 0).3;
+            bot_bar_luma += px_rgb(x, H - 1).3;
+        }
+        top_bar_luma /= 24;
+        bot_bar_luma /= 24;
+        let center_avg: i32 = lumas.iter().sum::<i32>() / 16;
+        let is_letterbox = !is_blocked && top_bar_luma <= 3 && bot_bar_luma <= 3 && center_avg >= 10;
+
+        // 3. Boss Health Bar Detection (wide crimson/gold horizontal strip at top y=1..2 or bottom y=15..16)
+        let mut has_boss_hp_bar = false;
+        'boss_scan: for &y in &[1usize, 2, 15, 16] {
+            let mut hp_hits = 0;
+            for x in 7..25 {
+                let (r, g, b, _) = px_rgb(x, y);
+                let is_crimson = r > 135 && g < 55 && b < 55 && (r - g.max(b)) > 85;
+                let is_gold = r > 185 && g > 130 && b < 60 && (r - b) > 120;
+                if is_crimson || is_gold {
+                    hp_hits += 1;
+                }
+            }
+            if hp_hits >= 10 {
+                has_boss_hp_bar = true;
+                break 'boss_scan;
+            }
+        }
+
         VisualSample {
             lumas,
-            red_score: red_score.clamp(0, 100),
+            red_score,
             is_letterbox,
             has_boss_hp_bar,
         }
     }
+}
+
+fn enrich_sensor_json(raw: &str) -> String {
+    let audio_peak = WASAPI_AUDIO_PEAK.load(Ordering::Relaxed);
+    let cap_blocked = LAST_CAPTURE_BLOCKED.load(Ordering::Relaxed);
+    let warmth = LAST_WARMTH.load(Ordering::Relaxed);
+    let coolness = LAST_COOLNESS.load(Ordering::Relaxed);
+    let saturation = LAST_SATURATION.load(Ordering::Relaxed);
+    let dpi_aware = DPI_AWARE_ENABLED.load(Ordering::Relaxed);
+    let extra = format!(
+        "\"gameAudioPeak\":{},\"captureBlocked\":{},\"warmth\":{},\"coolness\":{},\"saturation\":{},\"dpiAware\":{},\"version\":\"3.1.0\",\"sensorMode\":\"rust-win32-50hz-wasapi-v31\"",
+        audio_peak,
+        if cap_blocked { "true" } else { "false" },
+        warmth,
+        coolness,
+        saturation,
+        if dpi_aware { "true" } else { "false" }
+    );
+    raw.replacen("\"sensorMode\":\"rust-win32-50hz-neural-synced\"", &extra, 1)
 }
 
 fn now_ms() -> u128 {
@@ -483,6 +942,7 @@ fn is_online_competitive_game(proc: &str) -> bool {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let is_once = args.iter().any(|a| a == "--once");
+    init_sensor_subsystems();
 
     if is_once {
         unsafe {
@@ -956,6 +1416,7 @@ fn main() {
                 if is_respawn_spectating { "true" } else { "false" }
             );
 
+            let json = enrich_sensor_json(&json);
             let _ = fs::write(&out_file, &json);
 
             if is_once {

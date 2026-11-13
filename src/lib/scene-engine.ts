@@ -303,6 +303,11 @@ export interface TelemetryClassificationInput {
   crimsonIndex: number;
   brightness: number;
   lumaVariance?: number;
+  gameAudioPeak?: number;
+  captureBlocked?: boolean;
+  warmth?: number;
+  coolness?: number;
+  saturation?: number;
   cursorTravel?: number;
   attackApm?: number;
   moveApm?: number;
@@ -357,6 +362,11 @@ export function classifyTelemetryToSceneVector(
   const bossThresh = Math.max(66, Math.min(96, input.bossSensitivity || 82));
   const stealthLuma = Math.max(18, Math.min(58, input.stealthLumaThreshold || 38));
   const lumaVar = input.lumaVariance ?? 18;
+  const audioPeak = typeof input.gameAudioPeak === 'number' ? input.gameAudioPeak : -1;
+  const pixelsUsable = !input.captureBlocked;
+  const warmth = input.warmth ?? 0;
+  const audioCombatBoost = audioPeak >= 68 && input.motionDelta >= 22 ? 12 : audioPeak >= 45 && input.motionDelta >= 32 ? 6 : 0;
+  const silentMenuDamp = audioPeak === 0 && input.motionDelta < 20 ? -8 : 0;
   const cursorTravel = input.cursorTravel ?? 0;
   const attackApm = input.attackApm ?? 0;
   const moveApm = input.moveApm ?? 0;
@@ -364,7 +374,10 @@ export function classifyTelemetryToSceneVector(
 
   // Compute raw continuous sensor intensity (0..100)
   const crimsonBoost = input.crimsonIndex >= 18 ? Math.min(24, Math.round(input.crimsonIndex * 0.4)) : 0;
-  const rawEnergy = Math.max(8, Math.min(100, Math.round(input.motionDelta + crimsonBoost)));
+  const rawEnergy = Math.max(
+    8,
+    Math.min(100, Math.round(input.motionDelta + crimsonBoost + audioCombatBoost + silentMenuDamp))
+  );
 
   // Base continuous vector estimated from local vision + input telemetry
   let sceneTag: SceneTagId = input.isOnlineGame ? 'menu_lobby' : 'explore_wander';
@@ -454,7 +467,8 @@ export function classifyTelemetryToSceneVector(
   // 7. Horror dread vs Stealth infiltration
   else if (
     hint === 'HORROR_DREAD' ||
-    (input.brightness <= stealthLuma &&
+    (pixelsUsable &&
+      input.brightness <= stealthLuma &&
       (genreUpper === 'HORROR' || (lumaVar <= 12 && input.brightness < 26) || input.crimsonIndex >= 30) &&
       rawEnergy < combatThresh)
   ) {
@@ -462,7 +476,10 @@ export function classifyTelemetryToSceneVector(
     energy = Math.max(20, Math.min(42, rawEnergy));
     tension = Math.max(76, Math.min(94, 62 + input.crimsonIndex));
     valence = -78;
-  } else if (hint === 'STEALTH' || (input.brightness <= stealthLuma && !input.isOnlineGame)) {
+  } else if (
+    hint === 'STEALTH' ||
+    (pixelsUsable && input.brightness <= stealthLuma && !input.isOnlineGame && warmth < 18)
+  ) {
     sceneTag = 'stealth_infiltrate';
     energy = Math.max(24, Math.min(45, rawEnergy));
     tension = 68;

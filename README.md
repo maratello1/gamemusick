@@ -2,22 +2,36 @@
 
   <img src="public/banner.png" alt="GameMusick Banner" width="100%" style="max-width: 1200px; border-radius: 16px; margin-bottom: 16px;" />
 
-  # GAMEMUSICK v3.0
-  ### Гибридный ИИ-звукорежиссёр для ПК-игр: Dota 2 / CS2 GSI · 50Hz Rust · WinRT OCR · Gemini / Ollama / OpenRouter
+  # GAMEMUSICK v3.1
+  ### Гибридный ИИ-звукорежиссёр для ПК-игр: Valve GSI · LoL/SC2/PoE/MC Мосты · CoreAudio WASAPI 50Hz · WinRT OCR · Gemini / Ollama / OpenRouter
 
   **GameMusick в реальном времени понимает, что происходит у вас на экране — от тихого меню и стелса до файта с боссом, постановки бомбы или трагической катсцены — и бесшовно подбирает музыку под ваш вкус или атмосферу игры.**
 
-  [![Version](https://img.shields.io/badge/Version-v3.0.0-ff6a00?style=for-the-badge)](https://github.com/maratello1/gamemusick/releases)
+  [![Version](https://img.shields.io/badge/Version-v3.1.0-ff6a00?style=for-the-badge)](https://github.com/maratello1/gamemusick/releases)
   [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11%20(x64)-blue?style=for-the-badge&logo=windows)](https://github.com/maratello1/gamemusick/releases)
-  [![Telemetry](https://img.shields.io/badge/GSI-Dota%202%20%26%20CS2%20Native-10B981?style=for-the-badge)](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive_Game_State_Integration)
-  [![AI](https://img.shields.io/badge/AI-Local%20%7C%20Gemini%203.5%20%7C%20Ollama%20%7C%20OpenRouter-purple?style=for-the-badge)](https://github.com/maratello1/gamemusick)
+  [![Telemetry](https://img.shields.io/badge/Bridges-Dota%202%20%7C%20CS2%20%7C%20LoL%20%7C%20SC2%20%7C%20PoE%20%7C%20MC-10B981?style=for-the-badge)](https://github.com/maratello1/gamemusick)
+  [![AI](https://img.shields.io/badge/AI-Local%20WASAPI%20%7C%20Gemini%203.5%20%7C%20Ollama%20%7C%20OpenRouter-purple?style=for-the-badge)](https://github.com/maratello1/gamemusick)
   [![License](https://img.shields.io/badge/License-MIT%20(100%25%20Free)-emerald?style=for-the-badge)](LICENSE)
 
 </div>
 
 ---
 
-## ⚡ Что нового в GameMusick v3.0
+## ⚡ Что нового в GameMusick v3.1
+
+1. **Нативный сенсор 50 Гц v3.1 (32×18 GDI DIB + Windows CoreAudio WASAPI)**:
+   - В **48 раз меньше обращений к ядру Windows**: один проход `StretchBlt` + `GetDIBits` вместо 48 вызовов `GetPixel`, полная поддержка Per-Monitor DPI масштабирования (125%–200%) и приоритет активного окна.
+   - **Живой аудит звука игры (`gameAudioPeak`)**: чистый COM WASAPI-мониторинг на уровне PID (игнорирует сам плеер и браузер, слышит только звук игры — отличает тихое меню от взрывов и перестрелок!).
+   - **Защита от чёрных кадров DX12 (`captureBlocked`)**: полноэкранный DX12/Vulkan больше не вызывает ложный «хоррор».
+2. **Native Game Bridges 2.0 — 6 игр без чтения памяти**:
+   - **Dota 2 & Counter-Strike 2 (Valve GSI)** + **League of Legends Live Client Data API (`:2999`)** + **StarCraft II Local API (`:6119`)** + **Path of Exile 1/2 (`Client.txt`)** + **Minecraft (`latest.log`)**.
+   - Точное определение лобби, пика/драфта, убежища/города, замесов, арены босса, низкого HP, респавна и победы.
+3. **Неубиваемый аудиодвижок и настоящее самообучение RL**:
+   - Защита кроссфейда от гонок (`playGenerationRef`), моментальный авто-скип битых/DMCA-заблокированных YouTube embed-видео (Error `100/101/150`) без штрафного понижения артиста в ИИ + автоматический переход на локальные треки или процедурный **`stemSynth`** при отсутствии сети.
+   - **Вкус-ранжирование в `/api/ytmusic`**: дослушанные и лайкнутые артисты/жанры поднимаются вверх для конкретной игры, а дизлайки и недоступные видео строго фильтруются.
+   - **Быстрые системные медиа-клавиши**: фоновый Win32 `keybd_event` воркер (`< 10 мс` вместо холодного запуска PowerShell), автоперезапуск упавших сенсоров в Electron и 👍 / 👎 оценки прямо в мини-оверлее **`Alt+M`**.
+
+### Основа архитектуры (v3.0 — сохранена и улучшена в v3.1)
 
 1. **Прощайте «6 жёстких настроений» — встречайте `SceneVector` (15+ семантических тегов)**:
    Вместо грубого деления только на 6 папок движок теперь оценивает непрерывный вектор **`energy / tension / valence`** и **15+ детальных тегов сцен** (`menu_lobby`, `cozy_hub`, `explore_wander`, `vista_wonder`, `horror_dread`, `stealth_infiltrate`, `dialogue_story`, `tragedy_drama`, `respawn_downtime`, `skirmish_combat`, `teamfight_clash`, `chase_escape`, `boss_climax`, `victory_triumph`).
@@ -40,7 +54,7 @@
 
 | Режим | Лучше всего подходит для | Интернет / Ключи | Нагрузка | Точность сцен |
 | :--- | :--- | :---: | :---: | :---: |
-| **1. Valve GSI** *(Dota 2, CS2)* | Киберспорт, рейтинговые матчи, главное меню, бомба/респавн | Не нужны | ~0% CPU | **100% (данные из самой игры)** |
+| **1. Нативные мосты (6 игр)** *(Dota 2, CS2, LoL, SC2, PoE, MC)* | Киберспорт, MOBA, боссы ARPG, главное меню, бомба/респавн | Не нужны | ~0% CPU | **100% (официальные API/логи игры)** |
 | **2. Google Gemini (`3.5-flash-lite`)** | Сюжетные ААА, RPG, инди, хорроры *(Witcher 3, Elden Ring, Cyberpunk, хорроры)* | Нужен бесплатный ключ AI Studio | 0% GPU | **~90–95%** (~3–5 ч/день бесплатно) |
 | **3. Ollama (Локальная VLM)** | Сюжетные игры без интернета и без суточных лимитов | Нет (всё на вашем ПК) | ~2–4 ГБ VRAM | **~85–90%** |
 | **4. Локальный 50 Гц + WinRT OCR** | Слабые ПК, шутеры, диалоги с субтитрами, быстрый старт без настроек | Не нужны | < 1% CPU | **~75–85%** |
@@ -50,10 +64,13 @@
 
 ## 🛠️ Подробная инструкция по настройке каждого режима
 
-### Вариант 1: Dota 2 и Counter-Strike 2 через Valve GSI (Рекомендуется!)
+### Вариант 1: Нативные мосты (Dota 2, CS2, LoL, StarCraft II, Path of Exile 1/2, Minecraft)
+
 Никаких API-ключей и нейросетей не нужно — игры сами отдают точное состояние:
+- **League of Legends / StarCraft II / Path of Exile 1-2 / Minecraft** подключаются **автоматически** без конфигов (локальные API `:2999`, `:6119` и безопасное чтение конца логов `Client.txt` / `latest.log`).
+- Для **Dota 2** и **Counter-Strike 2** используется официальный Valve GSI:
 1. Запустите **GameMusick** и откройте вкладку **«Связь с плеерами»**.
-2. В блоке **«Game State Integration (Dota 2 & CS2)»** нажмите **«Автоустановить GSI в Steam (1 клик)»**.
+2. В блоке **«Native Game Bridges & GSI (6 игр без чтения памяти)»** нажмите **«Автоустановить GSI в Steam (1 клик)»**.
    - GameMusick автоматически найдёт Steam через реестр Windows + `libraryfolders.vdf` и создаст файл `gamestate_integration_gamemusick.cfg`.
 3. **Если игра установлена в нестандартную папку** — установите конфиг вручную:
    - В том же блоке нажмите **«Ручная установка .cfg» -> «Копировать .cfg»** (или возьмите готовые файлы из папки `desktop/` репозитория):
@@ -119,7 +136,7 @@
 ## 🚀 Запуск приложения (2 способа)
 
 ### Способ 1: Готовый пакет сенсора из Releases
-Скачайте последний архив `GameMusick-Sensor-v3.0-Windows-x64.zip` из раздела [**Releases**](https://github.com/maratello1/gamemusick/releases) *(внутри сенсор, локальный ИИ-режиссёр и готовые `.cfg` для Dota 2 / CS2)*.
+Скачайте последний архив `GameMusick-Sensor-v3.1-Windows-x64.zip` из раздела [**Releases**](https://github.com/maratello1/gamemusick/releases) *(внутри сенсор CoreAudio WASAPI, локальный ИИ-режиссёр 6 игр и готовые `.cfg` для Dota 2 / CS2)*.
 
 ### Способ 2: Запуск полной версии из исходного кода (рекомендуется — без SmartScreen!)
 Требования: **Windows 10/11 (x64)**, **[Node.js 18+](https://nodejs.org/)** и опционально **Python 3.10+** (для OCR / локальной ИИ-синхронизации).
@@ -178,5 +195,5 @@ npm run dev
 ---
 
 <div align="center">
-  <sub>Создано для геймеров · <b>GameMusick v3.0</b> · MIT License</sub>
+  <sub>Создано для геймеров · <b>GameMusick v3.1</b> · MIT License</sub>
 </div>

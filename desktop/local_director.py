@@ -21,6 +21,7 @@ import re
 import base64
 import urllib.request
 import urllib.error
+import ssl
 import ctypes
 from ctypes import wintypes
 import asyncio
@@ -571,6 +572,304 @@ def analyze_visual_atmosphere(rect, prev_gray: np.ndarray = None, is_online: boo
         }
 
 
+_LOL_MEMORY = {
+    'last_hp': 600.0,
+    'last_kills': 0,
+    'last_assists': 0,
+    'combat_until_ms': 0,
+}
+
+_POE_TOWN_KWS = (
+    'hideout', 'lioneye', 'forest encampment', 'sarn', 'highgate',
+    'overseer', 'oriath', 'karui shores', 'rogue harbour', 'menagerie',
+    'kingsmarch', 'clearfell encampment', 'ardura caravan', 'ziggurat encampment',
+)
+_POE_BOSS_KWS = (
+    'maven', 'shaper', 'elder', 'sirus', 'absence of', 'searing exarch',
+    'eater of worlds', 'kitava', 'dominus', 'malachai', 'innocence',
+    'arbiter', 'trialmaster', 'pinnacle',
+)
+
+
+def parse_lol_live_client(payload: dict, now_ms: int = None):
+    if not isinstance(payload, dict):
+        return None
+    if now_ms is None:
+        now_ms = int(time.time() * 1000)
+
+    active = payload.get('activePlayer') or {}
+    players = payload.get('allPlayers') or []
+    events = (payload.get('events') or {}).get('Events') or []
+    gdata = payload.get('gameData') or {}
+
+    active_name = str(active.get('summonerName') or active.get('riotIdGameName') or '').lower()
+    me = next(
+        (
+            p for p in players
+            if active_name and (
+                str(p.get('summonerName') or '').lower() == active_name
+                or str(p.get('riotIdGameName') or '').lower() == active_name
+            )
+        ),
+        players[0] if players else {},
+    )
+    champ = str(me.get('championName') or active.get('championName') or 'Champion').strip()
+    scores = me.get('scores') or {}
+    kills = int(scores.get('kills') or 0)
+    assists = int(scores.get('assists') or 0)
+    is_dead = bool(me.get('isDead'))
+    respawn_s = int(round(float(me.get('respawnTimer') or 0)))
+
+    for ev in reversed(events[-10:]):
+        if ev.get('EventName') == 'GameEnd':
+            is_win = str(ev.get('Result') or '').lower() == 'win'
+            return {
+                'game': 'lol',
+                'gameTitle': 'League of Legends',
+                'phase': 'victory' if is_win else 'defeat',
+                'sceneTag': 'victory_triumph' if is_win else 'tragedy_drama',
+                'sceneNameRu': 'Победа в League of Legends!' if is_win else 'Поражение (LoL)',
+                'energy': 72 if is_win else 24,
+                'tension': 20 if is_win else 48,
+                'valence': 92 if is_win else -65,
+                'summary': f"LoL API: {'Победа' if is_win else 'Итоги матча'} ({champ})",
+                'isRespawning': False,
+                'respawnSeconds': 0,
+                'inCombat': False,
+            }
+
+    if is_dead or respawn_s > 0:
+        _LOL_MEMORY['combat_until_ms'] = 0
+        return {
+            'game': 'lol',
+            'gameTitle': 'League of Legends',
+            'phase': 'respawn',
+            'sceneTag': 'respawn_downtime',
+            'sceneNameRu': f"Таверна / Респавн ({champ} · {respawn_s}с)" if respawn_s > 0 else f"Респавн ({champ})",
+            'energy': 18,
+            'tension': 20,
+            'valence': -18,
+            'summary': f"LoL API: {champ} на экране возрождения ({respawn_s}с)",
+            'isRespawning': True,
+            'respawnSeconds': respawn_s,
+            'inCombat': False,
+        }
+
+    stats = active.get('championStats') or {}
+    max_hp = max(1.0, float(stats.get('maxHealth') or 600.0))
+    cur_hp = max(0.0, float(stats.get('currentHealth', max_hp)))
+    hp_pct = int(round((cur_hp / max_hp) * 100))
+    game_time = float(gdata.get('gameTime') or 0.0)
+
+    hp_drop = (_LOL_MEMORY['last_hp'] - cur_hp) / max_hp if _LOL_MEMORY['last_hp'] > cur_hp else 0.0
+    got_kill = kills > _LOL_MEMORY['last_kills'] or assists > _LOL_MEMORY['last_assists']
+    obj_recent = any(
+        0 <= (game_time - float(ev.get('EventTime') or -999)) <= 10
+        and str(ev.get('EventName') or '') in ('BaronKill', 'DragonKill', 'HeraldKill', 'HordeKill', 'Ace')
+        for ev in events
+    )
+    in_fight_now = hp_drop >= 0.06 or got_kill or obj_recent
+    if in_fight_now:
+        _LOL_MEMORY['combat_until_ms'] = now_ms + 7500
+    in_combat = in_fight_now or now_ms < _LOL_MEMORY['combat_until_ms']
+
+    _LOL_MEMORY['last_hp'] = cur_hp
+    _LOL_MEMORY['last_kills'] = kills
+    _LOL_MEMORY['last_assists'] = assists
+
+    if obj_recent:
+        return {
+            'game': 'lol', 'gameTitle': 'League of Legends', 'phase': 'objective_boss',
+            'sceneTag': 'boss_climax', 'sceneNameRu': f"Барон / Дракон ({champ})",
+            'energy': 90, 'tension': 90, 'valence': 10,
+            'summary': f"LoL API: Решающий объектив ({champ})", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+        }
+    if in_combat and 0 < hp_pct <= 24:
+        return {
+            'game': 'lol', 'gameTitle': 'League of Legends', 'phase': 'escape_low_hp',
+            'sceneTag': 'chase_escape', 'sceneNameRu': f"Критическое HP ({hp_pct}%) · {champ}",
+            'energy': 86, 'tension': 92, 'valence': -42,
+            'summary': f"LoL API: Выживание на лоу HP ({hp_pct}%)", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+        }
+    if in_combat:
+        return {
+            'game': 'lol', 'gameTitle': 'League of Legends', 'phase': 'teamfight',
+            'sceneTag': 'teamfight_clash', 'sceneNameRu': f"Тимфайт ({champ} · {hp_pct}% HP)",
+            'energy': 84, 'tension': 82, 'valence': -10,
+            'summary': f"LoL API: Бой ({champ})", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+        }
+    return {
+        'game': 'lol', 'gameTitle': 'League of Legends', 'phase': 'laning',
+        'sceneTag': 'explore_wander', 'sceneNameRu': f"Лейнинг / Фарм ({champ})",
+        'energy': 42, 'tension': 28, 'valence': 15,
+        'summary': f"LoL API: Спокойный фарм ({champ})", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+    }
+
+
+def parse_sc2_api(ui_data: dict, game_data: dict):
+    if not ui_data and not game_data:
+        return None
+    screens = [str(s) for s in (ui_data or {}).get('activeScreens') or []]
+    if screens:
+        return {
+            'game': 'sc2', 'gameTitle': 'StarCraft II', 'phase': 'menu_lobby',
+            'sceneTag': 'menu_lobby', 'sceneNameRu': 'Меню / Лобби StarCraft II',
+            'energy': 20, 'tension': 15, 'valence': 12,
+            'summary': f"SC2 API: {screens[0]}", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+        }
+    players = (game_data or {}).get('players') or []
+    user_p = next((p for p in players if p.get('type') == 'user'), players[0] if players else {})
+    res = str(user_p.get('result') or 'Undecided')
+    if res in ('Victory', 'Defeat'):
+        win = res == 'Victory'
+        return {
+            'game': 'sc2', 'gameTitle': 'StarCraft II', 'phase': res.lower(),
+            'sceneTag': 'victory_triumph' if win else 'tragedy_drama',
+            'sceneNameRu': 'Победа в StarCraft II!' if win else 'Поражение (StarCraft II)',
+            'energy': 72 if win else 26, 'tension': 20 if win else 50, 'valence': 92 if win else -65,
+            'summary': f"SC2 API: {res}", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+        }
+    disp = float((game_data or {}).get('displayTime') or 0)
+    return {
+        'game': 'sc2', 'gameTitle': 'StarCraft II', 'phase': 'tactical_rts',
+        'sceneTag': 'explore_wander' if disp < 150 else 'skirmish_combat',
+        'sceneNameRu': 'Макро-развитие (StarCraft II)' if disp < 150 else 'Схватка / Тактика (SC2)',
+        'energy': 44 if disp < 150 else 68, 'tension': 30 if disp < 150 else 62, 'valence': 12,
+        'summary': f"SC2 API: Матч ({int(disp)}с)", 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': disp >= 150,
+    }
+
+
+def parse_poe_log_tail(tail_text: str):
+    if not tail_text:
+        return None
+    for line in reversed(tail_text.splitlines()):
+        if re.search(r'\bhas been slain\.?$', line, re.I):
+            return {
+                'game': 'poe', 'gameTitle': 'Path of Exile', 'phase': 'respawn',
+                'sceneTag': 'respawn_downtime', 'sceneNameRu': 'Персонаж погиб (PoE)',
+                'energy': 20, 'tension': 25, 'valence': -40,
+                'summary': 'PoE Log: Персонаж пал', 'isRespawning': True, 'respawnSeconds': 0, 'inCombat': False,
+            }
+        m = re.search(r':\s*You have entered (.+?)\.', line, re.I)
+        if m:
+            zone = m.group(1).strip()
+            low = zone.lower()
+            if any(k in low for k in _POE_BOSS_KWS):
+                return {
+                    'game': 'poe', 'gameTitle': 'Path of Exile', 'phase': 'boss_arena',
+                    'sceneTag': 'boss_climax', 'sceneNameRu': f'Арена босса: {zone}',
+                    'energy': 92, 'tension': 94, 'valence': -25,
+                    'summary': f'PoE Log: {zone}', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+                }
+            if any(k in low for k in _POE_TOWN_KWS):
+                return {
+                    'game': 'poe', 'gameTitle': 'Path of Exile', 'phase': 'town_hideout',
+                    'sceneTag': 'cozy_hub', 'sceneNameRu': f'Убежище / Город: {zone}',
+                    'energy': 24, 'tension': 12, 'valence': 32,
+                    'summary': f'PoE Log: {zone}', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+                }
+            return {
+                'game': 'poe', 'gameTitle': 'Path of Exile', 'phase': 'combat_zone',
+                'sceneTag': 'skirmish_combat', 'sceneNameRu': f'Локация: {zone}',
+                'energy': 72, 'tension': 64, 'valence': -12,
+                'summary': f'PoE Log: {zone}', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+            }
+    return None
+
+
+def parse_mc_log_tail(tail_text: str):
+    if not tail_text:
+        return None
+    for line in reversed(tail_text.splitlines()):
+        low = line.lower()
+        if any(k in low for k in ('was slain by', 'fell from a high place', 'tried to swim in lava', 'blew up', 'was killed by')):
+            return {
+                'game': 'minecraft', 'gameTitle': 'Minecraft', 'phase': 'death',
+                'sceneTag': 'respawn_downtime', 'sceneNameRu': 'Возрождение (Minecraft)',
+                'energy': 18, 'tension': 25, 'valence': -35,
+                'summary': 'Minecraft Log: Смерть игрока', 'isRespawning': True, 'respawnSeconds': 0, 'inCombat': False,
+            }
+        if any(k in low for k in ('ender dragon', 'wither', 'warden', 'raid')):
+            return {
+                'game': 'minecraft', 'gameTitle': 'Minecraft', 'phase': 'boss',
+                'sceneTag': 'boss_climax', 'sceneNameRu': 'Босс в Minecraft',
+                'energy': 86, 'tension': 88, 'valence': -10,
+                'summary': 'Minecraft Log: Встреча с боссом', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': True,
+            }
+        if any(k in low for k in ('the nether', 'nether fortress', 'ancient city')):
+            return {
+                'game': 'minecraft', 'gameTitle': 'Minecraft', 'phase': 'nether',
+                'sceneTag': 'horror_dread', 'sceneNameRu': 'Незер / Глубины (Minecraft)',
+                'energy': 44, 'tension': 66, 'valence': -55,
+                'summary': 'Minecraft Log: Опасная зона', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+            }
+        if any(k in low for k in ('the end', 'end city')):
+            return {
+                'game': 'minecraft', 'gameTitle': 'Minecraft', 'phase': 'end_vista',
+                'sceneTag': 'vista_wonder', 'sceneNameRu': 'Измерение Края (Minecraft)',
+                'energy': 42, 'tension': 45, 'valence': 30,
+                'summary': 'Minecraft Log: Космическая панорама Края', 'isRespawning': False, 'respawnSeconds': 0, 'inCombat': False,
+            }
+    return None
+
+
+def _fetch_local_json(url: str, insecure_tls: bool = False, timeout: float = 0.16):
+    try:
+        ctx = ssl._create_unverified_context() if insecure_tls else None
+        req = urllib.request.Request(url, method='GET')
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except Exception:
+        return None
+
+
+def _read_tail_log(paths, max_bytes: int = 4096) -> str:
+    now = time.time()
+    for p in paths:
+        try:
+            if os.path.exists(p) and (now - os.path.getmtime(p)) <= 180.0:
+                sz = os.path.getsize(p)
+                with open(p, 'rb') as f:
+                    if sz > max_bytes:
+                        f.seek(sz - max_bytes)
+                    return f.read().decode('utf-8', errors='ignore')
+        except Exception:
+            continue
+    return ''
+
+
+def read_active_native_telemetry(max_age_ms: int = 12000, active_proc: str = ''):
+    gsi = read_fresh_gsi(max_age_ms=max_age_ms)
+    if gsi:
+        return gsi
+    proc = (active_proc or '').lower()
+    if not proc:
+        return None
+    if 'league' in proc or proc == 'lol':
+        return parse_lol_live_client(
+            _fetch_local_json('https://127.0.0.1:2999/liveclientdata/allgamedata', insecure_tls=True)
+        )
+    if 'sc2' in proc or 'starcraft' in proc:
+        ui = _fetch_local_json('http://127.0.0.1:6119/ui')
+        gm = _fetch_local_json('http://127.0.0.1:6119/game')
+        return parse_sc2_api(ui, gm)
+    if 'pathofexile' in proc or 'poe' in proc:
+        return parse_poe_log_tail(_read_tail_log([
+            r'C:\Program Files (x86)\Grinding Gear Games\Path of Exile\logs\Client.txt',
+            r'C:\Program Files (x86)\Grinding Gear Games\Path of Exile 2\logs\Client.txt',
+            r'C:\Program Files (x86)\Steam\steamapps\common\Path of Exile\logs\Client.txt',
+            r'C:\Program Files (x86)\Steam\steamapps\common\Path of Exile 2\logs\Client.txt',
+            r'D:\SteamLibrary\steamapps\common\Path of Exile\logs\Client.txt',
+            r'D:\SteamLibrary\steamapps\common\Path of Exile 2\logs\Client.txt',
+        ]))
+    if 'minecraft' in proc or 'javaw' in proc:
+        appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+        return parse_mc_log_tail(_read_tail_log([
+            os.path.join(appdata, '.minecraft', 'logs', 'latest.log'),
+        ]))
+    return None
+
+
 def read_fresh_gsi(max_age_ms: int = 12000):
     """Read official Valve Dota 2 / CS2 GSI telemetry if fresh and not in standby."""
     try:
@@ -1031,6 +1330,10 @@ async def run_director():
             sensor_motion = int(fresh_sensor.get('motionDelta', 16)) if fresh_sensor else 16
             sensor_red = int(fresh_sensor.get('redAlertRatio', 0)) if fresh_sensor else 0
             sensor_hint = str(fresh_sensor.get('sceneHint', '') or '') if fresh_sensor else ''
+            sensor_audio_peak = int(fresh_sensor.get('gameAudioPeak', -1)) if fresh_sensor and 'gameAudioPeak' in fresh_sensor else -1
+            sensor_capture_blocked = bool(fresh_sensor.get('captureBlocked', False)) if fresh_sensor else False
+            if sensor_capture_blocked and cv_hint == 'horror_dread':
+                cv_hint = ''
 
             combat_threshold = 10 if is_online else 3
             is_fighting = (
@@ -1065,8 +1368,9 @@ async def run_director():
             is_recent_room_change = not is_online and (now_ms - last_room_wipe_ms < 10000)
 
             scene_tag = 'menu_lobby' if is_online else 'explore_wander'
-            est_energy = sensor_motion
-            est_tension = max(12, int(sensor_motion * 0.65 + sensor_red * 0.5))
+            audio_boost = 12 if (sensor_audio_peak >= 68 and sensor_motion >= 22) else (-8 if (sensor_audio_peak == 0 and sensor_motion < 20) else 0)
+            est_energy = max(8, min(100, sensor_motion + audio_boost))
+            est_tension = max(12, int(sensor_motion * 0.65 + sensor_red * 0.5 + (10 if sensor_audio_peak >= 65 else 0)))
             est_valence = 15 if center_luma >= 40 else -15
 
             if sensor_hint == 'RESPAWN':
@@ -1125,7 +1429,7 @@ async def run_director():
                 est_energy, est_tension, est_valence = 22, 48 if scene_tag == 'tragedy_drama' else 36, -65 if scene_tag == 'tragedy_drama' else -10
             elif in_stealth_hold or sensor_hint in ('STEALTH', 'HORROR_DREAD') or cv_hint == 'horror_dread':
                 active_vibe = 'STEALTH'
-                is_horror = (sensor_hint == 'HORROR_DREAD') or (cv_hint == 'horror_dread') or (center_luma < 24 and sensor_red > 10)
+                is_horror = (sensor_hint == 'HORROR_DREAD') or (cv_hint == 'horror_dread') or (not sensor_capture_blocked and center_luma < 24 and sensor_red > 10)
                 scene_tag = 'horror_dread' if is_horror else 'stealth_infiltrate'
                 active_scene_type = scene_tag
                 scene_label = 'Хоррор / Тёмная угроза' if is_horror else 'Скрытное проникновение'
@@ -1169,7 +1473,7 @@ async def run_director():
             rec_style = music_style_map.get(scene_tag, f"{game_title} ambient ost")
 
             # 6a. Official Game State Integration (Dota 2 / CS2) ground-truth override (0 Vision quota spent)
-            gsi_snapshot = read_fresh_gsi()
+            gsi_snapshot = read_active_native_telemetry(active_proc=game_proc)
             if gsi_snapshot:
                 if gsi_snapshot.get('sceneTag'):
                     scene_tag = str(gsi_snapshot['sceneTag']).strip().lower()

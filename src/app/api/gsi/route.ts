@@ -7,6 +7,7 @@ import {
   GsiMetricsMemory,
   parseGsiPayload,
 } from '@/lib/gsi-engine';
+import { getInstalledNativeLogBridges } from '@/lib/game-telemetry-bridge';
 import { GsiStateSnapshot } from '@/types/vibe';
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +42,9 @@ function readLatestGsi(): { gsiActive: boolean; gsi: GsiStateSnapshot | null } {
 export async function GET() {
   const { gsiActive, gsi } = readLatestGsi();
   const steam = detectSteamGameCfgDirs();
+  const bridges = getInstalledNativeLogBridges();
   return NextResponse.json({
+    bridges,
     ok: true,
     gsiActive,
     gsi,

@@ -4,6 +4,7 @@ import path from 'path';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { DirectorScene, GsiStateSnapshot, TelemetrySnapshot, VibeStateId } from '@/types/vibe';
+import { pollActiveNativeGameBridge } from '@/lib/game-telemetry-bridge';
 import {
   detectGameArchetype,
   tickNeuralEvolution,
@@ -198,6 +199,18 @@ export async function GET() {
         // ignore stale or partial GSI file
       }
 
+      if (!gsiActive && !rawIsStandby) {
+        try {
+          const bridgeSnap = await pollActiveNativeGameBridge(proc);
+          if (bridgeSnap) {
+            gsiSnap = bridgeSnap;
+            gsiActive = true;
+          }
+        } catch {
+          // ignore native bridge timeout
+        }
+      }
+
       const activeProc = rawIsStandby && gsiActive && gsiSnap ? gsiSnap.game : proc;
       const activeTitle = rawIsStandby && gsiActive && gsiSnap ? gsiSnap.gameTitle : title;
       const isStandby = rawIsStandby && !gsiActive;
@@ -209,6 +222,13 @@ export async function GET() {
       const cursorTravel = isStandby ? 0 : Math.max(0, Number(parsed.cursorTravel) || 0);
       const attackApm = isStandby ? 0 : Math.max(0, Number(parsed.attackApm) || 0);
       const moveApm = isStandby ? 0 : Math.max(0, Number(parsed.moveApm) || 0);
+      const gameAudioPeak = !isStandby && typeof parsed.gameAudioPeak === 'number'
+        ? Math.max(0, Math.min(100, Math.round(parsed.gameAudioPeak)))
+        : undefined;
+      const captureBlocked = !isStandby && Boolean(parsed.captureBlocked);
+      const warmth = !isStandby && typeof parsed.warmth === 'number' ? Math.round(parsed.warmth) : undefined;
+      const coolness = !isStandby && typeof parsed.coolness === 'number' ? Math.round(parsed.coolness) : undefined;
+      const saturation = !isStandby && typeof parsed.saturation === 'number' ? Math.round(parsed.saturation) : undefined;
       const sceneHint = typeof parsed.sceneHint === 'string' ? parsed.sceneHint : '';
 
       const preBrain = getNeuralBrainState();
@@ -269,6 +289,11 @@ export async function GET() {
         crimsonIndex: crimson,
         brightness: luma,
         lumaVariance,
+        gameAudioPeak,
+        captureBlocked,
+        warmth,
+        coolness,
+        saturation,
         cursorTravel,
         attackApm,
         moveApm,
@@ -369,6 +394,12 @@ export async function GET() {
         gsiGame: gsiSnap?.game,
         gsiPhase: gsiSnap?.phase,
         gsiSummary: gsiSnap?.summary,
+        nativeBridgeSource: gsiSnap ? `${gsiSnap.game}-api` : undefined,
+        gameAudioPeak,
+        captureBlocked,
+        warmth,
+        coolness,
+        saturation,
         isCutscene:
           !isStandby &&
           (Boolean(parsed.isCutscene) ||

@@ -3,7 +3,7 @@ import path from 'path';
 
 const TOKEN = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 const REPO = 'maratello1/gamemusick';
-const TAG = 'v3.0.0';
+const TAG = 'v3.1.0';
 
 async function run() {
   if (!TOKEN) {
@@ -17,21 +17,17 @@ async function run() {
     Accept: 'application/vnd.github+json',
   };
 
-  const bodyText = `## 🎮 GameMusick v3.0.0 — Hybrid AI Director & Dota 2 / CS2 GSI
+  const bodyText = `## 🎮 GameMusick v3.1.0 — 6-Game Native Bridges, WASAPI Sensor & Bulletproof Audio
 
-### 🏆 Что нового в v3.0:
-- **Официальная интеграция Valve GSI (Dota 2 & CS2)**: игра сама сообщает точную фазу (Главное меню, Драфт, Линия, Замес, Низкое HP, Бомба на пленте, Респавн, Победа) — 100% точность и 0 квот облака. Автоустановка \`.cfg\` в 1 клик!
-- **Непрерывный движок \`SceneVector\` (15+ сцен)** вместо жёстких 6 корзин + прямой промпт желаемой атмосферы + RL-оценка треков («В тему» / «Не под сцену»).
-- **Универсальный выбор ИИ-режиссёра (4 режима)**:
-  1. **Локальный 50 Гц Rust + WinRT OCR** (полностью офлайн)
-  2. **Google Gemini (\`gemini-3.5-flash-lite\` Free Tier)** со смарт-фильтром смены кадра (экономит до 80% квоты)
-  3. **Ollama (Локальная VLM)**: \`qwen3-vl:2b\`, \`qwen3.5:4b\`, \`gemma4:e4b\` без интернета и суточных лимитов
-  4. **OpenRouter / LM Studio / OpenAI-compatible API**
-- **Переработанный режим «Мои артисты»**: при выборе своих артистов игра больше не подмешивает левые OST и эмбиенты в меню и матчах.
+### 🏆 Что нового в v3.1:
+- **Нативный Rust-сенсор v3.1 (CoreAudio WASAPI + 32×18 DIB)**: мониторинг звука самой игры по PID (\`gameAudioPeak\`), поддержка Per-Monitor DPI, в 48 раз меньше вызовов GDI и защита от ложных срабатываний на чёрных кадрах DX12.
+- **Native Game Bridges 2.0 (6 игр без чтения памяти)**: Dota 2 & CS2 Valve GSI + автоматические мосты для **League of Legends (\`:2999\`)**, **StarCraft II (\`:6119\`)**, **Path of Exile 1/2 (\`Client.txt\`)** и **Minecraft (\`latest.log\`)**.
+- **Неубиваемый аудиодвижок и RL-ранжирование**: авто-скип битых/заблокированных YouTube embed-видео (Error \`100/101/150\`) без штрафного понижения артиста в ИИ, fallback на локальную музыку / процедурный \`stemSynth\`, быстрый Win32 воркер медиа-клавиш, кроссфейд без гонок и учёт весов RL в \`/api/ytmusic\`.
+- **Desktop Watchdog & Mini-HUD**: автоперезапуск фоновых сенсоров в Electron и быстрые кнопки 👍 / 👎 в оверлее \`Alt+M\`.
 
 ### 📦 Файлы релиза:
-- **\`GameMusick-Sensor-v3.0-Windows-x64.zip\`** (Рекомендуется) — пакет: \`interactive_sensor.exe\`, \`local_director.py\`, \`vision_director.py\`, \`.cfg\` файлы для Dota 2 и CS2 и \`README.txt\`.
-- **\`interactive_sensor.exe\`** — нативный 50 Гц сенсор на Rust.
+- **\`GameMusick-Sensor-v3.1-Windows-x64.zip\`** (Рекомендуется) — пакет: \`interactive_sensor.exe\`, \`local_director.py\`, \`vision_director.py\`, \`.cfg\` файлы для Dota 2 и CS2 и \`README.txt\`.
+- **\`interactive_sensor.exe\`** — нативный 50 Гц сенсор на Rust (Windows CoreAudio WASAPI + 32×18 DIB).
 - **\`gamestate_integration_gamemusick.cfg\` / \`gamestate_integration_cs2_gamemusick.cfg\`** — готовые конфиги для Steam.
 
 > ℹ️ **Windows SmartScreen**: это бесплатный open-source проект без платной коммерческой ЭЦП ($400/год). Нажмите «Подробнее» -> «Выполнить в любом случае» либо запускайте полную версию из исходников: \`npm install && npm run desktop\`.`;
@@ -72,7 +68,7 @@ async function run() {
   }
 
   const assetsToUpload = [
-    { file: 'GameMusick-Sensor-v3.0-Windows-x64.zip', mime: 'application/zip' },
+    { file: 'GameMusick-Sensor-v3.1-Windows-x64.zip', mime: 'application/zip' },
     { file: 'interactive_sensor.exe', mime: 'application/vnd.microsoft.portable-executable' },
     { file: 'gamestate_integration_gamemusick.cfg', mime: 'text/plain' },
     { file: 'gamestate_integration_cs2_gamemusick.cfg', mime: 'text/plain' },
