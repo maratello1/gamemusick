@@ -21,6 +21,17 @@ function formatDurationMs(ms?: number): string {
 
 import { getNeuralBrainState } from '@/lib/neural-evolution';
 
+function interleaveBatches<T>(batches: T[][]): T[] {
+  const maxLen = batches.reduce((m, b) => Math.max(m, b.length), 0);
+  const result: T[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    for (const batch of batches) {
+      if (i < batch.length) result.push(batch[i]);
+    }
+  }
+  return result;
+}
+
 function filterAndDeduplicateTracks(tracks: TrackItem[], excludeIdsParam: string[]): TrackItem[] {
   let disliked: string[] = [];
   try {
@@ -494,15 +505,17 @@ export async function GET(request: NextRequest) {
         const fetched = await Promise.all(
           customSemanticSeeds.slice(0, 4).map((s) => searchYouTubeDirect(s, vibe, 8))
         );
-        const merged = filterAndDeduplicateTracks(fetched.flat(), excludeIdsParam);
+        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam);
         if (merged.length > 0) {
           const tax = getSceneTaxonomy(sceneTag);
+          const label = `${tax.nameRu} (${selectedArtistsList.slice(0, 2).join(', ') || 'Мои артисты'})`;
           return NextResponse.json({
             ok: true,
             mode: 'semantic-custom',
             sceneTag,
             vibe,
-            resolvedQuery: `${tax.nameRu} (${selectedArtistsList.slice(0, 2).join(', ') || 'Мои артисты'})`,
+            resolvedQuery: label,
+            resolvedMoodQuery: label,
             tracks: merged.slice(0, 20),
           });
         }
@@ -586,8 +599,9 @@ export async function GET(request: NextRequest) {
         const fetched = await Promise.all(
           semanticQueries.slice(0, 3).map((qStr) => searchYouTubeDirect(qStr, vibe, 8))
         );
-        const merged = filterAndDeduplicateTracks(fetched.flat(), excludeIdsParam);
+        const merged = filterAndDeduplicateTracks(interleaveBatches(fetched), excludeIdsParam);
         if (merged.length >= 3) {
+          const label = `${tax.nameRu} · ${rawGameParam && rawGameParam !== 'Ожидание игры' ? rawGameParam : musicBrief || tax.shortRu}`;
           return NextResponse.json({
             ok: true,
             mode: 'semantic-game-vibe',
@@ -598,7 +612,8 @@ export async function GET(request: NextRequest) {
               Number.isFinite(tensionParam) ? tensionParam : tax.tension,
               Number.isFinite(valenceParam) ? valenceParam : tax.valence
             ),
-            resolvedQuery: `${tax.nameRu} · ${rawGameParam && rawGameParam !== 'Ожидание игры' ? rawGameParam : musicBrief || tax.shortRu}`,
+            resolvedQuery: label,
+            resolvedMoodQuery: label,
             tracks: merged.slice(0, 20),
           });
         }

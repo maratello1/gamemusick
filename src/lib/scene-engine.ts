@@ -326,6 +326,7 @@ export interface TelemetryClassificationInput {
     summary?: string;
     musicStyle?: string;
     hasGeminiVision?: boolean;
+    aiProvider?: string;
   } | null;
 }
 
@@ -495,13 +496,14 @@ export function classifyTelemetryToSceneVector(
     const dirHasRichVector =
       typeof dir.energy === 'number' || typeof dir.tension === 'number' || Boolean(dir.sceneTag);
     const dirHasGemini = Boolean(dir.hasGeminiVision);
+    const dirHasCvOcr = dir.aiProvider === 'cv_ocr';
 
     // If hardware sensor says clear active combat, hardware latency wins for instant kick-in;
-    // otherwise Vision Director refines semantic scene nuance (menu, tavern, horror, noir, cutscenes, etc.)
+    // otherwise Vision Director / OpenCV+OCR refines semantic scene nuance (menu, tavern, horror, vista, cutscenes, etc.)
     const hardwareUrgentCombat = rawEnergy >= combatThresh || hint === 'BOSSFIGHT' || hint === 'CHASE_ESCAPE';
 
-    if ((dirHasGemini || dirHasRichVector) && !hardwareUrgentCombat) {
-      source = dirHasGemini ? 'vision' : source;
+    if ((dirHasGemini || dirHasCvOcr || dirHasRichVector) && !hardwareUrgentCombat) {
+      source = dirHasGemini ? 'vision' : dirHasCvOcr ? 'ocr' : source;
       if (dirTag && dirTag !== 'exploration' && dirTag !== 'explore') {
         if (SCENE_TAXONOMY[dirTag]) {
           sceneTag = dirTag;

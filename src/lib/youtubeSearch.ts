@@ -117,10 +117,23 @@ function extractYtInitialDataJson(html: string): Record<string, any> | null {
   return null;
 }
 
+export function parseDurationSeconds(duration: string): number {
+  const clean = (duration || '').trim();
+  if (!clean) return 220;
+  const parts = clean.split(':').map((n) => parseInt(n, 10));
+  if (parts.some((n) => !Number.isFinite(n) || n < 0)) return 220;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 220;
+}
+
+const NOISY_MIX_RE =
+  /\b(1\s*hour|2\s*hours?|3\s*hours?|10\s*hours?|1hr|2hr|3hr|full\s+album|walkthrough|playthrough|no\s+damage|longplay|gameplay|nightcore|8d\s+audio|slowed\s*\+\s*reverb|compilation|megamix)\b/i;
+
 function deduplicateYtResults(items: YouTubeVideoResult[]): YouTubeVideoResult[] {
   const seenIds = new Set<string>();
   const seenTitles = new Set<string>();
-  const clean: YouTubeVideoResult[] = [];
+  const allUnique: YouTubeVideoResult[] = [];
   for (const v of items) {
     if (!v.videoId || v.videoId.length !== 11 || seenIds.has(v.videoId)) continue;
     if (!v.title || v.channel === 'Game Audio') continue;
@@ -132,9 +145,26 @@ function deduplicateYtResults(items: YouTubeVideoResult[]): YouTubeVideoResult[]
     if (!normTitle || seenTitles.has(normTitle)) continue;
     seenIds.add(v.videoId);
     seenTitles.add(normTitle);
-    clean.push(v);
+    allUnique.push(v);
   }
-  return clean;
+
+  // Prefer genuine studio/soundtrack single tracks (50s..12m) over 1-hour ambient loops or walkthroughs
+  const cleanStudio = allUnique.filter((v) => {
+    const sec = parseDurationSeconds(v.duration);
+    if (sec < 50 || sec > 720) return false;
+    if (NOISY_MIX_RE.test(v.title)) return false;
+    return true;
+  });
+
+  const pool = cleanStudio.length >= 2 ? cleanStudio : allUnique;
+  // Rank ideal 1.5–7.5 min studio tracks ahead of unusually long tracks
+  return [...pool].sort((a, b) => {
+    const da = parseDurationSeconds(a.duration);
+    const db = parseDurationSeconds(b.duration);
+    const aIdeal = da >= 90 && da <= 450 ? 0 : 1;
+    const bIdeal = db >= 90 && db <= 450 ? 0 : 1;
+    return aIdeal - bIdeal;
+  });
 }
 
 export async function searchYouTubeDirect(

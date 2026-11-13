@@ -489,6 +489,88 @@ def sample_cinematic_bars_and_luma(rect):
     return is_letterbox, int(center_luma)
 
 
+def analyze_visual_atmosphere_from_bgr(bgr_img: np.ndarray, prev_gray: np.ndarray = None, is_online: bool = False):
+    """
+    Fast (<2ms) OpenCV scene atmosphere classifier on a 96x54 game frame:
+    - cozy_hub: warm golden/amber firelight or bright hearth with steady frame
+    - horror_dread: dark outer vignette around dimmer center or cold desaturated shadows
+    - vista_wonder: bright open upper sky/horizon over ground in non-combat
+    - menu_lobby: high orthogonal UI border grid (dx/dy Sobel) with static background
+    """
+    small = cv2.resize(bgr_img, (96, 54), interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+
+    frame_delta = 255.0
+    if prev_gray is not None and prev_gray.shape == gray.shape:
+        frame_delta = float(np.mean(cv2.absdiff(gray, prev_gray)))
+
+    center_patch = gray[12:42, 22:74]
+    center_luma = float(np.mean(center_patch))
+    corner_mask = np.ones_like(gray, dtype=bool)
+    corner_mask[10:44, 16:80] = False
+    edge_luma = float(np.mean(gray[corner_mask]))
+    vignette_score = max(0.0, center_luma - edge_luma)
+
+    # HSV warmth vs cold/desat
+    h_ch, s_ch, v_ch = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+    warm_mask = (h_ch >= 7) & (h_ch <= 28) & (s_ch >= 55) & (v_ch >= 55)
+    warm_ratio = float(np.mean(warm_mask))
+
+    cold_desat_mask = ((s_ch <= 62) | ((h_ch >= 85) & (h_ch <= 135))) & (v_ch <= 118)
+    cold_desat_ratio = float(np.mean(cold_desat_mask))
+
+    # Upper sky vista vs lower foreground
+    upper_luma = float(np.mean(gray[0:18, 8:88]))
+    lower_luma = float(np.mean(gray[34:52, 8:88]))
+    upper_sat = float(np.mean(s_ch[0:18, 8:88]))
+    sky_vista_score = (upper_luma - lower_luma) + (upper_sat * 0.12 if upper_luma > 95 else 0.0)
+
+    # Orthogonal Sobel UI grid lines (strong horizontal + vertical borders typical of menus/inventories)
+    gx = np.abs(cv2.Sobel(gray, cv2.CV_16S, 1, 0, ksize=3))
+    gy = np.abs(cv2.Sobel(gray, cv2.CV_16S, 0, 1, ksize=3))
+    strong_edges = ((gx > 55) ^ (gy > 55))
+    ui_grid_score = round(float(np.mean(strong_edges)) * 100.0, 1)
+
+    cv_hint = ''
+    if ui_grid_score >= 21.0 and frame_delta < 2.2:
+        cv_hint = 'menu_lobby'
+    elif not is_online:
+        if warm_ratio >= 0.22 and center_luma >= 32 and frame_delta < 8.5 and vignette_score < 16:
+            cv_hint = 'cozy_hub'
+        elif (vignette_score >= 13.5 and center_luma < 65) or (cold_desat_ratio >= 0.72 and center_luma < 42):
+            cv_hint = 'horror_dread'
+        elif upper_luma >= 122 and sky_vista_score >= 22.0 and ui_grid_score < 19.0:
+            cv_hint = 'vista_wonder'
+
+    return {
+        'cv_hint': cv_hint,
+        'frame_delta': round(frame_delta, 2),
+        'warmth': round(warm_ratio * 100.0, 1),
+        'vignette': round(vignette_score, 1),
+        'sky_score': round(sky_vista_score, 1),
+        'ui_grid': ui_grid_score,
+        'cur_gray': gray,
+    }
+
+
+def analyze_visual_atmosphere(rect, prev_gray: np.ndarray = None, is_online: bool = False):
+    try:
+        full = grab_window_crop(rect, 0.04, 0.04, 0.92, 0.92)
+        bgr = cv2.cvtColor(np.array(full), cv2.COLOR_RGB2BGR)
+        return analyze_visual_atmosphere_from_bgr(bgr, prev_gray=prev_gray, is_online=is_online)
+    except Exception:
+        return {
+            'cv_hint': '',
+            'frame_delta': 10.0,
+            'warmth': 0.0,
+            'vignette': 0.0,
+            'sky_score': 0.0,
+            'ui_grid': 0.0,
+            'cur_gray': prev_gray,
+        }
+
+
 def read_fresh_gsi(max_age_ms: int = 12000):
     """Read official Valve Dota 2 / CS2 GSI telemetry if fresh and not in standby."""
     try:
@@ -770,6 +852,11 @@ async def run_director():
 
     last_dialogue_text = ''
     dialogue_hold_until = 0.0
+    prev_atm_gray = None
+    last_ocr_ms = 0
+    last_banner_ocr_ms = 0
+    banner_scene_tag = ''
+    banner_hold_until_ms = 0
 
     while True:
         try:
@@ -870,28 +957,55 @@ async def run_director():
                     last_room_wipe_ms = now_ms
                 black_screen_streak = 0
 
-            # 4. OCR Dialogue & Subtitle Context (Lower 22% crop)
-            dialogue_text = ''
-            dialogue_emotion = ''
-            is_dialogue_active = False
-
+            # 4. OpenCV Atmosphere & Multi-Zone WinRT OCR Context
             fg_hwnd = user32.GetForegroundWindow()
             is_game_foreground = bool(game and fg_hwnd == game.get('hwnd'))
             is_online = is_online_competitive_game(game_proc)
 
-            # Story dialogue OCR ONLY runs on foreground single-player story games!
-            # Online competitive games (Dota 2, CS2) have no story cutscene dialogue.
-            # Background windows must never be OCR-ed to avoid capturing music player UI!
-            if HAS_WINOCR and is_game_foreground and not is_online and not sustained_letterbox and center_luma > 8:
-                # Check subtitles area
-                sub_crop = grab_window_crop(game_rect, 0.12, 0.72, 0.76, 0.22)
-                t_en = await ocr_crop(sub_crop, 'en-US')
-                if is_valid_dialogue_text(t_en):
-                    dialogue_text = t_en
-                else:
-                    t_ru = await ocr_crop(sub_crop, 'ru')
-                    if is_valid_dialogue_text(t_ru):
-                        dialogue_text = t_ru
+            cv_atm = analyze_visual_atmosphere(game_rect, prev_gray=prev_atm_gray, is_online=is_online) if center_luma > 4 else {
+                'cv_hint': '', 'frame_delta': 0.0, 'warmth': 0.0, 'vignette': 0.0, 'sky_score': 0.0, 'ui_grid': 0.0, 'cur_gray': prev_atm_gray
+            }
+            prev_atm_gray = cv_atm.get('cur_gray')
+            cv_hint = str(cv_atm.get('cv_hint') or '')
+            in_menu_grid = (cv_atm.get('ui_grid', 0.0) >= 21.0 and cv_atm.get('frame_delta', 99.0) < 2.2)
+
+            dialogue_text = ''
+            dialogue_emotion = ''
+            is_dialogue_active = False
+
+            # Story dialogue OCR runs on foreground single-player games — INCLUDING during 21:9 cutscenes!
+            # Throttled (~900ms) so CPU stays <1% while still catching subtitles for dialogue ducking & drama.
+            if HAS_WINOCR and is_game_foreground and not is_online and center_luma > 8:
+                if now_ms - last_ocr_ms >= 900:
+                    last_ocr_ms = now_ms
+                    sub_crop = grab_window_crop(game_rect, 0.12, 0.70, 0.76, 0.25)
+                    t_en = await ocr_crop(sub_crop, 'en-US')
+                    if is_valid_dialogue_text(t_en):
+                        dialogue_text = t_en
+                    else:
+                        t_ru = await ocr_crop(sub_crop, 'ru')
+                        if is_valid_dialogue_text(t_ru):
+                            dialogue_text = t_ru
+
+                # Periodic center-upper banner OCR for Death / Victory / Boss Defeated screens
+                if (now_ms - last_banner_ocr_ms >= 2200) and not dialogue_text:
+                    last_banner_ocr_ms = now_ms
+                    banner_crop = grab_window_crop(game_rect, 0.22, 0.24, 0.56, 0.30)
+                    b_en = await ocr_crop(banner_crop, 'en-US')
+                    b_text = (b_en or '').lower()
+                    if not any(k in b_text for k in ('you died', 'victory', 'felled', 'slain', 'game over', 'defeat')):
+                        b_ru = await ocr_crop(banner_crop, 'ru')
+                        b_text = f"{b_text} {(b_ru or '').lower()}".strip()
+                    if b_text and not contains_ui_garbage(b_text):
+                        if any(k in b_text for k in ('you died', 'вы погибли', 'потрачено', 'game over', 'wasted')):
+                            banner_scene_tag = 'tragedy_drama'
+                            banner_hold_until_ms = now_ms + 7000
+                        elif any(k in b_text for k in ('victory', 'felled', 'slain', 'победа', 'босс повержен', 'враг повержен', 'quest completed')):
+                            banner_scene_tag = 'victory_triumph'
+                            banner_hold_until_ms = now_ms + 8000
+
+            if now_ms >= banner_hold_until_ms:
+                banner_scene_tag = ''
 
             if is_valid_dialogue_text(dialogue_text):
                 dialogue_emotion, d_label, ocr_scene_tag = analyze_text_sentiment(dialogue_text)
@@ -907,7 +1021,7 @@ async def run_director():
                 last_dialogue_text = ''
                 dialogue_text = ''
                 is_dialogue_active = False
-                ocr_scene_tag = ''
+                ocr_scene_tag = banner_scene_tag or ''
 
             if is_dialogue_active or sustained_letterbox:
                 last_cutscene_ms = now_ms
@@ -919,7 +1033,10 @@ async def run_director():
             sensor_hint = str(fresh_sensor.get('sceneHint', '') or '') if fresh_sensor else ''
 
             combat_threshold = 10 if is_online else 3
-            is_fighting = (total_presses_2s >= combat_threshold) or (sensor_hint in ('COMBAT', 'TEAMFIGHT', 'BOSSFIGHT'))
+            is_fighting = (
+                (total_presses_2s >= combat_threshold and (not is_online or (sensor_motion >= 26 and not in_menu_grid)))
+                or (sensor_hint in ('COMBAT', 'TEAMFIGHT', 'BOSSFIGHT') and not in_menu_grid)
+            )
             if is_fighting:
                 if combat_streak_start_ms == 0:
                     combat_streak_start_ms = now_ms
@@ -1006,25 +1123,31 @@ async def run_director():
                 if not is_dialogue_active:
                     scene_label = 'Сюжетная катсцена / Диалог'
                 est_energy, est_tension, est_valence = 22, 48 if scene_tag == 'tragedy_drama' else 36, -65 if scene_tag == 'tragedy_drama' else -10
-            elif in_stealth_hold or sensor_hint in ('STEALTH', 'HORROR_DREAD'):
+            elif in_stealth_hold or sensor_hint in ('STEALTH', 'HORROR_DREAD') or cv_hint == 'horror_dread':
                 active_vibe = 'STEALTH'
-                is_horror = (sensor_hint == 'HORROR_DREAD') or (center_luma < 24 and sensor_red > 10)
+                is_horror = (sensor_hint == 'HORROR_DREAD') or (cv_hint == 'horror_dread') or (center_luma < 24 and sensor_red > 10)
                 scene_tag = 'horror_dread' if is_horror else 'stealth_infiltrate'
                 active_scene_type = scene_tag
-                scene_label = 'Хоррор / Саспенс' if is_horror else 'Скрытное проникновение'
-                est_energy, est_tension, est_valence = 28, 82 if is_horror else 68, -75 if is_horror else -35
-            elif sensor_hint == 'MENU_LOBBY' or is_online:
+                scene_label = 'Хоррор / Тёмная угроза' if is_horror else 'Скрытное проникновение'
+                est_energy, est_tension, est_valence = 26, 84 if is_horror else 68, -78 if is_horror else -35
+            elif cv_hint == 'vista_wonder':
+                active_vibe = 'MAJESTIC'
+                active_scene_type = 'new_location'
+                scene_tag = 'vista_wonder'
+                scene_label = 'Панорама / Открытый горизонт'
+                est_energy, est_tension, est_valence = 42, 24, 76
+            elif sensor_hint == 'MENU_LOBBY' or cv_hint == 'menu_lobby' or is_online:
                 active_vibe = 'EXPLORE'
                 active_scene_type = 'menu_lobby'
                 scene_tag = 'menu_lobby'
-                scene_label = 'Меню / Лобби / Подготовка'
-                est_energy, est_tension, est_valence = 22, 18, 8
+                scene_label = 'Меню / Инвентарь / Подготовка'
+                est_energy, est_tension, est_valence = 20, 16, 8
             else:
                 active_vibe = 'EXPLORE'
                 active_scene_type = 'exploration'
-                scene_tag = 'cozy_hub' if sensor_hint == 'COZY_HUB' else 'explore_wander'
-                scene_label = 'Мирное убежище' if scene_tag == 'cozy_hub' else 'Атмосферное исследование'
-                est_energy, est_tension, est_valence = max(18, sensor_motion), 22, 30 if scene_tag == 'cozy_hub' else 15
+                scene_tag = 'cozy_hub' if (sensor_hint == 'COZY_HUB' or cv_hint == 'cozy_hub') else 'explore_wander'
+                scene_label = 'Мирное убежище / Таверна' if scene_tag == 'cozy_hub' else 'Атмосферное исследование'
+                est_energy, est_tension, est_valence = (18 if scene_tag == 'cozy_hub' else max(20, sensor_motion)), (10 if scene_tag == 'cozy_hub' else 22), (58 if scene_tag == 'cozy_hub' else 15)
 
             # 6. Dynamic Music Style & Recommendations
             music_style_map = {
@@ -1237,7 +1360,7 @@ async def run_director():
                 'changeMusic': should_change_music,
                 'picks': cached_gemini_picks,
                 'hasGeminiVision': bool(ai_cfg),
-                'aiProvider': ('gsi' if gsi_snapshot else (ai_cfg.get('provider') if ai_cfg else 'none')),
+                'aiProvider': ('gsi' if gsi_snapshot else (ai_cfg.get('provider') if ai_cfg else ('cv_ocr' if (cv_hint or is_dialogue_active or banner_scene_tag) else 'none'))),
                 'gsiActive': bool(gsi_snapshot),
             }
 
